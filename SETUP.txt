@@ -1,0 +1,95 @@
+===============================================================
+  MeterWorklog - Setup Guide (Windows 10)
+===============================================================
+
+PREREQUISITES (install once on the new machine)
+-----------------------------------------------
+1. Python 3.11+
+   https://www.python.org/downloads/
+   CHECK 'Add Python to PATH' during install!
+
+2. ODBC Driver 17 for SQL Server
+   https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server
+   Choose: ODBC Driver 17 for SQL Server (Windows x64)
+
+3. SQL Server Express (if not already installed)
+   https://www.microsoft.com/en-us/sql-server/sql-server-downloads
+   Note your instance name (default: SQLEXPRESS)
+
+4. NSSM - for Windows service install only
+   https://nssm.cc/download
+   Copy nssm.exe to C:\Windows\System32\
+
+===============================================================
+  STEP-BY-STEP SETUP
+===============================================================
+
+STEP 1 - Place the folder
+   Extract this ZIP. Put the MeterWorklog folder where you want it,
+   e.g. C:\MeterWorklog\
+
+STEP 2 - Configure .env
+   Copy .env.example  ->  .env
+   Edit .env and set your values:
+     SECRET_KEY=any-random-string
+     DB_SERVER=localhost\SQLEXPRESS
+     DB_NAME=MeterWorklog
+
+STEP 3 - Create the database
+   In SQL Server Management Studio (or sqlcmd):
+
+   a) Create the DB:
+      CREATE DATABASE MeterWorklog;
+
+   b) Run the schema (open init_db.sql in SSMS and execute),
+      OR from command line:
+      sqlcmd -S localhost\SQLEXPRESS -d MeterWorklog -i init_db.sql
+
+   c) Grant service account access (Windows Auth only):
+      Run in SSMS against MeterWorklog database:
+        CREATE LOGIN [NT AUTHORITY\SYSTEM] FROM WINDOWS;
+        CREATE USER  [NT AUTHORITY\SYSTEM] FOR LOGIN [NT AUTHORITY\SYSTEM];
+        ALTER ROLE db_owner ADD MEMBER [NT AUTHORITY\SYSTEM];
+
+STEP 4 - Create Python virtual environment
+   Open Command Prompt inside the MeterWorklog folder:
+     python -m venv .venv
+     .venv\Scripts\pip install -r requirements.txt
+
+STEP 5A - Run manually (simplest)
+     .venv\Scripts\python app.py
+   Open: http://localhost:5000
+
+STEP 5B - Install as Windows Service (auto-start on boot)
+   Right-click install-service.bat -> Run as administrator
+
+   Manage:
+     nssm status  MeterWorklog
+     nssm restart MeterWorklog
+     nssm stop    MeterWorklog
+   Uninstall: run uninstall-service.bat as administrator
+
+STEP 6 - Create the first admin account
+   Open http://localhost:5000 -> Create Account (register normally).
+   Then in SSMS run against MeterWorklog:
+     UPDATE users SET role='Super_Ultimate_ADMIN'
+     WHERE username='your-username';
+
+===============================================================
+  OPTIONAL: ngrok public tunnel
+===============================================================
+  1. Sign up at https://ngrok.com (free)
+  2. Get your authtoken from the ngrok dashboard
+  3. Add to .env:
+       NGROK_AUTHTOKEN=your-token
+       NGROK_DOMAIN=your-subdomain.ngrok-free.dev
+  4. If using service install, re-run install-service.bat
+
+===============================================================
+  TROUBLESHOOTING
+===============================================================
+  pyodbc.OperationalError  -> check DB_SERVER in .env,
+                              ensure SQL Server Browser is running
+  No module named ...      -> re-run pip install -r requirements.txt
+  Service won't start      -> check logs\app-error.log
+  Port 5000 in use         -> add PORT=5001 to .env

@@ -1,0 +1,427 @@
+# MeterWorklog — Project Context for Claude
+
+## Overview
+Team Worklog Management web app. Members log daily work (project, task, hours, status). Leaders/Admins review dashboards and export Excel reports.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Python Flask 3.1.0 |
+| Database | MS SQL Server (SQLEXPRESS) via pyodbc |
+| ORM/Query | Custom `db.py` wrapper (raw SQL) |
+| Frontend | Vanilla JavaScript + Tailwind CSS v2.2.19 CDN |
+| Excel Export | openpyxl 3.1.5 |
+| Production Server | waitress 3.0.2 |
+| External Tunnel | ngrok (optional) |
+| Auth | Flask session + werkzeug password hashing |
+
+**Tailwind version note:** Using CDN v2.2.19 — `cyan` color palette is NOT available. Use `style="background:#22d3ee"` or `bg-green-600` for teal/cyan-like colors instead of `bg-cyan-*`.
+
+---
+
+## File Structure
+
+```
+MeterWorklog_DEV/
+├── app.py                   # Entry point (creates waitress/flask server)
+├── db.py                    # pyodbc connection + query/execute helpers
+├── init_db.sql              # DB schema creation + safe migrations
+├── requirements.txt
+├── .env                     # DB credentials, SECRET_KEY, ngrok, storage caps
+├── app/                     # Flask blueprints (one per feature)
+│   ├── __init__.py          # App factory, config, CSRF-origin check, blueprint registration
+│   ├── constants.py         # Role constants
+│   ├── helpers.py           # parse_time, format_members, parse_members
+│   ├── auth.py              # Login / register / logout
+│   ├── core.py              # /, /api/me, /api/dashboard
+│   ├── members.py           # Members CRUD
+│   ├── projects.py          # Projects CRUD + assignment
+│   ├── worklogs.py          # Worklogs CRUD
+│   ├── users.py             # User accounts (admin)
+│   ├── exports.py           # Excel export
+│   └── files.py             # File Share: folders + uploads/downloads
+├── static/
+│   ├── app.js               # Frontend module loader (no build step)
+│   ├── style.css            # Custom styles
+│   └── app/                 # Per-feature frontend modules
+│       ├── i18n.js          # EN/TH translations + data-i18n wiring
+│       ├── core.js          # Tabs, currentUser, api(), toast(), esc()
+│       ├── dashboard.js     # Dashboard view
+│       ├── worklogs.js      # Worklog table/form logic
+│       ├── calendar.js      # Calendar view
+│       ├── export.js        # Month filter + Excel download
+│       ├── settings.js      # Members / projects / users tabs
+│       └── files.js         # File Share UI (tree, upload, download, delete, stats)
+├── templates/
+│   ├── index.html           # Main SPA with Files tab + new-folder modal
+│   ├── login.html           # Login + Register page
+│   └── Monthly_Worklog_Template.xlsx  # Excel template — CRITICAL: must have 'empty' sheet
+└── storage/
+    └── files/               # Blob store: YYYY/MM/<uuid>.bin (NOT served by static)
+```
+
+---
+
+## Database Schema
+
+### `members`
+| Column | Type | Notes |
+|---|---|---|
+| id | INT PK | |
+| name | NVARCHAR | |
+| department | NVARCHAR | |
+| staff_id | NVARCHAR | nullable |
+| position | NVARCHAR | nullable |
+
+### `projects`
+| Column | Type | Notes |
+|---|---|---|
+| id | INT PK | |
+| name | NVARCHAR UNIQUE | |
+| main_members | NVARCHAR(MAX) | member names joined by ` #` delimiter |
+| support_members | NVARCHAR(MAX) | member names joined by ` #` delimiter |
+
+Project member assignment stores **member names** (not IDs) concatenated with ` #` as delimiter.
+Parse with: `[n.strip() for n in col_val.split('#') if n.strip()]`
+
+### `worklogs`
+| Column | Type | Notes |
+|---|---|---|
+| id | INT PK | |
+| member_id | INT FK | → members |
+| log_date | DATE | |
+| project | NVARCHAR | project name string |
+| task | NVARCHAR | |
+| start_time | TIME | nullable |
+| end_time | TIME | nullable |
+| hours | computed | `DATEDIFF(MINUTE, start_time, end_time) / 60.0` |
+| status | NVARCHAR | CHECK: 'Done', 'In Progress', 'Pending' |
+| note | NVARCHAR | nullable |
+
+### `users`
+| Column | Type | Notes |
+|---|---|---|
+| id | INT PK | |
+| username | NVARCHAR UNIQUE | |
+| password_hash | NVARCHAR | werkzeug generated |
+| role | NVARCHAR | CHECK: see roles below |
+| member_id | INT FK | → members, nullable (admin accounts may have no member) |
+| status | NVARCHAR(20) | CHECK: 'Pending', 'Active', 'Declined'. New self-registrations land as `Pending`; existing rows are migrated to `Active`. |
+| reviewed_by | INT FK users, nullable | Approver / decliner |
+| reviewed_at | DATETIME2 nullable | Decision timestamp |
+
+**Account approval flow:** `/api/register` → user inserted with `status='Pending'`. `/api/login` checks status AFTER password verification (no enumeration leak): `Pending` → 403 `pending_approval`; `Declined` → 403 `declined`. Elevated roles (Admin/Leader/Super_Ultimate_ADMIN) approve via `POST /api/users/<uid>/approve` or decline via `POST /api/users/<uid>/decline`. Declined accounts are kept (audit) — never auto-deleted.
+
+### `file_folders` (File Share)
+| Column | Type | Notes |
+|---|---|---|
+| id | INT PK | |
+| name | NVARCHAR(200) | |
+| parent_id | INT FK self, nullable | NULL = root; self-referencing tree |
+| created_by | INT FK users, nullable | |
+| created_at | DATETIME2 | default GETDATE() |
+
+`UNIQUE (parent_id, name)` — no sibling folders with the same name.
+Seed row: `('Shared', NULL)` — the default landing folder.
+
+### `files` (File Share metadata)
+| Column | Type | Notes |
+|---|---|---|
+| id | INT PK | |
+| folder_id | INT FK file_folders, nullable | NULL = root |
+| original_name | NVARCHAR(400) | display + download name |
+| stored_name | NVARCHAR(200) UNIQUE | `YYYY/MM/<uuid>.bin` — NEVER user input |
+| size_bytes | BIGINT | |
+| mime_type | NVARCHAR(200) | nullable |
+| sha256 | CHAR(64) | nullable |
+| uploaded_by | INT FK users, nullable | |
+| uploaded_at | DATETIME2 | default GETDATE() |
+
+Blobs live under `FILE_STORAGE_DIR` (default `storage/files/`). Path is resolved with `os.path.realpath` and re-checked against the base dir on every download (path-traversal defense).
+
+---
+
+## Role System
+
+```python
+ROLE_SUPER_ADMIN = 'Super_Ultimate_ADMIN'   # Full access: user mgmt, role changes
+ROLE_ADMIN       = 'Admin'                  # Elevated: members, projects, all worklogs
+ROLE_LEADER      = 'Leader'                 # Elevated: members, projects, all worklogs
+ROLE_STAFF       = 'Staff'                  # Own worklogs + own project assignments only
+
+ELEVATED_ROLES   = (ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_LEADER)
+ASSIGNABLE_ROLES = (ROLE_ADMIN, ROLE_LEADER, ROLE_STAFF)  # Super admin can assign these
+```
+
+**Permission rules:**
+- Staff: can only edit/delete their own worklogs, can only assign themselves to projects
+- Elevated: can manage any member's worklogs and project assignments
+- Admin (Super_Ultimate_ADMIN only): change user roles, reset passwords for others
+- Super admin cannot be deleted or have role changed
+
+---
+
+## API Routes
+
+### Auth
+| Method | Route | Auth | Notes |
+|---|---|---|---|
+| GET | `/login` | None | Login page |
+| POST | `/api/login` | None | Returns role + member_id |
+| POST | `/api/register` | None | Creates member + Staff user |
+| POST | `/api/logout` | login | |
+| GET | `/api/me` | login | Current user info |
+
+### Members
+| Method | Route | Auth | Notes |
+|---|---|---|---|
+| GET | `/api/members` | login | All members |
+| POST | `/api/members` | elevated | Create member |
+| PUT | `/api/members/<mid>` | elevated | Update member |
+| DELETE | `/api/members/<mid>` | elevated | Fails if linked to user |
+| GET | `/api/members/<mid>/project-roles` | login | Returns `{main:[{id,name}], support:[{id,name}]}` |
+
+### Projects
+| Method | Route | Auth | Notes |
+|---|---|---|---|
+| GET | `/api/projects` | login | |
+| POST | `/api/projects` | elevated | |
+| DELETE | `/api/projects/<pid>` | elevated | |
+| POST | `/api/projects/<pid>/assign` | login | Body: `{member_id, type}` type='main'\|'support' |
+| POST | `/api/projects/<pid>/unassign` | login | Body: `{member_id, type}` |
+
+### Worklogs
+| Method | Route | Auth | Notes |
+|---|---|---|---|
+| GET | `/api/worklogs` | login | Params: member_id, year, month |
+| POST | `/api/worklogs` | login | Staff forced to own member_id |
+| PUT | `/api/worklogs/<wid>` | login | Staff can only edit own |
+| DELETE | `/api/worklogs/<wid>` | login | Staff can only delete own |
+
+### Dashboard & Export
+| Method | Route | Auth | Notes |
+|---|---|---|---|
+| GET | `/api/dashboard` | login | Params: member_id, year |
+| GET | `/api/export/excel` | login | Params: member_id, year, months (csv ints) |
+| GET | `/api/export/excel/bulk` | elevated | Params: member_ids (csv), year, months (csv ints) |
+
+### File Share
+| Method | Route | Auth | Notes |
+|---|---|---|---|
+| GET | `/api/files/tree` | login | Full nested folder tree |
+| GET | `/api/files/folder` | login | Root listing: `{breadcrumbs, subfolders, files}` |
+| GET | `/api/files/folder/<fid>` | login | Listing for folder `<fid>` |
+| POST | `/api/files/folder` | login | Create folder — body `{name, parent_id}` |
+| PUT | `/api/files/folder/<fid>` | creator OR elevated | Rename |
+| DELETE | `/api/files/folder/<fid>` | creator OR elevated | Must be empty |
+| POST | `/api/files/upload` | login | multipart; form `folder_id` (optional). 413 = too big, 507 = storage full |
+| GET | `/api/files/<fid>/download` | login | `send_file` with original_name + RFC 5987 header |
+| DELETE | `/api/files/<fid>` | uploader OR elevated | Removes DB row + blob |
+| GET | `/api/files/stats` | login | `{total_bytes, cap_bytes, free_bytes, file_count, pct_used}` |
+
+---
+
+## Excel Export Logic
+
+### Template
+- File: `templates/Monthly_Worklog_Template.xlsx`
+- **Critical sheet: `empty`** — this is the standard template for every month sheet
+  - Headers at row 4
+  - Data starts at row 5 (`data_start = 5`)
+  - 997 pre-styled rows (rows 5–1001) (`template_rows = 997`)
+- `Dashboard` sheet: filled with member name, department, staff_id, position, year
+
+### Column mapping (data rows)
+| Column | Content |
+|---|---|
+| A (1) | Date (`dd/mm/yyyy`) — only on first entry of each day |
+| B (2) | Project name |
+| C (3) | Task |
+| D (4) | Start time (`h:mm`) |
+| E (5) | End time (`h:mm`) |
+| F (6) | Hours (float) |
+| G (7) | Status |
+| H (8) | Note |
+
+### Generation flow (`generate_excel_bytes`)
+1. Query all worklogs for the member+year
+2. Build `by_month_day[(month, day)] = [entries...]`
+3. Load template workbook
+4. Fill Dashboard sheet
+5. Delete all old named month sheets (January–December) if present
+6. For each selected month: `wb.copy_worksheet(ws_empty)`, title = month name
+7. Build `row_data` — **only days with actual entries** (no blank day rows)
+   - First entry of a day: `(date_obj, entry)`
+   - Additional entries same day: `(None, entry)`
+8. Insert extra rows only if entries exceed 997 (copy style from last template row)
+9. Delete `empty` sheet from output
+10. Fill `tbl_project` / `Config` sheets with current project names
+
+### Month filter
+- API param: `months=1,3,6,12` (comma-separated integers)
+- If omitted or empty: generates all 12 months
+- Frontend: month filter modal opens before download, all months checked by default
+
+---
+
+## Frontend Architecture
+
+`static/app.js` is a **module loader** — it fetches and appends each `static/app/*.js` file in order. No bundler/build step; refresh is enough.
+
+### State (spread across `static/app/*.js`)
+```javascript
+// core.js
+let currentMemberId = null;   // selected member (int or null)
+let currentUser = null;        // {id, username, role, member_id}
+let members = [];              // [{id, name, department, ...}]
+let projects = [];             // [{id, name}]
+let worklogData = [];          // current month's worklogs
+let currentWorklogView = 'table';  // 'table' | 'calendar'
+
+// files.js
+let fileCurrentFolderId = null;  // null = root, else folder id
+let fileTreeCache = [];          // nested tree from /api/files/tree
+let fileListCache = [];          // current folder's files (for delete name lookup)
+let fileDragDepth = 0;           // drag-enter/leave counter for the drop overlay
+```
+
+### Key helpers
+```javascript
+api(url, opts)        // fetch wrapper — auto sets Content-Type when body is plain object
+isElevated()          // true if Admin/Leader/Super_Ultimate_ADMIN
+canEditMember(id)     // true if elevated OR own member
+toast(msg, type)      // type = 'success' | 'error'  (NOT boolean true/false)
+esc(s)                // HTML-escape string via DOM
+```
+
+**IMPORTANT:** `api()` only sets `Content-Type: application/json` when `body` is a plain object.
+Never pre-stringify: pass `body: { key: value }`, NOT `body: JSON.stringify({...})`.
+
+### Module structure
+- **Init** — DOMContentLoaded: load me, members, projects; set up year/month selects
+- **Tabs** — dashboard / worklog / settings
+- **Dashboard** — `loadDashboard()` → fills summary cards + monthly table → calls `loadProjectRoles()`
+- **Project Roles** — `loadProjectRoles()`, `openAddProjectModal()`, `confirmAddProjectRole()`, `removeProjectRole()`
+- **Worklogs** — `loadWorklogs()` → `applyFilters()` → `renderCurrentView()` → `renderWorklogs()` or `renderCalendar()`
+- **Calendar** — `renderCalendar()`, `openDayPopover()`, `openAddWorklogForDate()`
+- **Export** — `exportToExcel()` and `exportBulkMembers()` both go through `openMonthFilterModal()` → `confirmMonthExport()`
+- **Settings** — members list, projects list, users list (elevated only)
+- **File Share** (`files.js`) — `loadFileTree()`, `renderTreeNodes()`, `selectFolder()`, `loadFolderContents()`, `uploadFiles()`, `deleteFile()` (data-del-file delegation), `deleteFolder()` (data-del-folder delegation), `loadFileStats()`. Drag-and-drop on contents pane, click-and-browse upload, breadcrumb navigation.
+- **Modals** — worklog, bulk export, add project role, month filter, reset password, change role, **new folder**
+
+---
+
+## UI Layout (`index.html`)
+
+### Dashboard view structure (top to bottom)
+1. Export buttons (Export Multiple — elevated only, Export to Excel)
+2. Summary cards: Total Hours | Tasks Done | In Progress | [Avg Monthly — hidden]
+3. Member info card (avatar, name, department)
+4. **Project Roles section** (2-col grid):
+   - Main Project box (indigo label `bg-indigo-600`) + "+" button + project tags
+   - Support box (green label `bg-green-600`) + "+" button + project tags
+5. Monthly Breakdown table (clickable rows → navigate to worklog view for that month)
+
+### Modals (all in index.html)
+1. Worklog add/edit
+2. Bulk export
+3. Add project role
+4. Month filter
+5. Reset password
+6. Change role
+7. New folder (File Share)
+
+### File Share view (`#view-files`)
+Split-pane layout:
+- **Left sidebar:** folder tree (rendered by `renderTreeNodes()`), click to select
+- **Right pane:**
+  - Breadcrumbs (Root / Shared / Sub / …)
+  - Subfolder tiles
+  - Upload zone: drag-and-drop OR click to browse. Button label shows "Upload to [destination]"
+  - File list: original filename, size, uploader (member name via `COALESCE(m.name, u.username)`), timestamp, Download + Delete buttons
+  - Usage card: `X / Y used` progress bar (indigo → amber ≥ 75% → red ≥ 90%), plus free-disk and file-count meta lines
+
+---
+
+## Key Design Decisions & Gotchas
+
+1. **Tailwind v2.2.19 CDN** — no `cyan` palette. Use `bg-green-600` or `style="background:#22d3ee"`.
+
+2. **`api()` body** — always pass plain object `{key: value}`, never `JSON.stringify(...)`.
+
+3. **Project members as delimited strings** — `main_members` / `support_members` store names joined by ` #`. This is by design (simple, no join table). Splitting: `col.split('#')` then `.strip()` each part.
+
+4. **Excel `empty` sheet** — the template file MUST have a sheet named exactly `empty`. This is the layout source for all month sheets. Do not rename or delete it from the template file.
+
+5. **Date column in Excel** — only write rows for days that have worklog entries. Do NOT write rows for empty days.
+
+6. **`hours` is a computed column** in SQL — never INSERT/UPDATE it directly.
+
+7. **`delete_member`** — does not clean up project role memberships (member names in `main_members`/`support_members`). Known limitation.
+
+8. **`ensure_db()`** — runs `init_db.sql` once per process start via `app._db_initialized` flag.
+
+9. **Safe SQL migrations** — use `IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('table') AND name = 'column')` pattern before `ALTER TABLE`.
+
+10. **`toast()` type argument** — must be string `'error'` or `'success'`, NOT boolean.
+
+11. **File Share stored_name is UUID-based** — uploads are saved as `storage/files/YYYY/MM/<uuid>.bin` regardless of the original filename. The original name + MIME type live in the DB and are restored by `send_file(..., as_attachment=True, download_name=original_name)`. This is deliberate: user-controlled filenames must NEVER touch the filesystem (path-traversal + collision defense).
+
+12. **File Share delete uses event delegation** — inline `onclick="deleteFile(id, 'filename')"` is fragile when filenames contain quotes/backslashes. All delete buttons in files.js use `data-del-file="<id>"` / `data-del-folder="<id>"` + a single `document.addEventListener('click', ...)` handler.
+
+13. **Storage guards** — every upload checks three caps in order: per-upload `MAX_CONTENT_LENGTH` (413), free-disk floor `FILE_MIN_FREE_BYTES` (507), global cap `FILE_STORAGE_CAP_BYTES` from `SUM(files.size_bytes)` (507).
+
+14. **Blobs are NOT in DB backup** — `storage/files/` must be snapshotted separately (rsync / volume snapshot). A metadata-only restore will leave rows that fail to download.
+
+15. **`SESSION_COOKIE_SECURE` auto-detection** — `app/__init__.py` derives the flag from `NGROK_DOMAIN`: set → `Secure=True`; unset → `Secure=False`. Override with explicit `SESSION_COOKIE_SECURE=true|false`. This keeps ngrok HTTPS hardened while letting LAN/Tailscale plain-HTTP users keep their session. **Symptom of getting this wrong:** login API returns 200, browser shows no error, but next request is 401 — the `Secure` cookie was silently dropped.
+
+---
+
+## Environment Variables (`.env`)
+
+```
+SECRET_KEY=...
+DB_SERVER=localhost\SQLEXPRESS
+DB_NAME=MeterWorklog
+DB_DRIVER={ODBC Driver 17 for SQL Server}
+DB_TRUST_CERT=yes
+NGROK_AUTHTOKEN=...
+NGROK_DOMAIN=...
+
+# Tailscale serve — set this when fronting the app with `tailscale serve` (HTTPS).
+# Value is the tailnet hostname only, no scheme/port: mypc.tail1234a.ts.net
+# TAILSCALE_DOMAIN=
+
+# Session cookie 'Secure' flag — leave UNSET for auto-detect:
+#   • NGROK_DOMAIN or TAILSCALE_DOMAIN set → Secure=True  (HTTPS public access)
+#   • neither set                          → Secure=False (plain-HTTP LAN / raw Tailscale IPs work)
+# Override explicitly with: SESSION_COOKIE_SECURE=true | false
+# SESSION_COOKIE_SECURE=
+
+# File Share (all optional; defaults shown)
+FILE_UPLOAD_MAX_MB=100          # Per-upload cap → Flask MAX_CONTENT_LENGTH
+FILE_STORAGE_CAP_MB=10240       # Global cap (SUM of files.size_bytes) — 10 GB
+FILE_MIN_FREE_MB=500            # Free-disk floor — refuse uploads below this
+# Override the storage root if you want blobs on a different volume:
+# FILE_STORAGE_DIR=D:\meterworklog_blobs
+```
+
+**Why this matters:** browsers silently drop `Secure` cookies received over plain HTTP. If you access the app via a Tailscale device IP (`http://100.x.x.x:5000`), a hardcoded `Secure=True` would cause the session cookie to never persist → login appears to fail.
+
+---
+
+## Running the App
+
+```bash
+# Development
+.venv/Scripts/python app.py
+
+# Production
+.venv/Scripts/waitress-serve --host=0.0.0.0 --port=5000 app:app
+
+# ngrok tunnel (optional, separate terminal)
+ngrok-v3-stable-windows-amd64/ngrok http 5000 --url=<domain>
+```

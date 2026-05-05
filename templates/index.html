@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MWL Timesheet</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" integrity="sha384-HtMZLkYo+pR5/u7zCzXxMJP6QoNnQJt1qkHM0EaOPvGDIzaVZbmYr/TlvUZ/sKAg" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- Top Nav -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3 flex-none">
+                <img src="/static/mwllogo.png" alt="MWL Timesheet" style="height:40px;width:auto;">
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn active px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.dashboard">Dashboard</button>
+                <button onclick="showTab('worklog')" id="tab-worklog" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.worklog">Work Log</button>
+                <button onclick="showTab('files')" id="tab-files" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.files">File Share</button>
+                <button onclick="showTab('projects-summary')" id="tab-projects-summary" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium hidden" data-i18n="nav.projects_summary">Projects Summary</button>
+                <button onclick="showTab('settings')" id="tab-settings" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium relative">
+                    <span data-i18n="nav.settings">Settings</span>
+                    <span id="nav-pending-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center" style="display:none">0</span>
+                </button>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="lang-toggle-btn" onclick="toggleLang()" class="text-xs font-semibold px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors">TH</button>
+                <span id="nav-user" class="text-sm text-gray-600"></span>
+                <button onclick="logout()" class="text-sm text-gray-500 hover:text-red-600 flex items-center gap-1 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                    <span data-i18n="nav.logout">Logout</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+
+        <!-- Member Selector (global) -->
+        <div class="mb-6 flex items-center gap-4 flex-wrap">
+            <div class="flex items-center gap-2">
+                <label for="member-select" class="text-sm font-medium text-gray-600" data-i18n="sel.member">Team Member:</label>
+                <select id="member-select" onchange="onMemberChange()" class="input-field w-56">
+                    <option value="" data-i18n="sel.select_ph">Select a member...</option>
+                </select>
+            </div>
+            <div class="flex items-center">
+                <button id="btn-overall" onclick="selectOverall()" class="btn-secondary text-sm px-3 py-1 rounded" data-i18n="sel.overall">Overall</button>
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="year-select" class="text-sm font-medium text-gray-600" data-i18n="sel.year">Year:</label>
+                <select id="year-select" onchange="onContextChange()" class="input-field w-28"></select>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="view-dashboard">
+            <!-- Overall Team View -->
+            <div id="overall-dashboard" class="hidden">
+                <div class="flex items-center justify-between mb-5">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800" data-i18n="dash.team_overview">Team Overview</h2>
+                        <p class="text-sm text-gray-400 mt-0.5" id="overall-member-count"></p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 text-xs text-gray-500">
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-3 h-3 rounded-full inline-block" style="background:#4f46e5"></span>
+                                <span data-i18n="dash.has_project">Has project</span>
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-3 h-3 rounded-full bg-gray-400 inline-block"></span>
+                                <span data-i18n="dash.no_project">No project</span>
+                            </span>
+                        </div>
+                        <button id="btn-draft" onclick="openDraftPanel()"
+                                class="draft-entry-btn hidden"
+                                title="Open Squad Draft">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                            DRAFT
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="overall-member-grid"></div>
+            </div>
+
+            <div id="no-member-msg" class="hidden text-center py-16 text-gray-400">
+                <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <p class="text-lg" data-i18n="wl.no_member_title">Select a team member to view their dashboard</p>
+                <p class="text-sm mt-1"><span data-i18n="wl.no_member_hint2">Or go to</span> <button onclick="showTab('settings')" class="text-indigo-600 underline" data-i18n="wl.no_member_settings">Settings</button> <span data-i18n="wl.no_member_hint3">to add one</span></p>
+            </div>
+
+            <div id="dashboard-content" class="hidden">
+                <!-- Export Buttons -->
+                <div class="flex justify-end mb-4 gap-2">
+                    <button id="btn-export-multiple" onclick="openBulkExportModal()" class="hidden inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <span data-i18n="dash.export_multiple">Export Multiple</span>
+                    </button>
+                    <button onclick="exportToExcel()" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span data-i18n="dash.export_excel">Export to Excel</span>
+                    </button>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="card bg-white">
+                        <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.total_hours">Total Hours</p>
+                        <p id="dash-total-hours" class="text-2xl font-bold text-indigo-600 mt-1">0</p>
+                    </div>
+                    <div class="card bg-white">
+                        <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.tasks_done">Tasks Done</p>
+                        <p id="dash-total-done" class="text-2xl font-bold text-green-600 mt-1">0</p>
+                    </div>
+                    <div class="card bg-white">
+                        <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.in_progress_card">In Progress</p>
+                        <p id="dash-total-ip" class="text-2xl font-bold text-yellow-600 mt-1">0</p>
+                    </div>
+                </div>
+
+                <!-- Member Info -->
+                <div class="card bg-white mb-6">
+                    <div class="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+                        <div class="flex items-center gap-4 shrink-0">
+                            <div id="dash-avatar-wrap" class="avatar-wrap avatar-md bg-indigo-100">
+                                <span id="dash-avatar" class="avatar-letter text-indigo-600">?</span>
+                            </div>
+                            <div>
+                                <p id="dash-lvl" class="font-bold text-blue-800"></p>
+                                <p id="dash-name" class="font-semibold text-gray-800"></p>
+                                <p id="dash-dept" class="text-sm text-gray-500"></p>
+                                <p id="dash-empid" class="text-sm text-gray-500"></p>
+                            </div>
+                        </div>
+                        <div class="w-full flex-1" id="dashboard-member-grid"></div>
+                    </div>
+                </div>
+
+                <!-- Project Roles -->
+                <div id="project-roles-section" class="grid grid-cols-2 gap-4 mb-6">
+                    <!-- Main Project -->
+                    <div class="card bg-white">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="bg-indigo-600 text-white text-xs font-semibold px-3 py-1.5 rounded" data-i18n="dash.main_project">Main Project</span>
+                            <button id="btn-add-main" onclick="openAddProjectModal('main')"
+                                    class="w-6 h-6 bg-gray-600 hover:bg-gray-700 text-white rounded flex items-center justify-center text-base font-bold leading-none transition-colors">+</button>
+                        </div>
+                        <div id="main-project-tags" class="flex flex-wrap gap-2 min-h-[28px]"></div>
+                    </div>
+                    <!-- Support -->
+                    <div class="card bg-white">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded" data-i18n="dash.support">Support</span>
+                            <button id="btn-add-support" onclick="openAddProjectModal('support')"
+                                    class="w-6 h-6 bg-gray-600 hover:bg-gray-700 text-white rounded flex items-center justify-center text-base font-bold leading-none transition-colors">+</button>
+                        </div>
+                        <div id="support-project-tags" class="flex flex-wrap gap-2 min-h-[28px]"></div>
+                    </div>
+                </div>
+
+                <!-- Monthly Breakdown Table -->
+                <div class="card bg-white">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide" data-i18n="dash.monthly_breakdown">Monthly Breakdown</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-left py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_month">Month</th>
+                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_hours">Hours</th>
+                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_done">Done</th>
+                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_in_progress">In Progress</th>
+                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_man_day">Man day</th>
+                                    <th class="py-2 px-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="dash-months"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Work Log View -->
+        <div id="view-worklog" class="hidden">
+            <div id="worklog-no-member" class="text-center py-16 text-gray-400 hidden">
+                <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+                </svg>
+                <p class="text-lg" data-i18n="wl.no_member_title">Select a team member to view work logs</p>
+                <p class="text-sm mt-1" data-i18n="wl.no_member_hint">Choose a member from the selector above</p>
+            </div>
+            <div id="worklog-content" class="hidden">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-600" data-i18n="wl.month_label">Month:</label>
+                        <select id="month-select" onchange="loadWorklogs()" class="input-field w-40"></select>
+                    </div>
+                    <!-- View Toggle -->
+                    <div class="view-toggle" id="view-toggle">
+                        <button id="toggle-table" class="view-toggle-btn active" onclick="setWorklogView('table')" title="Table view" aria-label="Table view">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                            </svg>
+                        </button>
+                        <button id="toggle-calendar" class="view-toggle-btn" onclick="setWorklogView('calendar')" title="Calendar view" aria-label="Calendar view">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <button onclick="openAddWorklogMulti()" class="btn-secondary hidden" id="btn-add-worklog-multi">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span data-i18n="wl.add_multi">+ Add Entry for Multiple</span>
+                </button>
+                <button onclick="openAddWorklog()" class="btn-primary" id="btn-add-worklog">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span data-i18n="wl.add_entry">Add Entry</span>
+                </button>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+                <div class="search-wrap relative flex-1 min-w-40">
+                    <svg class="search-icon absolute w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+                    </svg>
+                    <input id="filter-search" type="text" placeholder="...Search by project, task, or note..."
+                           oninput="applyFilters()" class="input-field w-full pl-10" data-i18n-ph="wl.search_ph">
+                </div>
+                <select id="filter-status" onchange="applyFilters()" class="input-field w-36">
+                    <option value="" data-i18n="wl.all_status">All Status</option>
+                    <option value="Done">Done</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Man day">Man day</option>
+                </select>
+                <select id="filter-project" onchange="applyFilters()" class="input-field w-40">
+                    <option value="" data-i18n="wl.all_projects">All Projects</option>
+                </select>
+                <button onclick="clearFilters()" class="btn-secondary text-sm px-3 whitespace-nowrap" data-i18n="wl.clear">Clear</button>
+                <span id="filter-count" class="hidden text-xs text-gray-400 whitespace-nowrap"></span>
+            </div>
+
+            <!-- Missing entry count bar -->
+            <div id="missing-count-bar" class="hidden mb-3 -mt-1">
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-2.5 py-1">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <span id="missing-count-label"></span>
+                </span>
+            </div>
+
+            <!-- Bulk action bar (shown when ≥1 row selected) -->
+            <div id="wl-bulk-bar" class="hidden flex flex-wrap items-center gap-2 mb-3 p-2 rounded-lg bg-indigo-50 border border-indigo-200">
+                <span class="text-sm text-indigo-700"><span id="wl-bulk-count">0</span> <span data-i18n="wl.bulk_selected">selected</span></span>
+                <div class="flex-1"></div>
+                <button onclick="openBulkEditModal()" class="btn-secondary text-sm px-3" data-i18n="wl.bulk_edit">Bulk Edit</button>
+                <button onclick="bulkDeleteWorklogs()" class="btn-secondary text-sm px-3 text-red-600 border-red-200 hover:bg-red-50" data-i18n="wl.bulk_delete">Bulk Delete</button>
+                <button onclick="clearWorklogSelection()" class="btn-secondary text-sm px-3" data-i18n="btn.cancel">Cancel</button>
+            </div>
+
+            <!-- Table View -->
+            <div id="worklog-table-view">
+                <div class="card bg-white">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm" id="worklog-table">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="py-2 px-2 w-8" id="wl-th-checkbox">
+                                        <input type="checkbox" id="wl-select-all" onclick="onWorklogSelectAll(event)" class="rounded">
+                                    </th>
+                                    <th class="text-left py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_date">Date</th>
+                                    <th class="text-left py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_project">Project</th>
+                                    <th class="text-left py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_task">Task</th>
+                                    <th class="text-center py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_start">Start</th>
+                                    <th class="text-center py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_end">End</th>
+                                    <th class="text-right py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_hours">Hours</th>
+                                    <th class="text-center py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_status">Status</th>
+                                    <th class="text-left py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_note">Note</th>
+                                    <th class="py-2 px-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="worklog-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="worklog-empty" class="hidden text-center py-10 text-gray-400">
+                        <p data-i18n="wl.no_entries">No entries for this month yet</p>
+                        <button onclick="openAddWorklog()" class="text-indigo-600 underline text-sm mt-1" data-i18n="wl.add_first">Add your first entry</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar View -->
+            <div id="worklog-calendar-view" class="hidden">
+                <div class="cal-container card bg-white">
+                    <!-- Day-of-week header -->
+                    <div class="cal-grid cal-header-grid">
+                        <div class="cal-dow" data-i18n="cal.mon">Mon</div>
+                        <div class="cal-dow" data-i18n="cal.tue">Tue</div>
+                        <div class="cal-dow" data-i18n="cal.wed">Wed</div>
+                        <div class="cal-dow" data-i18n="cal.thu">Thu</div>
+                        <div class="cal-dow" data-i18n="cal.fri">Fri</div>
+                        <div class="cal-dow cal-weekend-label" data-i18n="cal.sat">Sat</div>
+                        <div class="cal-dow cal-weekend-label" data-i18n="cal.sun">Sun</div>
+                    </div>
+                    <!-- Day cells rendered by JS -->
+                    <div id="cal-body" class="cal-grid cal-body-grid"></div>
+                </div>
+                <!-- Stat summary bar -->
+                <div id="cal-summary" class="flex items-center gap-4 mt-3 px-1">
+                    <span class="text-xs text-gray-400" id="cal-summary-text"></span>
+                    <span class="flex items-center gap-3 ml-auto">
+                        <span class="flex items-center gap-1"><span class="cal-legend-dot" style="background:#059669"></span><span class="text-xs text-gray-500" data-i18n="legend.done">Done</span></span>
+                        <span class="flex items-center gap-1"><span class="cal-legend-dot" style="background:#d97706"></span><span class="text-xs text-gray-500" data-i18n="legend.in_progress">In Progress</span></span>
+                        <span class="flex items-center gap-1"><span class="cal-legend-dot" style="background:#9ca3af"></span><span class="text-xs text-gray-500" data-i18n="legend.pending">Pending</span></span>
+                    </span>
+                </div>
+            </div>
+            </div><!-- /worklog-content -->
+        </div>
+
+        <!-- File Share View -->
+        <div id="view-files" class="hidden">
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800" data-i18n="files.title">File Share</h2>
+                    <p class="text-sm text-gray-500 mt-0.5" data-i18n="files.subtitle">Shared files for the team. All users can upload and download.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="openNewFolderModal()" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg shadow-sm transition-colors">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        <span data-i18n="files.new_folder">New Folder</span>
+                    </button>
+                    <label for="file-upload-input" id="file-upload-label" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors cursor-pointer">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12"/>
+                        </svg>
+                        <span data-i18n="files.upload">Upload to </span>
+                        <span id="file-upload-dest" class="ml-1 font-semibold underline decoration-dotted">Root</span>
+                    </label>
+                    <input id="file-upload-input" type="file" class="hidden" onchange="onFileUploadChange(event)" multiple>
+                </div>
+            </div>
+
+            <!-- Usage card -->
+            <div id="file-usage-card" class="card bg-white mb-3 p-3">
+                <div class="flex items-center justify-between gap-4 flex-wrap">
+                    <div class="text-xs text-gray-500" id="file-stats-bar"></div>
+                    <div class="text-xs text-gray-500 text-right" id="file-usage-meta"></div>
+                </div>
+                <div class="mt-2 h-2 bg-gray-100 rounded overflow-hidden">
+                    <div id="file-usage-bar" class="h-full bg-indigo-500 transition-all" style="width:0%"></div>
+                </div>
+                <p id="file-usage-warning" class="hidden text-xs text-red-600 mt-1.5"></p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Sidebar: folder tree -->
+                <aside class="card bg-white md:col-span-1 p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-xs font-semibold text-gray-600 uppercase tracking-wide" data-i18n="files.folders">Folders</h3>
+                        <button onclick="loadFileTree()" title="Refresh" class="text-gray-400 hover:text-indigo-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.65-5.65M20 15a9 9 0 01-14.65 5.65"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="file-tree" class="text-sm text-gray-700 space-y-0.5"></div>
+                </aside>
+
+                <!-- Contents pane -->
+                <section class="card bg-white md:col-span-3 p-4 min-h-[24rem]" id="file-contents-pane"
+                         ondragover="onFileDragOver(event)" ondragleave="onFileDragLeave(event)" ondrop="onFileDrop(event)">
+                    <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                        <nav id="file-breadcrumbs" class="flex items-center gap-1 text-sm text-gray-500 flex-wrap"></nav>
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="file-recent-btn" onclick="toggleRecentUploads()"
+                                    class="text-xs px-2.5 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50">
+                                Recent uploads
+                            </button>
+                            <span id="file-folder-stats" class="text-xs text-gray-400"></span>
+                        </div>
+                    </div>
+
+                    <!-- Search bar -->
+                    <div class="search-wrap mb-3 relative">
+                        <svg class="search-icon w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+                        </svg>
+                        <input id="file-search" type="text" placeholder="       Search files in this folder..."
+                               oninput="onFileSearchInput(event)"
+                               class="input-field w-full pl-9 text-sm">
+                    </div>
+
+                    <!-- Subfolders -->
+                    <div id="file-subfolders-wrap" class="hidden mb-4">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2" data-i18n="files.subfolders">Subfolders</h4>
+                        <div id="file-subfolders" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"></div>
+                    </div>
+
+                    <!-- Bulk action bar (shown when ≥1 file selected) -->
+                    <div id="file-bulk-bar" class="hidden mb-2 flex items-center justify-between gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        <span class="text-sm font-medium text-indigo-800">
+                            <span id="file-bulk-count">0</span> selected
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="bulkDownloadSelected()"
+                                    class="text-xs px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded inline-flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+                                </svg>
+                                Download
+                            </button>
+                            <button type="button" onclick="bulkDeleteSelected()"
+                                    class="text-xs px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded inline-flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"/>
+                                </svg>
+                                Delete
+                            </button>
+                            <button type="button" onclick="clearFileSelection()"
+                                    class="text-xs px-2 py-1 text-gray-500 hover:text-gray-700">Clear</button>
+                        </div>
+                    </div>
+
+                    <!-- Files -->
+                    <div>
+                        <div class="grid grid-cols-12 gap-2 px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                            <div class="col-span-1 flex items-center">
+                                <input type="checkbox" id="file-select-all" onclick="onSelectAllToggle(event)"
+                                       class="cursor-pointer">
+                            </div>
+                            <div class="col-span-5 flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('name')">
+                                Name <span id="file-sort-name" class="ml-1"></span>
+                            </div>
+                            <div class="col-span-2 flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('size')">
+                                Size <span id="file-sort-size" class="ml-1"></span>
+                            </div>
+                            <div class="col-span-2 flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('uploader')">
+                                Uploader <span id="file-sort-uploader" class="ml-1"></span>
+                            </div>
+                            <div class="col-span-2 flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('date')">
+                                Uploaded <span id="file-sort-date" class="ml-1"></span>
+                            </div>
+                        </div>
+                        <div id="file-list" class="divide-y divide-gray-100"></div>
+                        <p id="file-empty-msg" class="text-sm text-gray-400 text-center py-8 hidden" data-i18n="files.empty">No files here yet. Drop files anywhere in this panel to upload.</p>
+                    </div>
+
+                    <!-- Drop overlay -->
+                    <div id="file-drop-overlay" class="hidden absolute inset-0 bg-indigo-50/80 border-2 border-dashed border-indigo-400 rounded-lg flex items-center justify-center pointer-events-none">
+                        <p class="text-indigo-700 font-medium" data-i18n="files.drop_here">Drop to upload</p>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Settings View (admin only) -->
+        <div id="view-settings" class="hidden">
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Members Management -->
+                <div class="card bg-white">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide" data-i18n="set.team_members">Team Members</h3>
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <input id="new-member-name" placeholder="Name" class="input-field" data-i18n-ph="set.name_ph">
+                        <input id="new-member-dept" placeholder="Department" class="input-field" data-i18n-ph="set.dept_ph">
+                        <input id="new-member-staffid" placeholder="Employee ID *" inputmode="numeric" pattern="[0-9]*" class="input-field" data-i18n-ph="set.empid_ph">
+                        <input id="new-member-position" placeholder="Position (optional)" class="input-field" data-i18n-ph="set.position_ph">
+                    </div>
+                    <button onclick="addMember()" class="btn-primary text-sm px-3 mb-4" data-i18n="set.add_member">Add Member</button>
+                    <ul id="members-list" class="space-y-2"></ul>
+                </div>
+
+                <!-- Projects Management -->
+                <div class="card bg-white">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide" data-i18n="set.projects">Projects</h3>
+                    <div class="flex gap-2 mb-4">
+                        <input id="new-project-name" placeholder="Project name" class="input-field flex-1" data-i18n-ph="set.project_name_ph">
+                        <button onclick="addProject()" class="btn-primary text-sm px-3" data-i18n="set.add">Add</button>
+                    </div>
+                    <ul id="projects-list" class="space-y-2"></ul>
+                </div>
+
+                <!-- Account Approvals -->
+                <div class="card bg-white md:col-span-2 border-l-4 border-amber-400">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+                            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
+                            <span data-i18n="set.account_approvals">Account Approvals</span>
+                            <span id="pending-count-badge" class="hidden ml-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">0</span>
+                        </h3>
+                        <button onclick="loadPendingUsers()" class="text-xs text-indigo-600 hover:underline" data-i18n="set.refresh">Refresh</button>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-3" data-i18n="set.account_approvals_desc">New self-registered accounts must be approved before they can log in.</p>
+                    <ul id="pending-users-list" class="space-y-2">
+                        <li class="text-sm text-gray-400 italic px-2 py-3" id="pending-empty-msg" data-i18n="set.no_pending">No pending registrations.</li>
+                    </ul>
+                </div>
+
+                <!-- User Accounts Management -->
+                <div class="card bg-white md:col-span-2">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide" data-i18n="set.user_accounts">User Accounts</h3>
+                    <ul id="users-list" class="space-y-2"></ul>
+                </div>
+
+                <!-- Worklog Visibility Toggle (Super Admin only) -->
+                <div id="settings-visibility-card" class="card bg-white md:col-span-2 hidden">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-1 uppercase tracking-wide" data-i18n="set.wl_visibility">Worklog Visibility</h3>
+                    <p class="text-xs text-gray-500 mb-4" data-i18n="set.wl_visibility_desc">Controls whether Staff members can view each other's worklogs.</p>
+                    <div class="flex items-center gap-4">
+                        <button id="visibility-toggle-btn" onclick="toggleWorklogVisibility()"
+                                class="relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none"
+                                style="background:#9ca3af">
+                            <span id="visibility-toggle-knob"
+                                  class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200"
+                                  style="transform:translateX(0.25rem)"></span>
+                        </button>
+                        <div>
+                            <p id="visibility-label" class="text-sm font-medium text-gray-800"></p>
+                            <p id="visibility-desc" class="text-xs text-gray-500 mt-0.5"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects Summary View (elevated only) -->
+        <div id="view-projects-summary" class="hidden">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800" data-i18n="ps.title">Projects Summary</h2>
+                    <p class="text-sm text-gray-400 mt-0.5" data-i18n="ps.subtitle">Hours logged per project for the selected month.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="ps-year" class="text-sm font-medium text-gray-600" data-i18n="sel.year">Year:</label>
+                    <select id="ps-year" onchange="loadProjectsSummary()" class="input-field w-28"></select>
+                    <label for="ps-month" class="text-sm font-medium text-gray-600" data-i18n="wl.month_label">Month:</label>
+                    <select id="ps-month" onchange="loadProjectsSummary()" class="input-field w-40"></select>
+                </div>
+            </div>
+            <div id="ps-empty" class="hidden text-sm text-gray-500 italic py-8 text-center" data-i18n="ps.empty">No project activity in this period.</div>
+            <div id="ps-table-wrap" class="card bg-white">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-xs text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                            <th class="py-2 px-3 text-left w-8"></th>
+                            <th class="py-2 px-3 text-left" data-i18n="ps.col_project">Project</th>
+                            <th class="py-2 px-3 text-right" data-i18n="ps.col_employees">Employees</th>
+                            <th class="py-2 px-3 text-right" data-i18n="ps.col_hours">Total Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ps-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for New Folder (File Share) -->
+    <div id="new-folder-modal" class="modal-overlay hidden" onclick="closeNewFolderModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="files.new_folder_title">New Folder</h3>
+                <button onclick="closeNewFolderModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form onsubmit="confirmNewFolder(event)">
+                <label class="label" data-i18n="files.folder_name">Folder name</label>
+                <input id="new-folder-name" type="text" class="input-field w-full" maxlength="200" required>
+                <p id="new-folder-parent-hint" class="text-xs text-gray-500 mt-2"></p>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="closeNewFolderModal()" class="btn-secondary text-sm px-3 py-1.5" data-i18n="btn.cancel">Cancel</button>
+                    <button type="submit" class="btn-primary text-sm px-3 py-1.5" data-i18n="btn.create">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Bulk Edit Worklog -->
+    <div id="wl-bulk-edit-modal" class="modal-overlay hidden" onclick="closeBulkEditModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="wl.bulk_edit_title">Bulk Edit Selected Entries</h3>
+                <button onclick="closeBulkEditModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mb-3">
+                <span data-i18n="wl.bulk_edit_hint">Only checked fields will be applied.</span>
+                <span class="text-indigo-600 font-medium">(<span id="wl-bulk-edit-count">0</span>)</span>
+            </p>
+            <form onsubmit="confirmBulkEdit(event)" class="space-y-3">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="bulk-apply-project" class="rounded">
+                    <label for="bulk-apply-project" class="label mb-0 flex-shrink-0 w-24" data-i18n="modal.project">Project</label>
+                    <select id="bulk-project" class="input-field w-full">
+                        <option value="">Select...</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="bulk-apply-status" class="rounded">
+                    <label for="bulk-apply-status" class="label mb-0 flex-shrink-0 w-24" data-i18n="modal.status">Status</label>
+                    <select id="bulk-status" class="input-field w-full">
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Done">Done</option>
+                        <option value="Man day">Man day</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="bulk-apply-note" class="rounded">
+                    <label for="bulk-apply-note" class="label mb-0 flex-shrink-0 w-24" data-i18n="modal.note">Note</label>
+                    <input type="text" id="bulk-note" class="input-field w-full" data-i18n-ph="modal.note_ph" placeholder="Optional note">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeBulkEditModal()" class="btn-secondary text-sm px-3 py-1.5" data-i18n="btn.cancel">Cancel</button>
+                    <button type="submit" class="btn-primary text-sm px-3 py-1.5" data-i18n="modal.save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Add/Edit Worklog -->
+    <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-title" class="text-lg font-semibold text-gray-800" data-i18n="modal.add_entry">Add Work Log Entry</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="worklog-form" onsubmit="saveWorklog(event)">
+                <input type="hidden" id="wl-id">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-2 sm:col-span-1">
+                        <label class="label" id="wl-date-from-label" data-i18n="modal.date">Date</label>
+                        <input type="date" id="wl-date-from" class="input-field w-full" required>
+                    </div>
+                    <div class="col-span-2 sm:col-span-1 hidden" id="wl-date-to-div">
+                        <label class="label"><span data-i18n="modal.to">To</span> <span class="font-normal text-gray-400 text-xs" data-i18n="modal.to_opt">(optional)</span></label>
+                        <input type="date" id="wl-date-to" class="input-field w-full">
+                    </div>
+                    <div class="col-span-2 sm:col-span-1">
+                        <label class="label" data-i18n="modal.project">Project</label>
+                        <select id="wl-project" class="input-field w-full">
+                            <option value="">Select...</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="label" data-i18n="modal.task">Task</label>
+                        <input type="text" id="wl-task" class="input-field w-full" placeholder="What did you work on?" data-i18n-ph="modal.task_ph">
+                    </div>
+                    <div>
+                        <label class="label" data-i18n="modal.start_time">Start Time</label>
+                        <div class="time-picker-wrap">
+                            <svg class="time-picker-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <select id="wl-start-hour" class="time-sel time-hour"></select>
+                            <span class="time-sep">:</span>
+                            <select id="wl-start-min" class="time-sel time-min"></select>
+                            <select id="wl-start-ampm" class="time-sel time-ampm">
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
+                        </div>
+                        <div class="time-presets">
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-start','07:30')">7:30</button>
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-start','08:00')">8:00</button>
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-start','08:30')">8:30</button>
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-start','09:00')">9:00</button>
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-start','13:00')">1 PM</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label" data-i18n="modal.end_time">End Time</label>
+                        <div class="time-picker-wrap">
+                            <svg class="time-picker-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <select id="wl-end-hour" class="time-sel time-hour"></select>
+                            <span class="time-sep">:</span>
+                            <select id="wl-end-min" class="time-sel time-min"></select>
+                            <select id="wl-end-ampm" class="time-sel time-ampm">
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
+                        </div>
+                        <div class="time-presets">
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-end','12:00')">12 PM</button>
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-end','13:00')">1 PM</button>
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-end','17:00')">5:00</button>
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-end','17:30')">5:30</button>
+                            <button type="button" class="time-preset-btn" onclick="setTimePreset('wl-end','18:00')">6:00</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label" data-i18n="modal.status">Status</label>
+                        <select id="wl-status" class="input-field w-full">
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Done">Done</option>
+                            <option value="Man day">Man day</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label" data-i18n="modal.note">Note</label>
+                        <input type="text" id="wl-note" class="input-field w-full" placeholder="Optional note" data-i18n-ph="modal.note_ph">
+                    </div>
+                </div>
+                <!-- Multi-member section: shown only in "Add Entry for Multiple" mode -->
+                <div id="multi-member-section" class="hidden mt-4">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="label mb-0" data-i18n="modal.apply_members">Apply to members</label>
+                        <div class="flex gap-2 text-xs">
+                            <button type="button" onclick="toggleAllMultiMembers(true)" class="text-indigo-600 hover:underline" data-i18n="modal.all">All</button>
+                            <span class="text-gray-300">|</span>
+                            <button type="button" onclick="toggleAllMultiMembers(false)" class="text-gray-500 hover:underline" data-i18n="modal.none">None</button>
+                        </div>
+                    </div>
+                    <div id="multi-member-list" class="border border-gray-200 rounded-lg p-2 max-h-44 overflow-y-auto bg-gray-50">
+                        <!-- populated by JS -->
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-5">
+                    <button type="button" onclick="closeModal()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                    <button type="submit" class="btn-primary" id="modal-save-btn" data-i18n="modal.save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Export Modal (admin only) -->
+    <div id="bulk-export-overlay" class="modal-overlay hidden" onclick="closeBulkExportModal()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:420px">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="modal.export_title">Export Multiple Members</h3>
+                <button onclick="closeBulkExportModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Year picker -->
+            <div class="mb-4">
+                <label class="label" data-i18n="modal.year">Year</label>
+                <select id="bulk-year-select" class="input-field w-full"></select>
+            </div>
+
+            <!-- Select All -->
+            <div class="flex items-center gap-2 pb-2 mb-2 border-b border-gray-100">
+                <input type="checkbox" id="bulk-select-all" onchange="toggleBulkSelectAll()"
+                       class="w-4 h-4 text-indigo-600 rounded">
+                <label for="bulk-select-all" class="text-sm font-medium text-gray-700 cursor-pointer select-none" data-i18n="modal.select_all">Select All</label>
+            </div>
+
+            <!-- Member checkboxes -->
+            <div id="bulk-member-list" class="space-y-1 max-h-56 overflow-y-auto mb-5 pr-1"></div>
+
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeBulkExportModal()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                <button type="button" onclick="exportBulkMembers()"
+                        class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    <span data-i18n="modal.download_zip">Download ZIP</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Project Role Modal -->
+    <div id="add-project-role-overlay" class="modal-overlay hidden" onclick="closeAddProjectModal()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:360px">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="add-project-role-title" class="text-lg font-semibold text-gray-800">Add Project</h3>
+                <button onclick="closeAddProjectModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <select id="add-project-role-select" class="input-field w-full mb-5"></select>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeAddProjectModal()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                <button type="button" onclick="confirmAddProjectRole()" class="btn-primary" data-i18n="set.add">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════ SQUAD DRAFT PANEL ════════════════════════════ -->
+    <div id="draft-overlay" class="draft-overlay">
+
+        <!-- Header -->
+        <div class="draft-header">
+            <div class="draft-header-left">
+                <div class="draft-logo">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                </div>
+                <span class="draft-title-text">SQUAD DRAFT</span>
+                <span class="draft-subtitle">Team Competency Planner</span>
+            </div>
+            <div class="draft-header-right">
+                <button class="draft-save-btn" onclick="saveDraftDeployment()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M5 13l4 4L19 7"/>
+                    </svg>
+                    DEPLOY
+                </button>
+                <button class="draft-close-btn" onclick="closeDraftPanel()">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Project Tabs -->
+        <div class="draft-tabs-bar">
+            <div class="draft-tabs-label">PROJECT</div>
+            <div id="draft-project-tabs" class="draft-tabs"></div>
+        </div>
+
+        <!-- 3-column layout -->
+        <div class="draft-body">
+
+            <!-- LEFT: Synergies -->
+            <div class="draft-panel draft-panel-left">
+                <div class="draft-panel-header">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    SYNERGIES
+                </div>
+                <div id="draft-synergies" class="draft-synergy-list"></div>
+                <div class="draft-panel-footer" id="draft-team-size"></div>
+            </div>
+
+            <!-- CENTER: Field -->
+            <div class="draft-panel draft-panel-center">
+                <div class="draft-panel-header">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/>
+                    </svg>
+                    FIELD
+                </div>
+                <div id="draft-board-units" class="draft-board-grid"></div>
+                <!-- Power bar -->
+                <div class="draft-power-section">
+                    <div class="draft-power-label">
+                        <span>FIELD POWER</span>
+                        <span id="draft-power-num" class="draft-power-num">0</span>
+                        <span class="draft-power-unit">pts</span>
+                    </div>
+                    <div class="draft-power-track">
+                        <div id="draft-power-bar" class="draft-power-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Roster -->
+            <div class="draft-panel draft-panel-right">
+                <div class="draft-panel-header">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    ROSTER
+                    <span id="draft-roster-count" class="draft-count-badge"></span>
+                </div>
+                <div class="draft-roster-hint">Drag a member to a Field slot (or click to auto-place)</div>
+                <div id="draft-roster-list" class="draft-roster-list"></div>
+            </div>
+        </div>
+    </div>
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Skills Manager Modal -->
+    <div id="skills-modal-overlay" class="modal-overlay hidden" onclick="closeSkillsManager()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:560px">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="skills-modal-title" class="text-lg font-semibold text-gray-800">Skills</h3>
+                <button onclick="closeSkillsManager()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sort</span>
+                    <button id="skills-sort-level" type="button" class="skill-sort-btn active" onclick="setSkillsModalSort('level')">Level ↓</button>
+                    <button id="skills-sort-name"  type="button" class="skill-sort-btn"        onclick="setSkillsModalSort('name')">A → Z</button>
+                </div>
+                <button type="button" onclick="addSkillRow()" class="btn-primary text-sm" style="padding:0.4rem 0.85rem">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Skill
+                </button>
+            </div>
+
+            <div id="skills-editor-list" class="mb-4" style="max-height:50vh; overflow-y:auto;"></div>
+
+            <div class="text-xs text-gray-400 mb-3 italic">
+                Tip: click any segment in the bar to set the level. Click the trash to delete. Changes apply on Save.
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeSkillsManager()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                <button type="button" onclick="saveSkillsManager()" class="btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Month Filter Modal -->
+    <div id="month-filter-overlay" class="modal-overlay hidden" onclick="closeMonthFilterModal()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:360px">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="modal.select_months">Select Months to Export</h3>
+                <button onclick="closeMonthFilterModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="flex items-center gap-2 pb-2 mb-3 border-b border-gray-100">
+                <input type="checkbox" id="month-select-all" onchange="toggleMonthSelectAll()"
+                       class="w-4 h-4 text-indigo-600 rounded" checked>
+                <label for="month-select-all" class="text-sm font-medium text-gray-700 cursor-pointer select-none" data-i18n="modal.select_all">Select All</label>
+            </div>
+            <div id="month-cb-list" class="grid grid-cols-3 gap-1 mb-5"></div>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeMonthFilterModal()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                <button type="button" onclick="confirmMonthExport()"
+                        class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    <span data-i18n="modal.download">Download</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div id="reset-pw-overlay" class="modal-overlay hidden" onclick="closeResetPasswordModal()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:380px">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="modal.reset_password">Reset Password</h3>
+                <button onclick="closeResetPasswordModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <p id="reset-pw-label" class="text-sm text-gray-500 mb-4"></p>
+            <input type="hidden" id="reset-pw-uid">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1" data-i18n="modal.new_password">New Password</label>
+                    <input id="reset-pw-new" type="password" placeholder="Min. 8 characters" class="input-field w-full" data-i18n-ph="modal.new_pw_ph">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1" data-i18n="modal.confirm_password">Confirm Password</label>
+                    <input id="reset-pw-confirm" type="password" placeholder="Repeat password" class="input-field w-full" data-i18n-ph="modal.repeat_pw_ph">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button type="button" onclick="closeResetPasswordModal()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                <button type="button" onclick="saveResetPassword()" class="btn-primary" data-i18n="modal.save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Role Modal (Super_Ultimate_ADMIN only) -->
+    <div id="change-role-overlay" class="modal-overlay hidden" onclick="closeChangeRoleModal()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:360px">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="modal.change_role">Change Role</h3>
+                <button onclick="closeChangeRoleModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <p id="change-role-label" class="text-sm text-gray-500 mb-4"></p>
+            <input type="hidden" id="change-role-uid">
+            <div class="space-y-2">
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 role-radio-label">
+                    <input type="radio" name="change-role-radio" value="Admin" class="text-indigo-600">
+                    <div>
+                        <span class="text-sm font-semibold text-orange-600">Admin</span>
+                        <p class="text-xs text-gray-400" data-i18n="modal.admin_desc">Department administrator</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 role-radio-label">
+                    <input type="radio" name="change-role-radio" value="Leader" class="text-indigo-600">
+                    <div>
+                        <span class="text-sm font-semibold text-blue-600">Leader</span>
+                        <p class="text-xs text-gray-400" data-i18n="modal.leader_desc">Team lead</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 role-radio-label">
+                    <input type="radio" name="change-role-radio" value="Staff" class="text-indigo-600">
+                    <div>
+                        <span class="text-sm font-semibold text-gray-600">Staff</span>
+                        <p class="text-xs text-gray-400" data-i18n="modal.staff_desc">Regular staff member</p>
+                    </div>
+                </label>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button type="button" onclick="closeChangeRoleModal()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                <button type="button" onclick="saveChangeRole()" class="btn-primary" data-i18n="modal.save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Preview Lightbox -->
+    <div id="file-preview-modal" class="modal-overlay hidden" onclick="closeFilePreview(event)">
+        <div class="file-preview-content" onclick="event.stopPropagation()">
+            <div class="file-preview-header">
+                <span id="file-preview-name" class="text-sm font-medium text-gray-700 truncate"></span>
+                <div class="flex items-center gap-1">
+                    <a id="file-preview-download" href="#" download
+                       class="text-xs px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded inline-flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        Download
+                    </a>
+                    <button type="button" onclick="closeFilePreview()"
+                            class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="file-preview-body">
+                <img id="file-preview-img" alt="" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Uploads Modal -->
+    <div id="file-recent-modal" class="modal-overlay hidden" onclick="closeRecentUploads(event)">
+        <div class="modal-content" style="max-width:42rem" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-base font-semibold text-gray-800">Recent Uploads</h3>
+                <button type="button" onclick="closeRecentUploads()" class="p-1 text-gray-400 hover:text-gray-700 rounded">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="file-recent-body" class="max-h-[28rem] overflow-y-auto divide-y divide-gray-100"></div>
+        </div>
+    </div>
+
+    <!-- Upload Progress Panel (Google Drive style) -->
+    <div id="upload-panel" class="upload-panel hidden" data-active="0">
+        <header class="upload-panel-header">
+            <span id="upload-panel-title">Uploading…</span>
+            <div class="upload-panel-actions">
+                <button type="button" id="upload-panel-collapse" class="upload-panel-btn" title="Collapse">
+                    <svg class="upload-panel-collapse-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <button type="button" id="upload-panel-close" class="upload-panel-btn" title="Close" disabled>
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+        <div id="upload-panel-body" class="upload-panel-body"></div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

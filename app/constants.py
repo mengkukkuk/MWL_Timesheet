@@ -1,0 +1,8 @@
+ROLE_SUPER_ADMIN = 'Super_Ultimate_ADMIN'
+ROLE_ADMIN = 'Admin'
+ROLE_LEADER = 'Leader'
+ROLE_STAFF = 'Staff'
+
+ELEVATED_ROLES = (ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_LEADER)
+ASSIGNABLE_ROLES = (ROLE_ADMIN, ROLE_LEADER, ROLE_STAFF)
+PROJECT_MEMBER_COLUMNS = {'main': 'main_members', 'support': 'support_members'}
