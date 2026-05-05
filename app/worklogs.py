@@ -409,6 +409,9 @@ def get_projects_summary():
             overlap = min(e_min, LUNCH_E) - max(s_min, LUNCH_S)
             if overlap > 0:
                 total -= overlap
+                if total > 480.00 :
+                    total = 480.00
+            #print(f"total: {total:.2f} (overlap: {overlap:.2f})")
         return max(0.0, total / 60.0)
 
     # Aggregate per (project, employee), summing the per-day capped hours.
@@ -419,6 +422,7 @@ def get_projects_summary():
         capped = min(raw, cap) if cap > 0 else raw
         if capped <= 0:
             continue
+
         key = (r['project_name'], r['employee_id'])
         entry = acc.setdefault(key, {
             'employee_id': r['employee_id'],
@@ -438,8 +442,8 @@ def get_projects_summary():
         bucket['total_hours'] += entry['hours']
         bucket['employees'].append({
             'employee_id': entry['employee_id'],
-            'name': entry['name'],
             'hours': round(entry['hours'], 2),
+            'name': entry['name'],
         })
 
     projects = [p for p in by_project.values() if p['total_hours'] > 0]
