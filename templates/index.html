@@ -6,7 +6,56 @@
     <title>MWL Timesheet</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" integrity="sha384-HtMZLkYo+pR5/u7zCzXxMJP6QoNnQJt1qkHM0EaOPvGDIzaVZbmYr/TlvUZ/sKAg" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <style>
+/* ── Projects Summary Dashboard ─────────────────────── */
+.ps-dash-title{font-family:'Syne',-apple-system,sans-serif;font-size:1.375rem;font-weight:800;color:#0f172a;letter-spacing:-.03em}
+.ps-dash-subtitle{font-size:.8125rem;color:#94a3b8;margin-top:2px}
+.ps-controls{background:#fff;border:1px solid #e2e8f0;border-radius:.625rem;padding:.4375rem .875rem;box-shadow:0 1px 3px rgba(0,0,0,.05);display:flex;align-items:center;gap:.5rem}
+.ps-sel{border:none;outline:none;font-size:.875rem;color:#374151;background:transparent;cursor:pointer;font-weight:500}
+.ps-sel:focus{outline:none}
+
+/* KPI */
+.ps-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.875rem;margin-bottom:1rem}
+.ps-kpi-card{background:#fff;border-radius:.875rem;padding:1.125rem 1.25rem;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.03);position:relative;overflow:hidden;transition:box-shadow .2s,transform .2s}
+.ps-kpi-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.08);transform:translateY(-1px)}
+.ps-kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kpi-color,#4f46e5);border-radius:3px 3px 0 0}
+.ps-kpi-icon{width:34px;height:34px;border-radius:.5rem;background:var(--kpi-color-bg,#eff6ff);color:var(--kpi-color,#4f46e5);display:flex;align-items:center;justify-content:center;margin-bottom:.75rem}
+.ps-kpi-value{font-family:'DM Mono','Courier New',monospace;font-size:1.75rem;font-weight:600;color:#0f172a;letter-spacing:-.04em;line-height:1;display:block}
+.ps-kpi-label{font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-top:.3125rem;display:block}
+
+/* Charts */
+.ps-charts-row{display:grid;grid-template-columns:1fr 300px;gap:.875rem;margin-bottom:1rem;align-items:start}
+.ps-chart-card{background:#fff;border-radius:.875rem;padding:1.25rem 1.5rem;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.03)}
+.ps-chart-title{font-family:'Syne',sans-serif;font-size:.9375rem;font-weight:700;color:#1e293b}
+.ps-chart-sub{font-size:.75rem;color:#94a3b8;margin-top:2px;margin-bottom:1rem}
+
+/* Donut legend */
+.ps-legend{display:flex;flex-direction:column;gap:.3125rem}
+.ps-legend-item{display:flex;align-items:center;gap:.5rem;font-size:.75rem;padding:.1875rem 0}
+.ps-legend-swatch{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ps-legend-name{flex:1;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ps-legend-pct{font-family:'DM Mono',monospace;font-size:.6875rem;color:#64748b;font-weight:500;white-space:nowrap}
+
+/* Detail table */
+.ps-detail-card{background:#fff;border-radius:.875rem;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.03);overflow:hidden}
+.ps-detail-header{padding:.875rem 1.25rem;border-bottom:1px solid #f8fafc;display:flex;align-items:center;gap:.4375rem;background:#fafbfc}
+.ps-detail-title{font-family:'Syne',sans-serif;font-size:.8125rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.07em}
+.ps-proj-row{border-bottom:1px solid #f8fafc;cursor:pointer;transition:background .1s}
+.ps-proj-row:hover{background:#f8fafc}
+.ps-proj-row.expanded{background:#fafbfc}
+.ps-emp-row{border-bottom:1px solid #f1f5f9;background:#fafbfd}
+.ps-hours-badge{display:inline-flex;align-items:center;font-family:'DM Mono',monospace;font-size:.75rem;font-weight:600;padding:.1875rem .625rem;border-radius:2rem;background:#eff6ff;color:#1d4ed8}
+.ps-hours-badge.emp{background:#f0fdf4;color:#15803d;font-size:.6875rem;font-weight:500}
+.ps-share-bar-bg{background:#f1f5f9;border-radius:4px;height:6px;overflow:hidden;width:100%}
+.ps-share-bar-fill{height:100%;border-radius:4px;background:var(--bar-color,#4f46e5);transition:width .6s cubic-bezier(.4,0,.2,1)}
+.ps-share-pct{font-family:'DM Mono',monospace;font-size:.6875rem;color:#94a3b8;min-width:3.5ch;text-align:right}
+.ps-chevron{transition:transform .2s;color:#94a3b8}
+.ps-chevron.open{transform:rotate(90deg)}
+.ps-proj-color-bar{width:3px;border-radius:2px;display:inline-block;flex-shrink:0}
+    </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
 
@@ -551,32 +600,99 @@
 
         <!-- Projects Summary View (elevated only) -->
         <div id="view-projects-summary" class="hidden">
-            <div class="flex items-center justify-between mb-5">
+
+            <!-- Header -->
+            <div class="flex items-end justify-between mb-6">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800" data-i18n="ps.title">Projects Summary</h2>
-                    <p class="text-sm text-gray-400 mt-0.5" data-i18n="ps.subtitle">Hours logged per project for the selected month.</p>
+                    <h2 class="ps-dash-title" data-i18n="ps.title">Projects Summary</h2>
+                    <p class="ps-dash-subtitle" data-i18n="ps.subtitle">Monthly worklog analytics</p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <label for="ps-year" class="text-sm font-medium text-gray-600" data-i18n="sel.year">Year:</label>
-                    <select id="ps-year" onchange="loadProjectsSummary()" class="input-field w-28"></select>
-                    <label for="ps-month" class="text-sm font-medium text-gray-600" data-i18n="wl.month_label">Month:</label>
-                    <select id="ps-month" onchange="loadProjectsSummary()" class="input-field w-40"></select>
+                <div class="ps-controls">
+                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <select id="ps-year" onchange="loadProjectsSummary()" class="ps-sel"></select>
+                    <span class="text-gray-300 text-sm select-none">/</span>
+                    <select id="ps-month" onchange="loadProjectsSummary()" class="ps-sel"></select>
                 </div>
             </div>
-            <div id="ps-empty" class="hidden text-sm text-gray-500 italic py-8 text-center" data-i18n="ps.empty">No project activity in this period.</div>
-            <div id="ps-table-wrap" class="card bg-white">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="text-xs text-gray-500 uppercase tracking-wide border-b border-gray-200">
-                            <th class="py-2 px-3 text-left w-8"></th>
-                            <th class="py-2 px-3 text-left" data-i18n="ps.col_project">Project</th>
-                            <th class="py-2 px-3 text-right" data-i18n="ps.col_employees">Employees</th>
-                            <th class="py-2 px-3 text-right" data-i18n="ps.col_hours">Total Hours</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ps-tbody"></tbody>
-                </table>
+
+            <!-- KPI Cards -->
+            <div class="ps-kpi-grid" id="ps-kpi-section">
+                <div class="ps-kpi-card" style="--kpi-color:#4f46e5;--kpi-color-bg:#eef2ff">
+                    <div class="ps-kpi-icon">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                    </div>
+                    <span class="ps-kpi-value" id="ps-kpi-projects">—</span>
+                    <span class="ps-kpi-label" data-i18n="ps.kpi_projects">Active Projects</span>
+                </div>
+                <div class="ps-kpi-card" style="--kpi-color:#10b981;--kpi-color-bg:#ecfdf5">
+                    <div class="ps-kpi-icon">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <span class="ps-kpi-value" id="ps-kpi-hours">—</span>
+                    <span class="ps-kpi-label" data-i18n="ps.kpi_hours">Total Hours</span>
+                </div>
+                <div class="ps-kpi-card" style="--kpi-color:#8b5cf6;--kpi-color-bg:#f5f3ff">
+                    <div class="ps-kpi-icon">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                    <span class="ps-kpi-value" id="ps-kpi-employees">—</span>
+                    <span class="ps-kpi-label" data-i18n="ps.kpi_employees">Active Employees</span>
+                </div>
+                <div class="ps-kpi-card" style="--kpi-color:#f59e0b;--kpi-color-bg:#fffbeb">
+                    <div class="ps-kpi-icon">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    </div>
+                    <span class="ps-kpi-value" id="ps-kpi-avg">—</span>
+                    <span class="ps-kpi-label" data-i18n="ps.kpi_avg">Avg hrs / Project</span>
+                </div>
             </div>
+
+            <!-- Charts Row -->
+            <div class="ps-charts-row" id="ps-charts-row">
+                <!-- Bar chart -->
+                <div class="ps-chart-card">
+                    <div class="ps-chart-title" data-i18n="ps.chart_hours_title">Hours by Project</div>
+                    <div class="ps-chart-sub" id="ps-bar-period-label"></div>
+                    <div id="ps-bar-wrap" style="position:relative;">
+                        <canvas id="ps-bar-canvas"></canvas>
+                    </div>
+                </div>
+                <!-- Donut chart -->
+                <div class="ps-chart-card">
+                    <div class="ps-chart-title" data-i18n="ps.chart_dist_title">Distribution</div>
+                    <div class="ps-chart-sub">&nbsp;</div>
+                    <div style="position:relative;height:210px;">
+                        <canvas id="ps-donut-canvas"></canvas>
+                    </div>
+                    <div id="ps-legend" class="ps-legend mt-4" style="max-height:160px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
+            <!-- Project Breakdown Table -->
+            <div class="ps-detail-card">
+                <div class="ps-detail-header">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    <span class="ps-detail-title" data-i18n="ps.detail_title">Project Breakdown</span>
+                </div>
+                <div id="ps-empty" class="hidden text-sm text-gray-400 italic py-10 text-center" data-i18n="ps.empty">No project activity in this period.</div>
+                <div id="ps-table-wrap">
+                    <table class="w-full text-sm" style="border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f8fafc;border-bottom:2px solid #f1f5f9;">
+                                <th class="py-2.5 px-4 w-8" style="font-size:.6875rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;font-weight:600;"></th>
+                                <th class="py-2.5 px-4 text-left" style="font-size:.6875rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;font-weight:600;" data-i18n="ps.col_project">Project</th>
+                                <th class="py-2.5 px-4 text-right" style="font-size:.6875rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;font-weight:600;" data-i18n="ps.col_employees">Members</th>
+                                <th class="py-2.5 px-4 text-right" style="font-size:.6875rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;font-weight:600;" data-i18n="ps.col_hours">Hours</th>
+                                <th class="py-2.5 px-4 text-left" style="font-size:.6875rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;font-weight:600;min-width:140px;" data-i18n="ps.col_share">Share</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ps-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </main>
 

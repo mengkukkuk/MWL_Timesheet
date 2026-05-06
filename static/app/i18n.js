@@ -11,11 +11,19 @@ const _i18n = {
 
         // Projects Summary
         'ps.title': 'Projects Summary',
-        'ps.subtitle': 'Hours logged per project for the selected month.',
+        'ps.subtitle': 'Monthly worklog analytics',
         'ps.empty': 'No project activity in this period.',
         'ps.col_project': 'Project',
-        'ps.col_employees': 'Employees',
-        'ps.col_hours': 'Total Hours',
+        'ps.col_employees': 'Members',
+        'ps.col_hours': 'Hours',
+        'ps.col_share': 'Share',
+        'ps.kpi_projects': 'Active Projects',
+        'ps.kpi_hours': 'Total Hours',
+        'ps.kpi_employees': 'Active Employees',
+        'ps.kpi_avg': 'Avg hrs / Project',
+        'ps.chart_hours_title': 'Hours by Project',
+        'ps.chart_dist_title': 'Distribution',
+        'ps.detail_title': 'Project Breakdown',
 
         // File Share
         'files.title': 'File Share',
@@ -272,11 +280,19 @@ const _i18n = {
 
         // Projects Summary
         'ps.title': 'สรุปโปรเจกต์',
-        'ps.subtitle': 'ชั่วโมงที่บันทึกต่อโปรเจกต์ในเดือนที่เลือก',
+        'ps.subtitle': 'วิเคราะห์ชั่วโมงทำงานรายเดือน',
         'ps.empty': 'ไม่มีกิจกรรมโปรเจกต์ในช่วงเวลานี้',
         'ps.col_project': 'โปรเจกต์',
-        'ps.col_employees': 'จำนวนคน',
-        'ps.col_hours': 'ชั่วโมงรวม',
+        'ps.col_employees': 'สมาชิก',
+        'ps.col_hours': 'ชั่วโมง',
+        'ps.col_share': 'สัดส่วน',
+        'ps.kpi_projects': 'โปรเจกต์ที่ใช้งาน',
+        'ps.kpi_hours': 'ชั่วโมงรวม',
+        'ps.kpi_employees': 'พนักงานที่ใช้งาน',
+        'ps.kpi_avg': 'ชม. เฉลี่ย / โปรเจกต์',
+        'ps.chart_hours_title': 'ชั่วโมงตามโปรเจกต์',
+        'ps.chart_dist_title': 'การกระจาย',
+        'ps.detail_title': 'รายละเอียดโปรเจกต์',
 
         // File Share
         'files.title': 'แชร์ไฟล์',
