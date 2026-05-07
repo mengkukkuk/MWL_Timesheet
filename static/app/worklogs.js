@@ -585,6 +585,7 @@ async function saveWorklog(e) {
         }
         if (ok === 0) {
             toast(t('toast.failed_save'), 'error');
+            toast(t('toast.overlap'), 'error_overlap');
             return;
         }
         toast(dates.length > 1 ? t('toast.added_days', ok, dates.length) : t('toast.entry_added'));

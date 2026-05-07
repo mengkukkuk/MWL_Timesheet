@@ -264,6 +264,7 @@ const _i18n = {
         'toast.select_one_member': 'Select at least one member',
         'toast.select_one_month': 'Select at least one month',
         'toast.failed_save': 'Failed to save entry',
+        'toast.overlap': 'Time range overlaps with another worklog',
         'toast.own_entries_only': 'You can only add entries for yourself',
         'toast.own_edit_only': 'You can only edit your own entries',
         'toast.name_dept_required': 'Name and department are required',

@@ -8,12 +8,13 @@ left in place but no longer authoritative.
 import calendar
 
 from datetime import date
-from datetime import datetime
+from datetime import datetime,time
 
 from flask import Blueprint
 from flask import jsonify
 from flask import request
 from flask import session
+from sympy import false
 
 import app as app_pkg
 
@@ -69,6 +70,17 @@ def get_worklogs():
 
     return jsonify(rows)
 
+def to_time(value):
+    if isinstance(value, time):
+        return value
+    if isinstance(value, str):
+        # supports "HH:MM" and "HH:MM:SS"
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                return datetime.strptime(value.strip(), fmt).time()
+            except ValueError:
+                pass
+    raise ValueError(f"Invalid time value: {value!r}")
 
 @worklogs_bp.route('/api/worklogs', methods=['POST'])
 @login_required
@@ -77,6 +89,10 @@ def create_worklog():
     project = data.get('project', '')
     task = data.get('task', '')
     note = data.get('note', '')
+    log_date = data.get('log_date', '').strip()
+    ns = data.get('start_time')
+    ne = data.get('end_time')
+    print(log_date,ns,ne)
 
     if len(project) > 200:
         return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
@@ -88,11 +104,11 @@ def create_worklog():
     if status not in VALID_STATUSES:
         return jsonify({'error': 'Invalid status'}), 400
 
-    log_date = data.get('log_date', '').strip()
+    #log_date = data.get('log_date', '').strip()
     if not log_date:
         return jsonify({'error': 'log_date is required'}), 400
     try:
-        datetime.strptime(log_date, '%Y-%m-%d')
+        datetime.strptime(log_date, '%Y-%m-%d') #Check time format
     except ValueError:
         return jsonify({'error': 'Invalid date format, expected YYYY-MM-DD'}), 400
 
@@ -115,6 +131,38 @@ def create_worklog():
     )
     if not emp:
         return jsonify({'error': 'Employee not found'}), 404
+
+    #Check if input time range is overlap with existed time range
+    overlap_time = app_pkg.db.query(
+        "SELECT start_time, end_time FROM worklogs WHERE EmployeeID = ? AND log_date = ?",
+        (target_employee, log_date),fetchone=false,
+    )
+
+    #Create Time Range List
+    ns = to_time(data.get('start_time'))
+    ne = to_time(data.get('end_time'))
+    start_time = []
+    end_time = []
+
+    if overlap_time:
+        for i in range(len(overlap_time)):
+            start_time.append(overlap_time[i]['start_time'])
+            end_time.append(overlap_time[i]['end_time'])
+
+            print("\noverlap_time_st: ",overlap_time[i]['start_time'])
+            print("overlap_time_end: ",overlap_time[i]['end_time'])
+            print("start_time: ",start_time)
+            print("end_time: ",end_time)
+    else:
+        print("no overlap")
+
+    for i in range(len(start_time)):
+        st = to_time(start_time[i])
+        et = to_time(end_time[i])
+
+        if (ns <= st < ne) or (ns < et <= ne) or (st < ns and ne < et):
+            # overlap found
+            return jsonify({'error_overlap': 'Time range overlaps with another worklog'}), 400
 
     # EmployeeID is authoritative. The legacy member_id column is nullable after
     # migration and must not receive EmployeeID values because it used to FK to
@@ -153,6 +201,7 @@ def update_worklog(wid):
     task = data.get('task', '')
     note = data.get('note', '')
 
+    #Not necessary to check if the worklog is open, because the frontend will not allow to create a worklog if the worklog is not open
     if len(project) > 200:
         return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
     if len(task) > 500:
