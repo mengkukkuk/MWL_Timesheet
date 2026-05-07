@@ -14,6 +14,7 @@ from flask import Blueprint
 from flask import jsonify
 from flask import request
 from flask import session
+from sympy import false
 
 import app as app_pkg
 
@@ -77,6 +78,10 @@ def create_worklog():
     project = data.get('project', '')
     task = data.get('task', '')
     note = data.get('note', '')
+    log_date = data.get('log_date', '').strip()
+    ns = data.get('start_time')
+    ne = data.get('end_time')
+    print(log_date,ns,ne)
 
     if len(project) > 200:
         return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
@@ -88,11 +93,11 @@ def create_worklog():
     if status not in VALID_STATUSES:
         return jsonify({'error': 'Invalid status'}), 400
 
-    log_date = data.get('log_date', '').strip()
+    #log_date = data.get('log_date', '').strip()
     if not log_date:
         return jsonify({'error': 'log_date is required'}), 400
     try:
-        datetime.strptime(log_date, '%Y-%m-%d')
+        datetime.strptime(log_date, '%Y-%m-%d') #Check time format
     except ValueError:
         return jsonify({'error': 'Invalid date format, expected YYYY-MM-DD'}), 400
 
@@ -115,6 +120,32 @@ def create_worklog():
     )
     if not emp:
         return jsonify({'error': 'Employee not found'}), 404
+
+    #Check if input time range is overlap with existed time range
+    overlap_time = app_pkg.db.query(
+        "SELECT start_time, end_time FROM worklogs WHERE EmployeeID = ? AND log_date = ?",
+        (target_employee, log_date),fetchone=false,
+    )
+
+    start_time = []
+    end_time = []
+
+    if overlap_time:
+        for i in range(len(overlap_time)):
+            print("\noverlap_time: ",overlap_time[i]['start_time'])
+            print("overlap_time: ",overlap_time[i]['end_time'])
+            start_time.append(overlap_time[i]['start_time'])
+            end_time.append(overlap_time[i]['end_time'])
+            print("start_time: ",start_time)
+            print("end_time: ",end_time)
+    else:
+        print("no overlap")
+    print("final start_time: ",start_time)
+    print("final end_time: ",end_time)
+
+    for i in range(len(start_time)):
+        if (ns <= start_time[i] < ne) or (ns < end_time[i] <= ne):
+            return jsonify({'error': 'Time range overlaps with another worklog'}), 400
 
     # EmployeeID is authoritative. The legacy member_id column is nullable after
     # migration and must not receive EmployeeID values because it used to FK to
