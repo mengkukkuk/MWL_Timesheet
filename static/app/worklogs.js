@@ -559,7 +559,9 @@ async function saveWorklog(e) {
         const memberId = isElevated() ? currentMemberId : currentUser.member_id;
         const res = await api(`/api/worklogs/${id}`, { method: 'PUT', body: { ...basePayload, member_id: memberId } });
         if (!res) return;
-        if (res.error) { toast(res.error, 'error'); return; }
+        if (res.error) { toast(res.error, 'error');
+                         toast(t('toast.overlap'), 'error_overlap');
+                         return; }
         toast(t('toast.entry_updated'));
     } else if (_multiAddMode) {
         // Multi-member × date range
@@ -583,6 +585,7 @@ async function saveWorklog(e) {
             const res = await api('/api/worklogs', { method: 'POST', body: { ...basePayload, log_date: d, member_id: memberId } });
             if (res && res.id) ok++;
         }
+        //Error
         if (ok === 0) {
             toast(t('toast.failed_save'), 'error');
             toast(t('toast.overlap'), 'error_overlap');

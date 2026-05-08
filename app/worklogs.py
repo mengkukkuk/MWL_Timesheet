@@ -15,6 +15,7 @@ from flask import jsonify
 from flask import request
 from flask import session
 from sympy import false
+from sympy.codegen.ast import continue_
 
 import app as app_pkg
 
@@ -24,7 +25,6 @@ from .constants import ELEVATED_ROLES
 
 worklogs_bp = Blueprint('worklogs', __name__)
 VALID_STATUSES = {'Done', 'In Progress', 'Pending', 'Man day'}
-
 
 @worklogs_bp.route('/api/worklogs', methods=['GET'])
 @login_required
@@ -70,6 +70,14 @@ def get_worklogs():
 
     return jsonify(rows)
 
+#Check if the input time range is overlap with existed time range
+def check_overlap(start_time, end_time, overlap_time):
+    for i in range(len(overlap_time)):
+        st = overlap_time[i]['start_time']
+        et = overlap_time[i]['end_time']
+        if (start_time <= st < end_time) or (start_time < et <= end_time) or (st < start_time and end_time < et):
+            return True
+    return False
 def to_time(value):
     if isinstance(value, time):
         return value
@@ -81,6 +89,15 @@ def to_time(value):
             except ValueError:
                 pass
     raise ValueError(f"Invalid time value: {value!r}")
+#Check if the input time range is overlap with existed time range//
+
+def check_overlap(start_time, end_time, overlap_time):
+    for i in range(len(overlap_time)):
+        st = overlap_time[i]['start_time']
+        et = overlap_time[i]['end_time']
+        if (start_time <= st < end_time) or (start_time < et <= end_time) or (st < start_time and end_time < et):
+            return True
+    return False
 
 @worklogs_bp.route('/api/worklogs', methods=['POST'])
 @login_required
@@ -90,9 +107,6 @@ def create_worklog():
     task = data.get('task', '')
     note = data.get('note', '')
     log_date = data.get('log_date', '').strip()
-    ns = data.get('start_time')
-    ne = data.get('end_time')
-    print(log_date,ns,ne)
 
     if len(project) > 200:
         return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
@@ -141,28 +155,8 @@ def create_worklog():
     #Create Time Range List
     ns = to_time(data.get('start_time'))
     ne = to_time(data.get('end_time'))
-    start_time = []
-    end_time = []
-
-    if overlap_time:
-        for i in range(len(overlap_time)):
-            start_time.append(overlap_time[i]['start_time'])
-            end_time.append(overlap_time[i]['end_time'])
-
-            print("\noverlap_time_st: ",overlap_time[i]['start_time'])
-            print("overlap_time_end: ",overlap_time[i]['end_time'])
-            print("start_time: ",start_time)
-            print("end_time: ",end_time)
-    else:
-        print("no overlap")
-
-    for i in range(len(start_time)):
-        st = to_time(start_time[i])
-        et = to_time(end_time[i])
-
-        if (ns <= st < ne) or (ns < et <= ne) or (st < ns and ne < et):
-            # overlap found
-            return jsonify({'error_overlap': 'Time range overlaps with another worklog'}), 400
+    if check_overlap(ns, ne, overlap_time):
+        return jsonify({'error': 'Time range overlaps with another worklog'}), 400
 
     # EmployeeID is authoritative. The legacy member_id column is nullable after
     # migration and must not receive EmployeeID values because it used to FK to
@@ -200,6 +194,8 @@ def update_worklog(wid):
     project = data.get('project', '')
     task = data.get('task', '')
     note = data.get('note', '')
+    member_id = data.get('member_id')
+    print(type(member_id))
 
     #Not necessary to check if the worklog is open, because the frontend will not allow to create a worklog if the worklog is not open
     if len(project) > 200:
@@ -220,7 +216,18 @@ def update_worklog(wid):
     except ValueError:
         return jsonify({'error': 'Invalid date format, expected YYYY-MM-DD'}), 400
 
-    app_pkg.db.execute(
+
+    #Check if input time range is overlap with existed time range
+    overlap_time = app_pkg.db.query(
+        "SELECT start_time, end_time FROM worklogs WHERE EmployeeID = ? AND log_date = ? AND id != ?",
+        (member_id, log_date, wid),fetchone=false,
+    )
+    ns = to_time(data.get('start_time'))
+    ne = to_time(data.get('end_time'))
+    if check_overlap(ns, ne, overlap_time):
+        return jsonify({'error': 'Time range overlaps with another worklog'}), 400
+    else:
+        app_pkg.db.execute(
         """
         UPDATE worklogs SET log_date=?, project=?, task=?, start_time=?, end_time=?,
                status=?, note=?, updated_at=GETDATE()
@@ -232,8 +239,9 @@ def update_worklog(wid):
             data.get('end_time') or None,
             status, note,
             wid,
-        ),
-    )
+            ),
+        )
+        print("Update worklog success")
     return jsonify({'ok': True})
 
 
