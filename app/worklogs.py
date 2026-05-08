@@ -91,14 +91,6 @@ def to_time(value):
     raise ValueError(f"Invalid time value: {value!r}")
 #Check if the input time range is overlap with existed time range//
 
-def check_overlap(start_time, end_time, overlap_time):
-    for i in range(len(overlap_time)):
-        st = overlap_time[i]['start_time']
-        et = overlap_time[i]['end_time']
-        if (start_time <= st < end_time) or (start_time < et <= end_time) or (st < start_time and end_time < et):
-            return True
-    return False
-
 @worklogs_bp.route('/api/worklogs', methods=['POST'])
 @login_required
 def create_worklog():
@@ -152,7 +144,6 @@ def create_worklog():
         (target_employee, log_date),fetchone=false,
     )
 
-    #Create Time Range List
     ns = to_time(data.get('start_time'))
     ne = to_time(data.get('end_time'))
     if check_overlap(ns, ne, overlap_time):
@@ -226,22 +217,22 @@ def update_worklog(wid):
     ne = to_time(data.get('end_time'))
     if check_overlap(ns, ne, overlap_time):
         return jsonify({'error': 'Time range overlaps with another worklog'}), 400
-    else:
-        app_pkg.db.execute(
-        """
-        UPDATE worklogs SET log_date=?, project=?, task=?, start_time=?, end_time=?,
-               status=?, note=?, updated_at=GETDATE()
-        WHERE id=?
-        """,
-        (
-            log_date, project, task,
-            data.get('start_time') or None,
-            data.get('end_time') or None,
-            status, note,
-            wid,
-            ),
-        )
-        print("Update worklog success")
+
+    app_pkg.db.execute(
+    """
+    UPDATE worklogs SET log_date=?, project=?, task=?, start_time=?, end_time=?,
+           status=?, note=?, updated_at=GETDATE()
+    WHERE id=?
+    """,
+    (
+        log_date, project, task,
+        data.get('start_time') or None,
+        data.get('end_time') or None,
+        status, note,
+        wid,
+        ),
+    )
+    print("Update worklog success")
     return jsonify({'ok': True})
 
 
