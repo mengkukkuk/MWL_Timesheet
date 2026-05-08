@@ -91,14 +91,6 @@ def to_time(value):
     raise ValueError(f"Invalid time value: {value!r}")
 #Check if the input time range is overlap with existed time range//
 
-def check_overlap(start_time, end_time, overlap_time):
-    for i in range(len(overlap_time)):
-        st = overlap_time[i]['start_time']
-        et = overlap_time[i]['end_time']
-        if (start_time <= st < end_time) or (start_time < et <= end_time) or (st < start_time and end_time < et):
-            return True
-    return False
-
 @worklogs_bp.route('/api/worklogs', methods=['POST'])
 @login_required
 def create_worklog():
