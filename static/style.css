@@ -197,6 +197,23 @@ body {
     margin-bottom: 1rem;
 }
 
+.existing-ranges-box {
+    padding: 0.5rem 0.75rem;
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+.existing-ranges-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+.existing-ranges-box ul { margin: 0; padding-left: 1rem; }
+.existing-ranges-box li { line-height: 1.5; }
+.existing-ranges-date { font-weight: 600; margin-top: 0.25rem; list-style: none; margin-left: -1rem; }
+
 /* ── View Toggle ── */
 .view-toggle {
     display: inline-flex;

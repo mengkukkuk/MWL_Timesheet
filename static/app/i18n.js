@@ -171,6 +171,7 @@ const _i18n = {
         'modal.project': 'Project',
         'modal.task': 'Task',
         'modal.task_ph': 'What did you work on?',
+        'modal.existing_ranges_title': 'Existing time ranges on this date',
         'modal.start_time': 'Start Time',
         'modal.end_time': 'End Time',
         'modal.status': 'Status',
@@ -281,7 +282,7 @@ const _i18n = {
 
         // Projects Summary
         'ps.title': 'สรุปโปรเจกต์',
-        'ps.subtitle': 'วิเคราะห์ชั่วโมงทำงานรายเดือน',
+        'ps.subtitle': 'วิเคราะห์ชั่วโมงการทำงานรายเดือน',
         'ps.empty': 'ไม่มีกิจกรรมโปรเจกต์ในช่วงเวลานี้',
         'ps.col_project': 'โปรเจกต์',
         'ps.col_employees': 'สมาชิก',
@@ -293,7 +294,7 @@ const _i18n = {
         'ps.kpi_avg': 'ชม. เฉลี่ย / โปรเจกต์',
         'ps.chart_hours_title': 'ชั่วโมงตามโปรเจกต์',
         'ps.chart_dist_title': 'การกระจาย',
-        'ps.detail_title': 'รายละเอียดโปรเจกต์',
+        'ps.detail_title': 'รายละเอียดของโปรเจกต์',
 
         // File Share
         'files.title': 'แชร์ไฟล์',
@@ -382,7 +383,7 @@ const _i18n = {
         'wl.bulk_edit': 'แก้ไขหลายรายการ',
         'wl.bulk_delete': 'ลบหลายรายการ',
         'wl.bulk_edit_title': 'แก้ไขรายการที่เลือก',
-        'wl.bulk_edit_hint': 'จะนำไปใช้กับทุกรายการที่เลือกเฉพาะฟิลด์ที่ติ๊ก',
+        'wl.bulk_edit_hint': 'จะนำไปใช้กับทุกรายการที่เลือกเฉพาะฟิลด์ที่ติ๊กถูก',
 
         // Calendar day-of-week
         'cal.mon': 'จ.', 'cal.tue': 'อ.', 'cal.wed': 'พ.',
@@ -441,6 +442,7 @@ const _i18n = {
         'modal.project': 'โปรเจกต์',
         'modal.task': 'งาน',
         'modal.task_ph': 'คุณทำงานอะไร?',
+        'modal.existing_ranges_title': 'ช่วงเวลาที่มีการบันทึกไว้แล้ว(ไม่สามารถลงซ้ำได้)',
         'modal.start_time': 'เวลาเริ่ม',
         'modal.end_time': 'เวลาสิ้นสุด',
         'modal.status': 'สถานะ',
@@ -476,9 +478,9 @@ const _i18n = {
 
         // Modal — change role
         'modal.change_role': 'เปลี่ยนตำแหน่ง',
-        'modal.admin_desc': 'ผู้ดูแลแผนก',
-        'modal.leader_desc': 'หัวหน้าทีม',
-        'modal.staff_desc': 'พนักงานทั่วไป',
+        'modal.admin_desc': 'Admin',
+        'modal.leader_desc': 'Leader',
+        'modal.staff_desc': 'Staff',
 
         // Login page
         'login.title': 'บันทึกงานทีม',
@@ -510,7 +512,7 @@ const _i18n = {
         'login.resetting': 'กำลังรีเซ็ต...',
         'login.reset_success': 'รีเซ็ตรหัสผ่านสำเร็จ! กรุณาเข้าสู่ระบบ',
         'login.no_staff_id': 'บัญชีของคุณไม่มีรหัสพนักงาน กรุณาติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน',
-        'login.remember': 'จำฉันไว้',
+        'login.remember': 'Remember me',
         'login.pending_approval': 'บัญชีของคุณรอการอนุมัติจากผู้ดูแลระบบ',
         'login.declined': 'บัญชีของคุณถูกปฏิเสธ กรุณาติดต่อผู้ดูแลระบบ',
         'login.pending_approval_after_register': 'สร้างบัญชีสำเร็จ กรุณารอผู้ดูแลระบบอนุมัติก่อนเข้าใช้งาน',

@@ -438,6 +438,53 @@ function setDateRangeMode(show) {
     if (!show) document.getElementById('wl-date-to').value = '';
 }
 
+// ── Existing-ranges display (below Task input) ──
+function renderExistingRanges() {
+    const box  = document.getElementById('wl-existing-ranges');
+    const list = document.getElementById('wl-existing-ranges-list');
+    if (!box || !list) return;
+    list.innerHTML = '';
+    box.classList.add('hidden');
+
+    if (!currentMemberId || !Array.isArray(worklogData)) return;
+
+    const fromStr = document.getElementById('wl-date-from').value;
+    const toStr   = document.getElementById('wl-date-to').value;
+    if (!fromStr) return;
+
+    const dates = toStr ? dateRange(fromStr, toStr) : [fromStr];
+    const editingId = Number(document.getElementById('wl-id').value) || null;
+
+    let total = 0;
+    dates.forEach(d => {
+        const entries = worklogData.filter(w =>
+            w.log_date === d &&
+            Number(w.member_id) === Number(currentMemberId) &&
+            (!editingId || Number(w.id) !== editingId) &&
+            w.start_time && w.end_time
+        ).sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+        if (!entries.length) return;
+        total += entries.length;
+
+        if (dates.length > 1) {
+            const dateLi = document.createElement('li');
+            dateLi.className = 'existing-ranges-date';
+            dateLi.textContent = d;
+            list.appendChild(dateLi);
+        }
+
+        entries.forEach(w => {
+            const li = document.createElement('li');
+            const taskTxt = w.task ? ` — ${w.task}` : '';
+            li.textContent = `${w.start_time} – ${w.end_time}${taskTxt}`;
+            list.appendChild(li);
+        });
+    });
+
+    if (total > 0) box.classList.remove('hidden');
+}
+
 // ── Modal ──
 function openAddWorklog() {
     if (!currentMemberId) { toast(t('toast.select_member'), 'error'); return; }
@@ -453,6 +500,7 @@ function openAddWorklog() {
     document.getElementById('wl-note').value = '';
     setDateRangeMode(true);
     populateProjectDropdown();
+    renderExistingRanges();
     document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -472,6 +520,7 @@ function openAddWorklogMulti() {
     populateMultiMemberList();
     document.getElementById('multi-member-section').classList.remove('hidden');
     document.getElementById('modal-save-btn').textContent = t('modal.save_selected');
+    renderExistingRanges();
     document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -514,6 +563,7 @@ function editWorklog(w) {
     setTimeInputs('wl-end',   w.end_time   || '');
     document.getElementById('wl-status').value = w.status || 'Pending';
     document.getElementById('wl-note').value = w.note || '';
+    renderExistingRanges();
     document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -522,6 +572,10 @@ function closeModal() {
     setDateRangeMode(false);
     document.getElementById('multi-member-section').classList.add('hidden');
     document.getElementById('modal-save-btn').textContent = t('modal.save');
+    const rangesBox = document.getElementById('wl-existing-ranges');
+    const rangesList = document.getElementById('wl-existing-ranges-list');
+    if (rangesBox) rangesBox.classList.add('hidden');
+    if (rangesList) rangesList.innerHTML = '';
     document.getElementById('modal-overlay').classList.add('hidden');
 }
 
@@ -650,5 +704,13 @@ async function deleteProject(id) {
     loadProjectsList();
     toast(t('toast.project_removed'));
 }
+
+// ── Wire existing-ranges live refresh ──
+(function wireExistingRangesListeners() {
+    const fromEl = document.getElementById('wl-date-from');
+    const toEl   = document.getElementById('wl-date-to');
+    if (fromEl) fromEl.addEventListener('change', renderExistingRanges);
+    if (toEl)   toEl.addEventListener('change', renderExistingRanges);
+})();
 
 // ── Members (Settings) ──
