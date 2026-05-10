@@ -662,7 +662,7 @@ async function deleteWorklog(id) {
 
 // ── Projects ──
 async function loadProjects() {
-    const data = await api('/api/projects');
+    const data = await cachedApi('/api/projects');
     if (data) projects = data;
 }
 
@@ -690,6 +690,7 @@ async function addProject() {
     if (!res) return;
     if (res.error) { toast(res.error, 'error'); return; }
     input.value = '';
+    invalidateCache('/api/projects');
     await loadProjects();
     loadProjectsList();
     toast(t('toast.project_added'));
@@ -700,6 +701,7 @@ async function deleteProject(id) {
     const res = await api(`/api/projects/${id}`, { method: 'DELETE' });
     if (!res) return;
     if (res.error) { toast(res.error, 'error'); return; }
+    invalidateCache('/api/projects');
     await loadProjects();
     loadProjectsList();
     toast(t('toast.project_removed'));

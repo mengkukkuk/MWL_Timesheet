@@ -53,6 +53,7 @@ async function loadProjectsSummary() {
     if (!year || !month) return;
     const data = await api(`/api/projects-summary?year=${year}&month=${month}`);
     if (!data) return;
+    await loadChartJs();
     renderProjectsSummary(data);
 }
 

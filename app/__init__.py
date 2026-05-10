@@ -5,6 +5,7 @@ from datetime import timedelta
 from flask import Flask
 from flask import jsonify
 from flask import request
+from flask_compress import Compress
 from urllib.parse import urlparse
 
 import db
@@ -37,6 +38,42 @@ app = Flask(
     template_folder=os.path.join(BASE_DIR, 'templates'),
     static_folder=os.path.join(BASE_DIR, 'static'),
 )
+
+# ── Response compression ──────────────────────────────────────────────────────
+# Gzip everything we serve over text-based MIME types (HTML, JSON, JS, CSS).
+# Cuts /api/* JSON and /static/* asset payloads by ~70-80% with negligible CPU.
+Compress(app)
+
+
+def _static_version(filename):
+    """Return mtime epoch for a file under static/, used as a cache-busting
+    query string in templates so updated files invalidate browser caches
+    automatically without a build step.
+
+    Usage in Jinja: <link href="/static/style.css?v={{ static_v('style.css') }}">
+    Returns 0 if the file does not exist (the URL still works; cache is just
+    not busted on that request)."""
+    full = os.path.join(BASE_DIR, 'static', filename.lstrip('/'))
+    try:
+        return int(os.path.getmtime(full))
+    except OSError:
+        return 0
+
+
+app.jinja_env.globals['static_v'] = _static_version
+
+
+@app.after_request
+def _add_static_cache_headers(response):
+    """Long-cache /static/* assets — bust by file mtime appended as ?v=...
+    in templates (see _static_version). Werkzeug's built-in static handler
+    sets `Cache-Control: no-cache` by default, so we overwrite it here for
+    /static/* paths. Avatar/file endpoints live under /api/* and set their
+    own Cache-Control; they are unaffected by this filter."""
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    return response
+
 
 _secret = os.getenv('SECRET_KEY')
 if not _secret:
@@ -145,8 +182,10 @@ def verify_api_csrf_origin():
     forwarded_proto = request.headers.get('X-Forwarded-Proto', request.scheme)
     forwarded_host  = request.headers.get('X-Forwarded-Host') or request.host
     proxy_host_url  = f"{forwarded_proto}://{forwarded_host}/"
-
     trusted = {request.host_url, proxy_host_url}
+
+    #trusted = {request.host_url}
+
 
     ngrok_domain = os.getenv('NGROK_DOMAIN', '').strip()
     if ngrok_domain:

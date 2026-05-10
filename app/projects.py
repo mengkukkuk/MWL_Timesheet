@@ -70,29 +70,26 @@ def get_member_project_roles(mid):
     if not emp:
         return jsonify({'error': 'member not found'}), 404
 
-    projects = app_pkg.db.query(
-        "SELECT id, name, main_members, support_members FROM projects ORDER BY name"
-    )
-
-    def has_member(col_value, target_eid):
-        ids = parse_member_ids(col_value)
-        # IDs may be ints (new format) or strings (legacy un-migrated). Compare loosely.
-        for raw in ids:
-            try:
-                if int(raw) == target_eid:
-                    return True
-            except (TypeError, ValueError):
-                continue
-        return False
-
-    main_list = [
-        {'id': p['id'], 'name': p['name']}
-        for p in projects if has_member(p['main_members'], mid)
-    ]
-    support_list = [
-        {'id': p['id'], 'name': p['name']}
-        for p in projects if has_member(p['support_members'], mid)
-    ]
+    # Push the membership filter into SQL via OPENJSON so we only return rows
+    # the employee actually belongs to, instead of fetching every project and
+    # filtering in Python. TRY_CAST handles any legacy string-typed IDs.
+    sql = """
+        SELECT id, name, 'main' AS role_type
+        FROM projects
+        CROSS APPLY OPENJSON(main_members) AS j
+        WHERE main_members IS NOT NULL AND TRY_CAST(j.value AS INT) = ?
+        UNION ALL
+        SELECT id, name, 'support' AS role_type
+        FROM projects
+        CROSS APPLY OPENJSON(support_members) AS j
+        WHERE support_members IS NOT NULL AND TRY_CAST(j.value AS INT) = ?
+        ORDER BY name
+    """
+    rows = app_pkg.db.query(sql, (mid, mid))
+    main_list, support_list = [], []
+    for r in rows:
+        entry = {'id': r['id'], 'name': r['name']}
+        (main_list if r['role_type'] == 'main' else support_list).append(entry)
     return jsonify({'main': main_list, 'support': support_list})
 
 

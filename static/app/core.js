@@ -13,6 +13,52 @@ let _multiAddMode = false;
 const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
 
+// ── Lazy module loader ───────────────────────────────────────────────────────
+// On-demand <script> injection for tab modules that aren't needed for first
+// paint. Each module is fetched at most once; subsequent calls return the
+// cached promise. Modules are listed by basename (without `.js`), and pulled
+// from /static/app/<name>.js — same path used by the eager <script defer>
+// tags in templates/index.html.
+const _moduleLoadPromises = Object.create(null);
+function loadModuleOnce(name) {
+    if (_moduleLoadPromises[name]) return _moduleLoadPromises[name];
+    _moduleLoadPromises[name] = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = `/static/app/${name}.js`;
+        s.async = false; // preserve global-init order if multiple lazy loads stack
+        s.onload = () => resolve();
+        s.onerror = () => {
+            delete _moduleLoadPromises[name]; // allow retry on transient failure
+            reject(new Error(`Failed to load module: ${name}`));
+        };
+        document.head.appendChild(s);
+    });
+    return _moduleLoadPromises[name];
+}
+
+// Lazy-load Chart.js (~70 KB gz) only when a chart-using view is opened.
+// Returns a cached promise that resolves when window.Chart is available.
+let _chartJsPromise = null;
+function loadChartJs() {
+    if (_chartJsPromise) return _chartJsPromise;
+    if (typeof window.Chart !== 'undefined') {
+        _chartJsPromise = Promise.resolve();
+        return _chartJsPromise;
+    }
+    _chartJsPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js';
+        s.async = false;
+        s.onload = () => resolve();
+        s.onerror = () => {
+            _chartJsPromise = null;
+            reject(new Error('Failed to load Chart.js'));
+        };
+        document.head.appendChild(s);
+    });
+    return _chartJsPromise;
+}
+
 // ── Init ──
 async function initializeApp() {
     // Background glow tracking
@@ -35,11 +81,15 @@ async function initializeApp() {
         document.getElementById('btn-export-multiple').classList.remove('hidden');
         document.getElementById('btn-add-worklog-multi').classList.remove('hidden');
         document.getElementById('tab-projects-summary').classList.remove('hidden');
-        // Pending-account approval badge: refresh now + every 60s
-        if (typeof refreshPendingBadge === 'function') {
-            refreshPendingBadge();
-            setInterval(() => { try { refreshPendingBadge(); } catch (e) {} }, 60_000);
-        }
+        // Pending-account approval badge: refresh now + every 60s.
+        // settings.js is lazy-loaded — fetch it once for the badge ticker,
+        // then refresh on a 60-second cadence.
+        loadModuleOnce('settings').then(() => {
+            if (typeof refreshPendingBadge === 'function') {
+                refreshPendingBadge();
+                setInterval(() => { try { refreshPendingBadge(); } catch (e) {} }, 60_000);
+            }
+        }).catch(() => { /* badge stays unrendered — non-critical */ });
     }
 
     populateYearSelect();
@@ -69,10 +119,13 @@ async function initializeApp() {
         if (toShow === 'projects-summary' && !isElevated()) toShow = 'dashboard';
         showTab(toShow);
         // Restore Squad Draft state (open/closed + selected project) after
-        // core context (members/projects/currentUser) is ready.
-        if (typeof restoreDraftPanelState === 'function') {
-            await restoreDraftPanelState();
-        }
+        // core context (members/projects/currentUser) is ready. draft.js is
+        // lazy-loaded — only fetch when needed, after first paint.
+        loadModuleOnce('draft').then(() => {
+            if (typeof restoreDraftPanelState === 'function') {
+                return restoreDraftPanelState();
+            }
+        }).catch(() => { /* draft panel stays closed — non-critical */ });
     } catch (e) {
         onContextChange();
     }
@@ -108,7 +161,7 @@ function populateMonthSelect() {
 }
 
 // ── Tabs ──
-function showTab(name) {
+async function showTab(name) {
     if (name === 'settings' && !isElevated()) return;
     if (name === 'projects-summary' && !isElevated()) return;
     ['dashboard', 'worklog', 'files', 'projects-summary', 'settings'].forEach(t => {
@@ -142,14 +195,22 @@ function showTab(name) {
 
     if (name === 'dashboard') onContextChange();
     if (name === 'settings') {
-        loadMembersList();
+        // settings.js is lazy — wait for it before invoking its renderers.
+        // loadProjectsList lives in worklogs.js (eager) so it can run immediately.
         loadProjectsList();
-        loadUsersList();
+        await loadModuleOnce('settings');
+        if (typeof loadMembersList === 'function') loadMembersList();
+        if (typeof loadUsersList === 'function') loadUsersList();
         if (typeof loadPendingUsers === 'function') loadPendingUsers();
-        if (currentUser && currentUser.role === 'Super_Ultimate_ADMIN') loadSettings();
+        if (currentUser && currentUser.role === 'Super_Ultimate_ADMIN'
+            && typeof loadSettings === 'function') loadSettings();
     }
-    if (name === 'files') { if (typeof loadFileTree === 'function') loadFileTree(); }
+    if (name === 'files') {
+        await loadModuleOnce('files');
+        if (typeof loadFileTree === 'function') loadFileTree();
+    }
     if (name === 'projects-summary') {
+        await loadModuleOnce('projects-summary');
         if (typeof populateProjectsSummarySelectors === 'function') populateProjectsSummarySelectors();
         if (typeof loadProjectsSummary === 'function') loadProjectsSummary();
     }
@@ -182,6 +243,27 @@ async function api(url, opts = {}) {
         }
         toast('Server error - please try again', 'error');
         return null;
+    }
+}
+
+// ── Tiny in-memory cache for safe-to-cache GETs ──────────────────────────────
+// Keyed by URL. Each entry = { ts, data }. Default TTL 60 s. Invalidated by
+// callers after mutating endpoints (see invalidateCache).
+const _apiCache = new Map();
+async function cachedApi(url, ttlMs = 60_000) {
+    const now = Date.now();
+    const hit = _apiCache.get(url);
+    if (hit && (now - hit.ts) < ttlMs) return hit.data;
+    const data = await api(url);
+    if (data !== null && data !== undefined) {
+        _apiCache.set(url, { ts: now, data });
+    }
+    return data;
+}
+function invalidateCache(prefix) {
+    if (!prefix) { _apiCache.clear(); return; }
+    for (const k of _apiCache.keys()) {
+        if (k.startsWith(prefix)) _apiCache.delete(k);
     }
 }
 
@@ -226,7 +308,7 @@ function canEditMember(memberId) {
 
 // ── Members ──
 async function loadMembers() {
-    const data = await api('/api/members');
+    const data = await cachedApi('/api/members');
     if (!data) return;
     members = data;
     const sel = document.getElementById('member-select');

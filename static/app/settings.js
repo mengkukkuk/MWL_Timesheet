@@ -17,7 +17,7 @@ async function refreshMembersUI() {
 }
 
 async function loadEmployees() {
-    const data = await api('/api/employees');
+    const data = await cachedApi('/api/employees');
     _employeesCache = Array.isArray(data) ? data : [];
 }
 
@@ -99,6 +99,8 @@ async function saveMemberEdit(id) {
     });
     if (!res) return;
     if (res.error) { toast(res.error, 'error'); return; }
+    invalidateCache('/api/employees');
+    invalidateCache('/api/members');
     await refreshMembersUI();
     toast(t('toast.member_updated'));
 }
@@ -122,6 +124,8 @@ async function addMember() {
     deptInput.value = '';
     staffIdInput.value = '';
     positionInput.value = '';
+    invalidateCache('/api/employees');
+    invalidateCache('/api/members');
     await refreshMembersUI();
     toast(t('toast.member_added'));
 }
@@ -132,6 +136,8 @@ async function deleteMember(id) {
     if (!result) return;
     if (result.error) { toast(result.error, 'error'); return; }
     if (result.warning) toast(result.warning, 'error');
+    invalidateCache('/api/employees');
+    invalidateCache('/api/members');
     clearMemberSelectionIfActive(id);
     await refreshMembersUI();
     toast(t('toast.member_removed'));

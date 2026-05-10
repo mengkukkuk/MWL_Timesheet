@@ -14,8 +14,6 @@ from flask import Blueprint
 from flask import jsonify
 from flask import request
 from flask import session
-from sympy import false
-from sympy.codegen.ast import continue_
 
 import app as app_pkg
 
@@ -141,7 +139,7 @@ def create_worklog():
     #Check if input time range is overlap with existed time range
     overlap_time = app_pkg.db.query(
         "SELECT start_time, end_time FROM worklogs WHERE EmployeeID = ? AND log_date = ?",
-        (target_employee, log_date),fetchone=false,
+        (target_employee, log_date),fetchone=False,
     )
 
     ns = to_time(data.get('start_time'))
@@ -211,7 +209,7 @@ def update_worklog(wid):
     #Check if input time range is overlap with existed time range
     overlap_time = app_pkg.db.query(
         "SELECT start_time, end_time FROM worklogs WHERE EmployeeID = ? AND log_date = ? AND id != ?",
-        (member_id, log_date, wid),fetchone=false,
+        (member_id, log_date, wid),fetchone=False,
     )
     ns = to_time(data.get('start_time'))
     ne = to_time(data.get('end_time'))

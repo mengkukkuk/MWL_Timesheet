@@ -7,8 +7,17 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" integrity="sha384-HtMZLkYo+pR5/u7zCzXxMJP6QoNnQJt1qkHM0EaOPvGDIzaVZbmYr/TlvUZ/sKAg" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+    <!-- Chart.js is lazy-loaded on demand by dashboard/projects-summary modules to reduce initial payload. -->
+    <!-- Eager frontend modules: load in parallel via `defer` (executes in document order, downloads concurrently). -->
+    <script defer src="/static/app/i18n.js?v={{ static_v('app/i18n.js') }}"></script>
+    <script defer src="/static/app/core.js?v={{ static_v('app/core.js') }}"></script>
+    <script defer src="/static/app/dashboard.js?v={{ static_v('app/dashboard.js') }}"></script>
+    <script defer src="/static/app/worklogs.js?v={{ static_v('app/worklogs.js') }}"></script>
+    <script defer src="/static/app/calendar.js?v={{ static_v('app/calendar.js') }}"></script>
+    <script defer src="/static/app/export.js?v={{ static_v('app/export.js') }}"></script>
+    <!-- Bootstrap shim runs last among defers — fires `modulesLoaded` event for legacy listeners. -->
+    <script defer src="/static/app.js?v={{ static_v('app.js') }}"></script>
     <style>
 /* ── Projects Summary Dashboard ─────────────────────── */
 .ps-dash-title{font-family:'Syne',-apple-system,sans-serif;font-size:1.375rem;font-weight:800;color:#0f172a;letter-spacing:-.03em}
@@ -63,7 +72,7 @@
     <nav class="bg-white shadow-sm border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3 flex-none">
-                <img src="/static/mwllogo.png" alt="MWL Timesheet" style="height:40px;width:auto;">
+                <img src="/static/mwllogo.png?v={{ static_v('mwllogo.png') }}" alt="MWL Timesheet" style="height:40px;width:auto;">
             </div>
             <div class="flex items-center gap-2">
                 <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn active px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.dashboard">Dashboard</button>
@@ -1237,6 +1246,6 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden"></div>
 
-    <script src="/static/app.js"></script>
+    <!-- Frontend modules are loaded via `<script defer>` in the <head>, in dependency order. -->
 </body>
 </html>
