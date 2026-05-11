@@ -70,11 +70,13 @@
 
     <!-- Top Nav -->
     <nav class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <!-- Logo -->
             <div class="flex items-center gap-3 flex-none">
-                <img src="/static/mwllogo.png?v={{ static_v('mwllogo.png') }}" alt="MWL Timesheet" style="height:40px;width:auto;">
+                <img src="/static/mwllogo.png?v={{ static_v('mwllogo.png') }}" alt="MWL Timesheet" style="height:36px;width:auto;">
             </div>
-            <div class="flex items-center gap-2">
+            <!-- Tab buttons — grow to fill, wrap on small screens -->
+            <div class="flex items-center gap-1 flex-wrap flex-1 justify-center min-w-0 py-0.5">
                 <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn active px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.dashboard">Dashboard</button>
                 <button onclick="showTab('worklog')" id="tab-worklog" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.worklog">Work Log</button>
                 <button onclick="showTab('files')" id="tab-files" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.files">File Share</button>
@@ -84,36 +86,35 @@
                     <span id="nav-pending-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center" style="display:none">0</span>
                 </button>
             </div>
-            <div class="flex items-center gap-3">
+            <!-- User controls — always pushed to end -->
+            <div class="flex items-center gap-2 flex-none ml-auto">
                 <button id="lang-toggle-btn" onclick="toggleLang()" class="text-xs font-semibold px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors">TH</button>
-                <span id="nav-user" class="text-sm text-gray-600"></span>
+                <span id="nav-user" class="text-sm text-gray-600 hidden sm:inline"></span>
                 <button onclick="logout()" class="text-sm text-gray-500 hover:text-red-600 flex items-center gap-1 transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                     </svg>
-                    <span data-i18n="nav.logout">Logout</span>
+                    <span class="hidden sm:inline" data-i18n="nav.logout">Logout</span>
                 </button>
             </div>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 py-6">
+    <main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 
         <!-- Member Selector (global) -->
-        <div class="mb-6 flex items-center gap-4 flex-wrap">
-            <div class="flex items-center gap-2">
-                <label for="member-select" class="text-sm font-medium text-gray-600" data-i18n="sel.member">Team Member:</label>
-                <select id="member-select" onchange="onMemberChange()" class="input-field w-56">
+        <div class="mb-4 flex items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <label for="member-select" class="text-sm font-medium text-gray-600 whitespace-nowrap" data-i18n="sel.member">Team Member:</label>
+                <select id="member-select" onchange="onMemberChange()" class="input-field flex-1 min-w-0 sm:w-56 sm:flex-none">
                     <option value="" data-i18n="sel.select_ph">Select a member...</option>
                 </select>
             </div>
-            <div class="flex items-center">
-                <button id="btn-overall" onclick="selectOverall()" class="btn-secondary text-sm px-3 py-1 rounded" data-i18n="sel.overall">Overall</button>
-            </div>
-            <div class="flex items-center gap-2">
+            <button id="btn-overall" onclick="selectOverall()" class="btn-secondary text-sm px-3 py-1 rounded flex-none" data-i18n="sel.overall">Overall</button>
+            <div class="flex items-center gap-2 flex-none">
                 <label for="year-select" class="text-sm font-medium text-gray-600" data-i18n="sel.year">Year:</label>
-                <select id="year-select" onchange="onContextChange()" class="input-field w-28"></select>
+                <select id="year-select" onchange="onContextChange()" class="input-field w-24"></select>
             </div>
         </div>
 
@@ -121,13 +122,13 @@
         <div id="view-dashboard">
             <!-- Overall Team View -->
             <div id="overall-dashboard" class="hidden">
-                <div class="flex items-center justify-between mb-5">
+                <div class="flex flex-wrap items-start justify-between gap-2 mb-5">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800" data-i18n="dash.team_overview">Team Overview</h2>
                         <p class="text-sm text-gray-400 mt-0.5" id="overall-member-count"></p>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <div class="flex items-center gap-3 text-xs text-gray-500">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                             <span class="flex items-center gap-1.5">
                                 <span class="w-3 h-3 rounded-full inline-block" style="background:#4f46e5"></span>
                                 <span data-i18n="dash.has_project">Has project</span>
@@ -161,7 +162,7 @@
 
             <div id="dashboard-content" class="hidden">
                 <!-- Export Buttons -->
-                <div class="flex justify-end mb-4 gap-2">
+                <div class="flex flex-wrap justify-end mb-4 gap-2">
                     <button id="btn-export-multiple" onclick="openBulkExportModal()" class="hidden inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -194,7 +195,7 @@
 
                 <!-- Member Info -->
                 <div class="card bg-white mb-6">
-                    <div class="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+                    <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
                         <div class="flex items-center gap-4 shrink-0">
                             <div id="dash-avatar-wrap" class="avatar-wrap avatar-md bg-indigo-100">
                                 <span id="dash-avatar" class="avatar-letter text-indigo-600">?</span>
@@ -211,7 +212,7 @@
                 </div>
 
                 <!-- Project Roles -->
-                <div id="project-roles-section" class="grid grid-cols-2 gap-4 mb-6">
+                <div id="project-roles-section" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                     <!-- Main Project -->
                     <div class="card bg-white">
                         <div class="flex items-center gap-2 mb-3">
@@ -264,34 +265,36 @@
                 <p class="text-sm mt-1" data-i18n="wl.no_member_hint">Choose a member from the selector above</p>
             </div>
             <div id="worklog-content" class="hidden">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm font-medium text-gray-600" data-i18n="wl.month_label">Month:</label>
-                        <select id="month-select" onchange="loadWorklogs()" class="input-field w-40"></select>
-                    </div>
-                    <!-- View Toggle -->
-                    <div class="view-toggle" id="view-toggle">
-                        <button id="toggle-table" class="view-toggle-btn active" onclick="setWorklogView('table')" title="Table view" aria-label="Table view">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                            </svg>
-                        </button>
-                        <button id="toggle-calendar" class="view-toggle-btn" onclick="setWorklogView('calendar')" title="Calendar view" aria-label="Calendar view">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                        </button>
-                    </div>
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+                <!-- Month selector + view toggle -->
+                <div class="flex items-center gap-2 flex-none">
+                    <label class="text-sm font-medium text-gray-600" data-i18n="wl.month_label">Month:</label>
+                    <select id="month-select" onchange="loadWorklogs()" class="input-field w-36"></select>
                 </div>
-                <button onclick="openAddWorklogMulti()" class="btn-secondary hidden" id="btn-add-worklog-multi">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="view-toggle flex-none" id="view-toggle">
+                    <button id="toggle-table" class="view-toggle-btn active" onclick="setWorklogView('table')" title="Table view" aria-label="Table view">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        </svg>
+                    </button>
+                    <button id="toggle-calendar" class="view-toggle-btn" onclick="setWorklogView('calendar')" title="Calendar view" aria-label="Calendar view">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </button>
+                </div>
+                <!-- Spacer pushes buttons right on wide screens -->
+                <div class="flex-1"></div>
+                <!-- Action buttons -->
+                <button onclick="openAddWorklogMulti()" class="btn-secondary hidden flex-none" id="btn-add-worklog-multi">
+                    <svg class="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
-                    <span data-i18n="wl.add_multi">+ Add Entry for Multiple</span>
+                    <span class="hidden sm:inline" data-i18n="wl.add_multi">+ Add Entry for Multiple</span>
+                    <span class="sm:hidden">+ Multi</span>
                 </button>
-                <button onclick="openAddWorklog()" class="btn-primary" id="btn-add-worklog">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button onclick="openAddWorklog()" class="btn-primary flex-none" id="btn-add-worklog">
+                    <svg class="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
                     <span data-i18n="wl.add_entry">Add Entry</span>
@@ -300,24 +303,24 @@
 
             <!-- Filter Bar -->
             <div class="flex flex-wrap items-center gap-2 mb-3">
-                <div class="search-wrap relative flex-1 min-w-40">
+                <div class="search-wrap relative flex-1" style="min-width:140px;">
                     <svg class="search-icon absolute w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
                     </svg>
                     <input id="filter-search" type="text" placeholder="...Search by project, task, or note..."
                            oninput="applyFilters()" class="input-field w-full pl-10" data-i18n-ph="wl.search_ph">
                 </div>
-                <select id="filter-status" onchange="applyFilters()" class="input-field w-36">
+                <select id="filter-status" onchange="applyFilters()" class="input-field" style="min-width:7rem;flex:0 1 auto;">
                     <option value="" data-i18n="wl.all_status">All Status</option>
                     <option value="Done">Done</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Pending">Pending</option>
                     <option value="Man day">Man day</option>
                 </select>
-                <select id="filter-project" onchange="applyFilters()" class="input-field w-40">
+                <select id="filter-project" onchange="applyFilters()" class="input-field" style="min-width:8rem;flex:1 1 auto;">
                     <option value="" data-i18n="wl.all_projects">All Projects</option>
                 </select>
-                <button onclick="clearFilters()" class="btn-secondary text-sm px-3 whitespace-nowrap" data-i18n="wl.clear">Clear</button>
+                <button onclick="clearFilters()" class="btn-secondary text-sm px-3 whitespace-nowrap flex-none" data-i18n="wl.clear">Clear</button>
                 <span id="filter-count" class="hidden text-xs text-gray-400 whitespace-nowrap"></span>
             </div>
 
@@ -402,12 +405,12 @@
 
         <!-- File Share View -->
         <div id="view-files" class="hidden">
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800" data-i18n="files.title">File Share</h2>
                     <p class="text-sm text-gray-500 mt-0.5" data-i18n="files.subtitle">Shared files for the team. All users can upload and download.</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap flex-none">
                     <button onclick="openNewFolderModal()" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg shadow-sm transition-colors">
                         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -516,13 +519,13 @@
                             <div class="col-span-5 flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('name')">
                                 Name <span id="file-sort-name" class="ml-1"></span>
                             </div>
-                            <div class="col-span-2 flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('size')">
+                            <div class="col-span-2 hidden sm:flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('size')">
                                 Size <span id="file-sort-size" class="ml-1"></span>
                             </div>
-                            <div class="col-span-2 flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('uploader')">
+                            <div class="col-span-2 hidden sm:flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('uploader')">
                                 Uploader <span id="file-sort-uploader" class="ml-1"></span>
                             </div>
-                            <div class="col-span-2 flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('date')">
+                            <div class="col-span-2 hidden sm:flex items-center cursor-pointer hover:text-indigo-600 select-none" onclick="onFileSortClick('date')">
                                 Uploaded <span id="file-sort-date" class="ml-1"></span>
                             </div>
                         </div>
@@ -544,7 +547,7 @@
                 <!-- Members Management -->
                 <div class="card bg-white">
                     <h3 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide" data-i18n="set.team_members">Team Members</h3>
-                    <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                         <input id="new-member-name" placeholder="Name" class="input-field" data-i18n-ph="set.name_ph">
                         <input id="new-member-dept" placeholder="Department" class="input-field" data-i18n-ph="set.dept_ph">
                         <input id="new-member-staffid" placeholder="Employee ID *" inputmode="numeric" pattern="[0-9]*" class="input-field" data-i18n-ph="set.empid_ph">
@@ -611,12 +614,12 @@
         <div id="view-projects-summary" class="hidden">
 
             <!-- Header -->
-            <div class="flex items-end justify-between mb-6">
+            <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
                 <div>
                     <h2 class="ps-dash-title" data-i18n="ps.title">Projects Summary</h2>
                     <p class="ps-dash-subtitle" data-i18n="ps.subtitle">Monthly worklog analytics</p>
                 </div>
-                <div class="ps-controls">
+                <div class="ps-controls flex-none">
                     <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>

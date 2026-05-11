@@ -23,7 +23,7 @@ GO
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Employee')
 CREATE TABLE Employee (
                           ID              int IDENTITY(1,1) PRIMARY KEY,
-                          EmployeeID      NVARCHAR(10) NOT NULL,
+                          EmployeeID      NVARCHAR(5) NOT NULL,
                           EmployeeName    NVARCHAR(150) NOT NULL,
                           Department      NVARCHAR(100) NULL,
                           Position        NVARCHAR(100) NULL,
@@ -57,7 +57,7 @@ IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'worklogs')
 CREATE TABLE worklogs (
                           id INT IDENTITY(1,1) PRIMARY KEY,
                           member_id INT NULL FOREIGN KEY REFERENCES members(id),
-                          EmployeeID INT NULL,
+                          EmployeeID NVARCHAR(5) NULL,
 
                           log_date DATE NOT NULL,
                           project NVARCHAR(200),
@@ -145,7 +145,7 @@ CREATE TABLE users (
                        role NVARCHAR(50) NOT NULL DEFAULT 'Staff'
                            CONSTRAINT CK_users_role CHECK (role IN ('Staff','Leader','Admin','Super_Ultimate_ADMIN')),
                        member_id INT NULL FOREIGN KEY REFERENCES members(id),
-                       EmployeeID INT NULL,
+                       EmployeeID NVARCHAR(5) NULL,
                        status NVARCHAR(20) NOT NULL DEFAULT 'Active'
                            CONSTRAINT CK_users_status CHECK (status IN ('Pending','Active','Declined')),
                        reviewed_by INT NULL FOREIGN KEY REFERENCES users(id),
@@ -153,7 +153,7 @@ CREATE TABLE users (
                        created_at DATETIME2 DEFAULT GETDATE()
 );
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'EmployeeID')
-    ALTER TABLE users ADD EmployeeID INT NULL;
+    ALTER TABLE users ADD EmployeeID NVARCHAR(5) NULL;
 GO
 
 /* =========================
@@ -206,7 +206,7 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_member_skills_member')
 -- EmployeeID is the post-migration skill owner key. Keep legacy member_id
 -- nullable so new Employee-backed users are not forced through members.id.
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('member_skills') AND name = 'EmployeeID')
-    ALTER TABLE member_skills ADD EmployeeID INT NULL;
+    ALTER TABLE member_skills ADD EmployeeID NVARCHAR(5) NULL;
 
 GO
 
@@ -299,7 +299,7 @@ IF NOT EXISTS (SELECT 1 FROM users WHERE username = 'sultadkukkuk')
     VALUES (
                'sultadkukkuk',
                'scrypt:32768:8:1$6BpoyyNeineDbHF7$ab9ef6ceb57ba1a3bebe67b798313a149be239686efbe3a622421b287884b61232151accc1ee2b30bed04b6a85e688ab65544354fb434bad28641d650e01145d',
-               'Super_Ultimate_ADMIN','Active',11111
+               'Super_Ultimate_ADMIN','Active','11111'
            );
 GO
 

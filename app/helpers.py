@@ -32,14 +32,8 @@ def format_member_ids(id_list):
     """Format a list of EmployeeIDs as a JSON array string. None on empty."""
     if not id_list:
         return None
-    # Coerce to ints to keep storage clean even if callers pass strings
-    coerced = []
-    for item in id_list:
-        try:
-            coerced.append(int(item))
-        except (TypeError, ValueError):
-            # Allow strings to pass through for legacy compat
-            coerced.append(item)
+    # Store as strings — EmployeeID is NVARCHAR(5)
+    coerced = [str(item).strip() for item in id_list if str(item).strip()]
     return json.dumps(coerced, ensure_ascii=False)
 
 

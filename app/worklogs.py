@@ -27,7 +27,7 @@ VALID_STATUSES = {'Done', 'In Progress', 'Pending', 'Man day'}
 @worklogs_bp.route('/api/worklogs', methods=['GET'])
 @login_required
 def get_worklogs():
-    employee_id = request.args.get('member_id', type=int)   # param name kept; value is EmployeeID
+    employee_id = request.args.get('member_id')   # param name kept; value is EmployeeID (NVARCHAR string)
     year = request.args.get('year', type=int, default=date.today().year)
     month = request.args.get('month', type=int, default=date.today().month)
 

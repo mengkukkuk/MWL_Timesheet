@@ -215,7 +215,7 @@ def api_login():
     return jsonify({'ok': True, 'role': user['role'], 'member_id': user['member_id']})
 
 
-@auth_bp.route('/api/employee-lookup/<int:emp_id>', methods=['GET'])
+@auth_bp.route('/api/employee-lookup/<emp_id>', methods=['GET'])
 def api_employee_lookup(emp_id):
     """Public endpoint used by the registration form to preview an EmployeeID
     before submitting. Returns minimal HR data (name/department/position).
@@ -226,7 +226,8 @@ def api_employee_lookup(emp_id):
     abuse, it returns ONLY the basic profile fields and is rate-limited at the
     proxy layer (TODO: add rate limiting).
     """
-    if emp_id <= 0:
+    emp_id = emp_id.strip()
+    if not emp_id:
         return jsonify({'error': 'invalid EmployeeID'}), 400
     row = app_pkg.db.query(
         "SELECT EmployeeID, EmployeeName, Department, Position FROM dbo.Employee WHERE EmployeeID=?",
@@ -267,10 +268,7 @@ def api_register():
     raw_emp = data.get('employee_id', '')
     employee_id = None
     if raw_emp != '' and raw_emp is not None:
-        try:
-            employee_id = int(str(raw_emp).strip())
-        except (TypeError, ValueError):
-            return jsonify({'error': 'EmployeeID must be a number'}), 400
+        employee_id = str(raw_emp).strip() or None
 
     # Legacy fallback (still supported until full migration completes)
     legacy_name       = data.get('name', '').strip()

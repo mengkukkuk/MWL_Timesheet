@@ -54,7 +54,7 @@ def delete_project(pid):
     return jsonify({'ok': True})
 
 
-@projects_bp.route('/api/members/<int:mid>/project-roles', methods=['GET'])
+@projects_bp.route('/api/members/<mid>/project-roles', methods=['GET'])
 @login_required
 def get_member_project_roles(mid):
     """Given an EmployeeID, return the {main, support} projects they belong to.
@@ -62,6 +62,7 @@ def get_member_project_roles(mid):
     Path param `mid` is an EmployeeID (post-migration the rest of the app refers
     to employees as `member_id` for backward compat).
     """
+    mid = mid.strip()
     # Validate the employee exists in HR
     emp = app_pkg.db.query(
         "SELECT EmployeeID, EmployeeName FROM dbo.Employee WHERE EmployeeID=?",
@@ -72,17 +73,17 @@ def get_member_project_roles(mid):
 
     # Push the membership filter into SQL via OPENJSON so we only return rows
     # the employee actually belongs to, instead of fetching every project and
-    # filtering in Python. TRY_CAST handles any legacy string-typed IDs.
+    # filtering in Python. OPENJSON value column is always nvarchar — compare directly.
     sql = """
         SELECT id, name, 'main' AS role_type
         FROM projects
         CROSS APPLY OPENJSON(main_members) AS j
-        WHERE main_members IS NOT NULL AND TRY_CAST(j.value AS INT) = ?
+        WHERE main_members IS NOT NULL AND j.value = ?
         UNION ALL
         SELECT id, name, 'support' AS role_type
         FROM projects
         CROSS APPLY OPENJSON(support_members) AS j
-        WHERE support_members IS NOT NULL AND TRY_CAST(j.value AS INT) = ?
+        WHERE support_members IS NOT NULL AND j.value = ?
         ORDER BY name
     """
     rows = app_pkg.db.query(sql, (mid, mid))
@@ -117,13 +118,12 @@ def _modify_project_member(pid, employee_id, role_type, action):
     if not project:
         return jsonify({'error': 'project not found'}), 404
 
-    # Normalise current list to ints
+    # Normalise current list to strings (EmployeeID is NVARCHAR)
     current = []
     for raw in parse_member_ids(project[column_name]):
-        try:
-            current.append(int(raw))
-        except (TypeError, ValueError):
-            continue
+        val = str(raw).strip()
+        if val:
+            current.append(val)
 
     if action == 'add':
         if employee_id not in current:
@@ -146,7 +146,7 @@ def assign_project_role(pid):
     role_type = data.get('type')
     if employee_id is None:
         return jsonify({'error': 'member_id is required'}), 400
-    return _modify_project_member(pid, int(employee_id), role_type, 'add')
+    return _modify_project_member(pid, str(employee_id).strip(), role_type, 'add')
 
 
 @projects_bp.route('/api/projects/<int:pid>/unassign', methods=['POST'])
@@ -157,4 +157,4 @@ def unassign_project_role(pid):
     role_type = data.get('type')
     if employee_id is None:
         return jsonify({'error': 'member_id is required'}), 400
-    return _modify_project_member(pid, int(employee_id), role_type, 'remove')
+    return _modify_project_member(pid, str(employee_id).strip(), role_type, 'remove')

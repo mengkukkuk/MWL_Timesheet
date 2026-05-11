@@ -1624,6 +1624,72 @@ body {
     .cal-chip-dot { width: 6px; height: 6px; }
 }
 
+/* ══════════════════════════════════════════════
+   MOBILE-FIRST RESPONSIVE OVERRIDES
+   Target breakpoints: ≤768px (tablet) / ≤640px (mobile)
+   ══════════════════════════════════════════════ */
+
+/* ── Touch targets: make all interactive controls finger-friendly ── */
+@media (max-width: 640px) {
+    .btn-primary,
+    .btn-secondary { min-height: 42px; padding: 0.5rem 0.875rem; }
+    .input-field    { min-height: 42px; }
+    .tab-btn        { min-height: 38px; padding: 0.5rem 0.625rem; font-size: 0.8125rem; }
+}
+
+/* ── Modal: full-width with safe margins on small screens ── */
+@media (max-width: 540px) {
+    .modal-content {
+        max-width: calc(100vw - 1.5rem);
+        padding: 1.125rem;
+        margin: 0.75rem;
+        border-radius: 0.625rem;
+    }
+}
+
+/* ── Projects Summary: KPI grid 2-col on tablet/mobile ── */
+@media (max-width: 768px) {
+    .ps-kpi-grid        { grid-template-columns: repeat(2, 1fr); gap: 0.625rem; }
+    .ps-charts-row      { grid-template-columns: 1fr; }
+    .ps-kpi-value       { font-size: 1.375rem; }
+}
+
+/* ── Worklog table: hide Start, End, Note columns on small screens ── */
+@media (max-width: 640px) {
+    /* header cells */
+    #worklog-table th:nth-child(5),
+    #worklog-table th:nth-child(6),
+    #worklog-table th:nth-child(9) { display: none; }
+    /* body cells (JS-rendered) */
+    #worklog-body td:nth-child(5),
+    #worklog-body td:nth-child(6),
+    #worklog-body td:nth-child(9) { display: none; }
+}
+
+/* ── File list: collapse to name-only layout on mobile ── */
+@media (max-width: 640px) {
+    /* Override the 12-col grid to checkbox + name + actions */
+    .file-row {
+        grid-template-columns: auto 1fr;
+        gap: 0.25rem;
+    }
+    .file-row-checkbox  { grid-column: 1; }
+    .file-row-name      { grid-column: 2; }
+    .file-row-size,
+    .file-row-uploader,
+    .file-row-date      { display: none; }
+    /* Always show actions on mobile (no hover state on touch) */
+    .file-row .file-row-actions { display: inline-flex; }
+}
+
+/* ── Calendar: tighter cells on very small screens ── */
+@media (max-width: 400px) {
+    .cal-cell          { min-height: 52px; padding: 2px 2px; }
+    .cal-day-num       { font-size: 0.65rem; }
+    .cal-day-hours     { display: none; }
+    .cal-add-btn       { display: none; }
+}
+
 /* File Share — folder tree */
 .folder-tree-node {
     padding: 4px 8px;
