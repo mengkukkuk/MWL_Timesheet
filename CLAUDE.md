@@ -313,6 +313,12 @@ FILE_UPLOAD_MAX_MB=5120
 WAITRESS_CHANNEL_TIMEOUT=3600
 WAITRESS_MAX_REQUEST_BODY=5368709120
 
+# Storage (RECOMMENDED: use separate drive for safety & independent backups)
+FILE_STORAGE_DIR=D:\MeterWorklog_Storage\files        # General file-share uploads
+AVATAR_STORAGE_DIR=D:\MeterWorklog_Storage\avatars    # Profile photos (separate for backup strategy)
+FILE_STORAGE_CAP_MB=20480                             # Total quota across all files
+FILE_MIN_FREE_MB=8192                                 # Stop uploads if free space drops below
+
 # Optional SMTP (Super_Ultimate_ADMIN unlock emails)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -322,6 +328,66 @@ MAIL_FROM=...
 SUPER_ADMIN_UNLOCK_EMAIL=...
 APP_BASE_URL=https://<your-subdomain>.ngrok-free.dev
 ```
+
+---
+
+## 10a. Storage & Backup Strategy
+
+### Why Separate Storage from Code
+
+Storing user files (`FILE_STORAGE_DIR`, `AVATAR_STORAGE_DIR`) **outside the project root** is critical for:
+
+- **Accidental deletion protection**: Project improvements, redeploys, or version upgrades won't risk losing user data
+- **Independent backup cycles**: Back up `D:\MeterWorklog_Storage\` on a separate schedule from code repos (e.g., nightly vs. weekly)
+- **Permission isolation**: Storage directory can be restricted to SYSTEM account only, preventing accidental web access
+- **Disk management**: User data and code can grow independently; file quotas can be tuned separately
+
+### Recommended Windows Deployment
+
+After running `install-service.bat`, lock down storage permissions (run as Administrator):
+
+```batch
+REM Create the storage directory if it doesn't exist
+if not exist "D:\MeterWorklog_Storage" mkdir "D:\MeterWorklog_Storage"
+
+REM Reset ACLs and grant full access to SYSTEM only (the service account)
+icacls "D:\MeterWorklog_Storage" /reset
+icacls "D:\MeterWorklog_Storage" /grant:r "NT AUTHORITY\SYSTEM:(OI)(CI)F"
+icacls "D:\MeterWorklog_Storage" /inheritance:r
+
+REM Verify: only SYSTEM should have access
+icacls "D:\MeterWorklog_Storage"
+```
+
+This ensures:
+- Only the NSSM service (running as SYSTEM) can read/write files
+- Administrators cannot accidentally browse user files
+- Web server process cannot escape its restrictions to access storage
+
+### Backup Strategy
+
+Implement a separate backup pipeline for user data:
+
+1. **Code repository**: Back up `.git/` and source weekly (or per commit)
+2. **User data**: Back up `D:\MeterWorklog_Storage\` nightly to external/NAS
+3. **Database**: Back up MeterWorklog SQL Server database separately from files
+4. **Retention**: Keep 30+ days of file snapshots (user data is valuable; code can be rebuilt)
+
+Example backup script (Windows Task Scheduler):
+```batch
+REM Run daily at 2 AM: Backup storage to external NAS
+xcopy "D:\MeterWorklog_Storage\*" "\\nas.example.com\backups\meterworklog\files\" /E /I /Y
+```
+
+### Recovery Checklist
+
+If you need to restore from backup:
+
+1. Stop the service: `nssm stop MeterWorklog`
+2. Restore files to `D:\MeterWorklog_Storage\`
+3. Verify permissions with `icacls "D:\MeterWorklog_Storage"`
+4. Restart the service: `nssm start MeterWorklog`
+5. Check logs: `logs\app.log` and `logs\app-error.log`
 
 ---
 

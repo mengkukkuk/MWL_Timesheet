@@ -104,7 +104,10 @@ else:
 # Per-upload limit — blocks one huge request.
 _max_mb = int(os.getenv('FILE_UPLOAD_MAX_MB', '5120'))
 app.config['MAX_CONTENT_LENGTH'] = _max_mb * 1024 * 1024
-app.config['FILE_STORAGE_DIR'] = os.path.join(BASE_DIR, 'storage', 'files')
+# File-share storage — can be moved to separate drive for backups/performance.
+# Override with FILE_STORAGE_DIR env var if needed.
+app.config['FILE_STORAGE_DIR'] = os.getenv('FILE_STORAGE_DIR') \
+    or os.path.join(BASE_DIR, 'storage', 'files')
 # Profile avatars — separate root from the file-share so backups/permissions
 # can be managed independently. Override with AVATAR_STORAGE_DIR if needed.
 app.config['AVATAR_STORAGE_DIR'] = os.getenv('AVATAR_STORAGE_DIR') \

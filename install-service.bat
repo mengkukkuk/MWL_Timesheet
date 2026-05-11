@@ -33,6 +33,12 @@ REM this MUST be at least as large as FILE_UPLOAD_MAX_MB * 1024 * 1024.
 REM Default 5368709120 = 5 GB (matches FILE_UPLOAD_MAX_MB=5120 with no headroom).
 REM For larger uploads, raise both this and FILE_UPLOAD_MAX_MB.
 SET WAITRESS_MAX_REQUEST_BODY=5368709120
+REM Storage paths — recommended to use separate drive (e.g. D:\) for safety & backups
+SET FILE_STORAGE_DIR=D:\MeterWorklog_Storage\files
+SET AVATAR_STORAGE_DIR=D:\MeterWorklog_Storage\avatars
+SET FILE_UPLOAD_MAX_MB=5120
+SET FILE_STORAGE_CAP_MB=20480
+SET FILE_MIN_FREE_MB=8192
 
 REM Load settings from .env if present
 if exist "%APP_DIR%\.env" (
@@ -44,6 +50,11 @@ if exist "%APP_DIR%\.env" (
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b TAILSCALE_DOMAIN "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="TAILSCALE_DOMAIN" set TAILSCALE_DOMAIN=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b WAITRESS_CHANNEL_TIMEOUT "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="WAITRESS_CHANNEL_TIMEOUT" set WAITRESS_CHANNEL_TIMEOUT=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b WAITRESS_MAX_REQUEST_BODY "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="WAITRESS_MAX_REQUEST_BODY" set WAITRESS_MAX_REQUEST_BODY=%%B
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b FILE_STORAGE_DIR "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="FILE_STORAGE_DIR" set FILE_STORAGE_DIR=%%B
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b AVATAR_STORAGE_DIR "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="AVATAR_STORAGE_DIR" set AVATAR_STORAGE_DIR=%%B
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b FILE_UPLOAD_MAX_MB "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="FILE_UPLOAD_MAX_MB" set FILE_UPLOAD_MAX_MB=%%B
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b FILE_STORAGE_CAP_MB "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="FILE_STORAGE_CAP_MB" set FILE_STORAGE_CAP_MB=%%B
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b FILE_MIN_FREE_MB "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="FILE_MIN_FREE_MB" set FILE_MIN_FREE_MB=%%B
 )
 
 net session >nul 2>&1
@@ -75,7 +86,12 @@ echo [1/2] Installing %SVC_APP% service...
     "DB_TRUST_CERT=%DB_TRUST_CERT%" ^
     "SECRET_KEY=%SECRET_KEY%" ^
     "NGROK_DOMAIN=%NGROK_DOMAIN%" ^
-    "TAILSCALE_DOMAIN=%TAILSCALE_DOMAIN%"
+    "TAILSCALE_DOMAIN=%TAILSCALE_DOMAIN%" ^
+    "FILE_STORAGE_DIR=%FILE_STORAGE_DIR%" ^
+    "AVATAR_STORAGE_DIR=%AVATAR_STORAGE_DIR%" ^
+    "FILE_UPLOAD_MAX_MB=%FILE_UPLOAD_MAX_MB%" ^
+    "FILE_STORAGE_CAP_MB=%FILE_STORAGE_CAP_MB%" ^
+    "FILE_MIN_FREE_MB=%FILE_MIN_FREE_MB%"
 
 echo [2/2] Installing %SVC_NGROK% service...
 %NSSM_EXE% install %SVC_NGROK% "%NGROK_EXE%"
