@@ -15,6 +15,7 @@ from flask import jsonify
 import app as app_pkg
 
 from .auth import login_required
+from .cache import cached_list
 
 members_bp = Blueprint('members', __name__)
 
@@ -28,13 +29,8 @@ def _avatar_url(row):
     return f"/api/avatars/{row['id']}?v={version}"
 
 
-@members_bp.route('/api/members', methods=['GET'])
-@login_required
-def get_members():
-    """Return the team roster shaped like legacy /api/members.
-
-    `id` = `EmployeeID` (business key — used as the worklog/skill member_id).
-    """
+def _load_members():
+    """Build the team roster list. Pulled out so cached_list can call it lazily."""
     rows = app_pkg.db.query(
         """SELECT EmployeeID  AS id,
                   EmployeeName AS name,
@@ -52,7 +48,19 @@ def get_members():
         row['avatar_url'] = _avatar_url(row)
         row.pop('AvatarPath', None)
         row.pop('AvatarUpdatedAt', None)
-    return jsonify(rows)
+    return rows
+
+
+@members_bp.route('/api/members', methods=['GET'])
+@login_required
+def get_members():
+    """Return the team roster shaped like legacy /api/members.
+
+    `id` = `EmployeeID` (business key — used as the worklog/skill member_id).
+    Result is memoized in app.cache for 5 minutes; invalidation is driven by
+    write paths in employees.py (POST/PUT/DELETE /api/employees).
+    """
+    return jsonify(cached_list('members:list', _load_members))
 
 
 @members_bp.route('/api/members', methods=['POST'])

@@ -20,6 +20,8 @@ import app as app_pkg
 
 from .auth import elevated_required
 from .auth import login_required
+from .cache import cached_list
+from .cache import invalidate
 
 employees_bp = Blueprint('employees', __name__)
 
@@ -69,16 +71,27 @@ def _validate_employee_id(raw):
     return eid, None
 
 
-@employees_bp.route('/api/employees', methods=['GET'])
-@login_required
-def list_employees():
+def _load_employees():
+    """Build the employee DTO list. Pulled out so cached_list can call it lazily."""
     rows = app_pkg.db.query(
         """SELECT EmployeeID, EmployeeName, Department, Position, Level, JG,
                   AvatarPath, AvatarUpdatedAt
            FROM dbo.Employee
            ORDER BY EmployeeName"""
     )
-    return jsonify([_row_to_dto(r) for r in rows])
+    return [_row_to_dto(r) for r in rows]
+
+
+def _invalidate_employee_caches():
+    """dbo.Employee feeds BOTH /api/employees and /api/members — drop both."""
+    invalidate('employees:')
+    invalidate('members:')
+
+
+@employees_bp.route('/api/employees', methods=['GET'])
+@login_required
+def list_employees():
+    return jsonify(cached_list('employees:list', _load_employees))
 
 
 @employees_bp.route('/api/employees', methods=['POST'])
@@ -110,7 +123,7 @@ def create_employee():
     if err:
         return jsonify({'error': err}), 400
 
-    # Reject duplicate EmployeeID (UQ_Employee_EmpID would also catch it but
+    # Reject duplicate EmployeeID (UQ_Employee_EmpID would also catch
     # we want a clean 409 instead of a generic DB error).
     existing = app_pkg.db.query(
         "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
@@ -126,6 +139,7 @@ def create_employee():
            VALUES (?, ?, ?, ?, ?, ?, GETDATE())""",
         (eid, name, dept or None, position or None, level or None, jg or None),
     )
+    _invalidate_employee_caches()
     return jsonify({
         'id': eid,
         'name': name,
@@ -176,6 +190,7 @@ def update_employee(eid):
             WHERE EmployeeID=?""",
         (name, dept or None, position or None, level or None, jg or None, eid),
     )
+    _invalidate_employee_caches()
     return jsonify({
         'id': eid,
         'name': name,
@@ -208,6 +223,7 @@ def delete_employee(eid):
     linked_count = (linked or {}).get('n', 0)
 
     app_pkg.db.execute("DELETE FROM dbo.Employee WHERE EmployeeID=?", (eid,))
+    _invalidate_employee_caches()
 
     return jsonify({
         'ok': True,

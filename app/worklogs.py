@@ -184,7 +184,6 @@ def update_worklog(wid):
     task = data.get('task', '')
     note = data.get('note', '')
     member_id = data.get('member_id')
-    print(type(member_id))
 
     #Not necessary to check if the worklog is open, because the frontend will not allow to create a worklog if the worklog is not open
     if len(project) > 200:
@@ -230,7 +229,6 @@ def update_worklog(wid):
         wid,
         ),
     )
-    print("Update worklog success")
     return jsonify({'ok': True})
 
 
@@ -290,8 +288,6 @@ def get_dashboard():
     # This avoids double-counting overlapping entries on the same day.
     # Lunch time (12:00-13:00) is deducted from the daily span.
     # Time before 08:30 and after 17:30 is kept as overtime duration.
-    import time
-    start_db = time.time()
     monthly = app_pkg.db.query(
         """
         SELECT month,
@@ -339,8 +335,6 @@ def get_dashboard():
         """,
         (employee_id, year),
     )
-    print(f"[PERF] get_dashboard DB query took {time.time() - start_db:.4f}s")
-
 
     month_map = {row['month']: row for row in monthly}
     months = []

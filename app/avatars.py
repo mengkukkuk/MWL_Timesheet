@@ -90,7 +90,7 @@ def _delete_blob_silent(stored_name):
         if os.path.exists(path):
             os.remove(path)
     except (ValueError, OSError) as exc:
-        print(f"avatar: blob removal failed for {stored_name!r}: {exc}")
+        current_app.logger.warning("avatar: blob removal failed for %r: %s", stored_name, exc)
 
 
 @avatars_bp.route('/api/avatars/<int:eid>', methods=['GET'])

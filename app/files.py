@@ -173,20 +173,26 @@ def get_folder_contents(fid=None):
                ORDER BY f.original_name""",
             (fid,),
         ) or []
-        # Build breadcrumbs by walking up
-        breadcrumbs = []
-        cur = fid
-        seen = set()
-        while cur is not None and cur not in seen:
-            seen.add(cur)
-            row = app_pkg.db.query(
-                "SELECT id, name, parent_id FROM file_folders WHERE id=?", (cur,), fetchone=True
+        # Build breadcrumbs in a single recursive CTE — replaces an N+1 loop
+        # that ran one query per level of nesting. MAXRECURSION 100 mirrors the
+        # prior implicit cycle guard (the `seen` set) and prevents infinite
+        # walks on malformed parent chains.
+        bc_rows = app_pkg.db.query(
+            """
+            WITH bc AS (
+                SELECT id, name, parent_id, 0 AS lvl
+                FROM file_folders WHERE id = ?
+                UNION ALL
+                SELECT f.id, f.name, f.parent_id, bc.lvl + 1
+                FROM file_folders f
+                JOIN bc ON f.id = bc.parent_id
             )
-            if not row:
-                break
-            breadcrumbs.append({'id': row['id'], 'name': row['name']})
-            cur = row.get('parent_id')
-        breadcrumbs.reverse()
+            SELECT id, name FROM bc ORDER BY lvl DESC
+            OPTION (MAXRECURSION 100)
+            """,
+            (fid,),
+        ) or []
+        breadcrumbs = [{'id': r['id'], 'name': r['name']} for r in bc_rows]
 
     for f in files_rows:
         if f.get('uploaded_at'):
@@ -442,7 +448,7 @@ def delete_file(fid):
             os.remove(abs_path)
     except (ValueError, OSError) as exc:
         # DB row is already gone; log and move on (orphan blob can be cleaned later)
-        print(f"file delete: blob removal failed for id={fid}: {exc}")
+        current_app.logger.warning("file delete: blob removal failed for id=%s: %s", fid, exc)
 
     return jsonify({'ok': True})
 

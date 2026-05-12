@@ -14,6 +14,8 @@ import app as app_pkg
 
 from .auth import elevated_required
 from .auth import login_required
+from .cache import cached_list
+from .cache import invalidate
 from .constants import ELEVATED_ROLES
 from .helpers import format_member_ids
 from .helpers import parse_member_ids
@@ -22,13 +24,17 @@ projects_bp = Blueprint('projects', __name__)
 PROJECT_MEMBER_COLUMN_WHITELIST = {'main': 'main_members', 'support': 'support_members'}
 
 
+def _load_projects():
+    """Build the projects list. Pulled out so cached_list can call it lazily."""
+    return app_pkg.db.query(
+        "SELECT id, name, main_members, support_members FROM projects ORDER BY name"
+    )
+
+
 @projects_bp.route('/api/projects', methods=['GET'])
 @login_required
 def get_projects():
-    rows = app_pkg.db.query(
-        "SELECT id, name, main_members, support_members FROM projects ORDER BY name"
-    )
-    return jsonify(rows)
+    return jsonify(cached_list('projects:list', _load_projects))
 
 
 @projects_bp.route('/api/projects', methods=['POST'])
@@ -44,6 +50,7 @@ def create_project():
         "INSERT INTO projects (name) OUTPUT INSERTED.id VALUES (?)",
         (name,),
     )
+    invalidate('projects:')
     return jsonify({'id': project_id, 'name': name}), 201
 
 
@@ -51,6 +58,7 @@ def create_project():
 @elevated_required
 def delete_project(pid):
     app_pkg.db.execute("DELETE FROM projects WHERE id=?", (pid,))
+    invalidate('projects:')
     return jsonify({'ok': True})
 
 
@@ -135,6 +143,7 @@ def _modify_project_member(pid, employee_id, role_type, action):
         f"UPDATE projects SET {column_name}=? WHERE id=?",
         (format_member_ids(current), pid),
     )
+    invalidate('projects:')
     return jsonify({'ok': True})
 
 

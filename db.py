@@ -35,7 +35,7 @@ def get_connection():
     conn = pyodbc.connect(conn_str)
     _thread_local.connection = conn
     return conn
-get_connection()
+
 
 def init_db():
     """Run init_db.sql to create tables if they don't exist."""
@@ -74,7 +74,7 @@ def init_db():
 def query(sql, params=(), fetchone=False):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(sql, params)
+    cursor.execute(sql, _rstrip_params(params))
     columns = [col[0] for col in cursor.description] if cursor.description else []
     if fetchone:
         row = cursor.fetchone()
@@ -83,10 +83,28 @@ def query(sql, params=(), fetchone=False):
     return [dict(zip(columns, row)) for row in rows]
 
 
+def _rstrip_params(params):
+    """Right-trim every string parameter before binding.
+
+    Trailing whitespace in NVARCHAR columns (notably the NVARCHAR(5)
+    EmployeeID column) gets URL-encoded to %20 by the SPA, which then
+    fails string-equality matching against trimmed values returned from
+    other queries. Centralizing the trim here means every current and
+    future INSERT/UPDATE/DELETE path is protected without having to
+    audit each call site.
+
+    Non-string values (None, int, bytes, datetime, decimal, ...) are
+    passed through untouched.
+    """
+    if not params:
+        return params
+    return tuple(p.rstrip() if isinstance(p, str) else p for p in params)
+
+
 def execute(sql, params=()):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(sql, params)
+    cursor.execute(sql, _rstrip_params(params))
     result = None
     try:
         row = cursor.fetchone()

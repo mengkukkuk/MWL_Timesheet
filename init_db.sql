@@ -334,3 +334,78 @@ CREATE NONCLUSTERED INDEX IX_files_folder ON files(folder_id);
 -- Seed a root folder (parent_id = NULL is the implicit root; this is a convenient 'Shared' subfolder)
 IF NOT EXISTS (SELECT 1 FROM file_folders WHERE parent_id IS NULL AND name = 'Shared')
     INSERT INTO file_folders (name, parent_id) VALUES ('Shared', NULL);
+
+GO
+
+-- ── P0 performance indexes (added 2026-05-12) ────────────────────────────────
+-- Auto-applied by db.init_db() on first request. Idempotent via IF NOT EXISTS.
+
+-- Speeds /api/projects-summary aggregation (filtered for non-null projects)
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_worklogs_project')
+    CREATE NONCLUSTERED INDEX IX_worklogs_project
+    ON worklogs(project)
+    WHERE project IS NOT NULL;
+
+GO
+
+-- Speeds /api/users pending list and approval flow
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_users_status')
+    CREATE NONCLUSTERED INDEX IX_users_status
+    ON users(status);
+
+GO
+
+-- Speeds folder breadcrumb recursion and dedup checks
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_file_folders_parent_name')
+    CREATE NONCLUSTERED INDEX IX_file_folders_parent_name
+    ON file_folders(parent_id, name);
+
+GO
+
+-- Speeds /api/worklogs date-range scans without EmployeeID filter (admin views)
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_worklogs_log_date')
+    CREATE NONCLUSTERED INDEX IX_worklogs_log_date
+    ON worklogs(log_date)
+    INCLUDE (EmployeeID, project, status);
+
+GO
+
+/* =========================
+   EmployeeID whitespace backfill (one-time, idempotent)
+
+   NVARCHAR EmployeeID values that picked up trailing whitespace at some
+   point get URL-encoded to %20 by the SPA, which then fails to match
+   trimmed values elsewhere in the app. Strip the spaces on every table
+   that stores an EmployeeID.
+
+   The WHERE clause uses DATALENGTH (which counts trailing spaces) rather
+   than `=` (which ignores trailing spaces in NVARCHAR comparison under
+   ANSI rules), so re-runs are true no-ops once data is clean.
+
+   Going forward, db._rstrip_params() in db.py trims every string
+   parameter before SQL binding, so this backfill only matters for rows
+   written before that fix landed.
+========================= */
+UPDATE dbo.Employee
+SET EmployeeID = RTRIM(EmployeeID)
+WHERE EmployeeID IS NOT NULL
+  AND DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
+GO
+
+UPDATE worklogs
+SET EmployeeID = RTRIM(EmployeeID)
+WHERE EmployeeID IS NOT NULL
+  AND DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
+GO
+
+UPDATE users
+SET EmployeeID = RTRIM(EmployeeID)
+WHERE EmployeeID IS NOT NULL
+  AND DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
+GO
+
+UPDATE member_skills
+SET EmployeeID = RTRIM(EmployeeID)
+WHERE EmployeeID IS NOT NULL
+  AND DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
+GO

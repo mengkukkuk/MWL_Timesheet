@@ -65,13 +65,22 @@ app.jinja_env.globals['static_v'] = _static_version
 
 @app.after_request
 def _add_static_cache_headers(response):
-    """Long-cache /static/* assets — bust by file mtime appended as ?v=...
-    in templates (see _static_version). Werkzeug's built-in static handler
-    sets `Cache-Control: no-cache` by default, so we overwrite it here for
-    /static/* paths. Avatar/file endpoints live under /api/* and set their
-    own Cache-Control; they are unaffected by this filter."""
-    if request.path.startswith('/static/'):
+    """Cache-Control for static assets and read-mostly API endpoints.
+
+    /static/* — long-cache (1y, immutable), busted by ?v=<mtime> in templates.
+    /api/avatars/* — private 1-day cache; URLs already carry ?v=<ts>.
+    /api/members, /api/projects (GET) — short 60s private cache to absorb
+    repeat hits from the SPA during a single page session. Server-side
+    in-process TTL cache (app.cache) provides the deeper invalidatable
+    layer; this header just trims repeat round-trips."""
+    path = request.path
+    if path.startswith('/static/'):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif path.startswith('/api/avatars/'):
+        response.headers['Cache-Control'] = 'private, max-age=86400'
+    elif path in ('/api/members', '/api/projects') and request.method == 'GET':
+        response.headers['Cache-Control'] = 'private, max-age=60'
+    response.headers.setdefault('Vary', 'Accept-Encoding')
     return response
 
 
