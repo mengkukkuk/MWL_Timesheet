@@ -163,10 +163,15 @@
             if (p && saved.mode === 'username_password' && saved.password) p.value = saved.password;
             if (cb) cb.checked = true;
         }
+        let applyI18n;
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', applyRememberedCredentials);
+            document.addEventListener('DOMContentLoaded', () => {
+                applyRememberedCredentials();
+                if (typeof applyI18n === 'function') applyI18n();
+            });
         } else {
             applyRememberedCredentials();
+            if (typeof applyI18n === 'function') applyI18n();
         }
 
         function toggleForm(form) {

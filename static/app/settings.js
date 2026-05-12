@@ -283,6 +283,7 @@ async function refreshPendingBadge() {
 }
 
 try {
+    window.showSettingsPanel    = showSettingsPanel;
     window.loadPendingUsers     = loadPendingUsers;
     window.approvePendingUser   = approvePendingUser;
     window.declinePendingUser   = declinePendingUser;
@@ -366,12 +367,23 @@ async function saveResetPassword() {
     }
 }
 
+// ── Settings sub-menu navigation ──
+function showSettingsPanel(name) {
+    document.querySelectorAll('.settings-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.settings-nav-item').forEach(b => b.classList.remove('active'));
+    const panel = document.getElementById('settings-panel-' + name);
+    if (panel) panel.classList.remove('hidden');
+    const btn = document.querySelector(`.settings-nav-item[data-panel="${name}"]`);
+    if (btn) btn.classList.add('active');
+    localStorage.setItem('settings_panel', name);
+}
+
 // ── Worklog Visibility Settings (Super Admin only) ──
 async function loadSettings() {
     const data = await api('/api/settings');
     if (!data) return;
     renderVisibilityToggle(data.worklog_open);
-    document.getElementById('settings-visibility-card').classList.remove('hidden');
+    document.getElementById('settings-nav-visibility').classList.remove('hidden');
 }
 
 function renderVisibilityToggle(isOpen) {

@@ -24,7 +24,8 @@ function loadModuleOnce(name) {
     if (_moduleLoadPromises[name]) return _moduleLoadPromises[name];
     _moduleLoadPromises[name] = new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = `/static/app/${name}.js`;
+        const _v = (window.STATIC_V || {})[name] || 0;
+        s.src = `/static/app/${name}.js?v=${_v}`;
         s.async = false; // preserve global-init order if multiple lazy loads stack
         s.onload = () => resolve();
         s.onerror = () => {
@@ -199,6 +200,8 @@ async function showTab(name) {
         // loadProjectsList lives in worklogs.js (eager) so it can run immediately.
         loadProjectsList();
         await loadModuleOnce('settings');
+        const lastPanel = localStorage.getItem('settings_panel') || 'members';
+        if (typeof showSettingsPanel === 'function') showSettingsPanel(lastPanel);
         if (typeof loadMembersList === 'function') loadMembersList();
         if (typeof loadUsersList === 'function') loadUsersList();
         if (typeof loadPendingUsers === 'function') loadPendingUsers();
