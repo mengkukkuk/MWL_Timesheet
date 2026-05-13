@@ -327,12 +327,16 @@ function renderSkillsEditor() {
         return [...arr].sort((a, b) => (b.level - a.level) || (a.name || '').localeCompare(b.name || ''));
     })();
 
-    if (sorted.length === 0) {
+    // New (unsaved) rows always render at the bottom, outside the sort.
+    const newRows   = _skillsEditDraft.filter(s => s._new && !s._deleted);
+    const sortedOld = sorted.filter(s => !s._new);
+
+    if (sortedOld.length === 0 && newRows.length === 0) {
         list.innerHTML = `<div class="text-sm text-gray-400 italic text-center py-6">No skills yet — add one below.</div>`;
         return;
     }
 
-    list.innerHTML = sorted.map(s => {
+    list.innerHTML = [...sortedOld, ...newRows].map(s => {
         const idx = _skillsEditDraft.indexOf(s);
         let segs = '';
         for (let i = 1; i <= 5; i++) {
