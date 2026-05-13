@@ -93,9 +93,10 @@ def _delete_blob_silent(stored_name):
         current_app.logger.warning("avatar: blob removal failed for %r: %s", stored_name, exc)
 
 
-@avatars_bp.route('/api/avatars/<int:eid>', methods=['GET'])
+@avatars_bp.route('/api/avatars/<eid>', methods=['GET'])
 @login_required
 def get_avatar(eid):
+    eid = eid.strip()
     row = app_pkg.db.query(
         "SELECT AvatarPath, AvatarMime FROM dbo.Employee WHERE EmployeeID=?",
         (eid,), fetchone=True,
@@ -117,9 +118,10 @@ def get_avatar(eid):
     )
 
 
-@avatars_bp.route('/api/avatars/<int:eid>', methods=['POST'])
+@avatars_bp.route('/api/avatars/<eid>', methods=['POST'])
 @login_required
 def upload_avatar(eid):
+    eid = eid.strip()
     if not _can_write(eid):
         return jsonify({'error': 'permission denied'}), 403
 
@@ -172,9 +174,10 @@ def upload_avatar(eid):
     }), 201
 
 
-@avatars_bp.route('/api/avatars/<int:eid>', methods=['DELETE'])
+@avatars_bp.route('/api/avatars/<eid>', methods=['DELETE'])
 @login_required
 def delete_avatar(eid):
+    eid = eid.strip()
     if not _can_write(eid):
         return jsonify({'error': 'permission denied'}), 403
 

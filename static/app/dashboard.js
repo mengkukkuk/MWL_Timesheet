@@ -26,7 +26,7 @@ async function loadDashboard() {
                 _skillsByMember[currentMemberId] = s || [];
             } catch (e) { _skillsByMember[currentMemberId] = []; }
         }
-        const canEdit = isElevated() || Number(currentMemberId) === currentUser.member_id;
+        const canEdit = isElevated() || String(currentMemberId) === String(currentUser.member_id);
         skillsGrid.innerHTML = `
             <div class="rounded-2xl p-5 text-white shadow-sm w-full" style="background:#4f46e5">
                 ${_renderMemberSkillsBox(currentMemberId, canEdit, 16)}
@@ -68,7 +68,7 @@ let _addProjectRoleType = null;
 
 async function loadProjectRoles() {
     if (!currentMemberId) return;
-    const canManage = isElevated() || Number(currentMemberId) === currentUser.member_id;
+    const canManage = isElevated() || String(currentMemberId) === String(currentUser.member_id);
 
     // Show/hide + buttons based on permission
     document.getElementById('btn-add-main').classList.toggle('hidden', !canManage);
@@ -117,7 +117,7 @@ async function confirmAddProjectRole() {
     if (!pid) { toast(t('toast.select_project'), 'error'); return; }
     const res = await api(`/api/projects/${pid}/assign`, {
         method: 'POST',
-        body: { member_id: Number(currentMemberId), type: _addProjectRoleType }
+        body: { member_id: currentMemberId, type: _addProjectRoleType }
     });
     if (res && res.ok) {
         closeAddProjectModal();
@@ -129,7 +129,7 @@ async function confirmAddProjectRole() {
 async function removeProjectRole(pid, type) {
     const res = await api(`/api/projects/${pid}/unassign`, {
         method: 'POST',
-        body: { member_id: Number(currentMemberId), type }
+        body: { member_id: currentMemberId, type }
     });
     if (res && res.ok) {
         loadProjectRoles();
@@ -259,7 +259,7 @@ async function loadOverallDashboard() {
         const mainText = roles.main.length ? esc(roles.main.join(', ')) : '<span class="opacity-50">—</span>';
         const suppText = roles.support.length ? esc(roles.support.join(', ')) : '<span class="opacity-50">—</span>';
 
-        const canEditThis = isElevated() || (currentUser && Number(currentUser.member_id) === m.id);
+        const canEditThis = isElevated() || (currentUser && String(currentUser.member_id) === String(m.id));
         const canEditAvatar = canEditAvatarFor(m.id);
         const skillsHTML = _renderMemberSkillsBox(m.id, canEditThis);
         const avatarHTML = _renderGridAvatar(m, canEditAvatar);
@@ -466,7 +466,7 @@ try {
 function canEditAvatarFor(employeeId) {
     if (!currentUser) return false;
     if (currentUser.role === 'Super_Ultimate_ADMIN') return true;
-    return Number(currentUser.member_id) === Number(employeeId);
+    return String(currentUser.member_id) === String(employeeId);
 }
 
 function _avatarFallbackChar(name) {

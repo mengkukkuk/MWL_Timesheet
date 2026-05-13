@@ -306,7 +306,7 @@ async function logout() {
 
 function canEditMember(memberId) {
     if (!currentUser) return false;
-    return isElevated() || currentUser.member_id === memberId;
+    return isElevated() || String(currentUser.member_id) === String(memberId);
 }
 
 // ── Members ──
@@ -327,7 +327,7 @@ async function loadMembers() {
 
 function onMemberChange() {
     const sel = document.getElementById('member-select');
-    currentMemberId = sel.value ? parseInt(sel.value) : null;
+    currentMemberId = sel.value || null;   // keep as string — EmployeeID is NVARCHAR
     // when a member is explicitly selected, ensure year-select is enabled
     const ys = document.getElementById('year-select'); if (ys) ys.disabled = false;
     onContextChange();
