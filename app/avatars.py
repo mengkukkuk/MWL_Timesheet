@@ -131,15 +131,24 @@ def get_avatar(eid):
 @login_required
 def upload_avatar(eid):
     eid = eid.strip()
+    current_app.logger.info(f"Avatar upload started for employee: {eid}")
+
     if not _can_write(eid):
+        current_app.logger.warning(f"Avatar upload denied for {eid}: permission check failed")
         return jsonify({'error': 'permission denied'}), 403
 
-    emp = app_pkg.db.query(
-        "SELECT EmployeeID, AvatarPath FROM dbo.Employee WHERE EmployeeID=?",
-        (eid,), fetchone=True,
-    )
-    if not emp:
-        return jsonify({'error': 'employee not found'}), 404
+    try:
+        emp = app_pkg.db.query(
+            "SELECT EmployeeID, AvatarPath FROM dbo.Employee WHERE EmployeeID=?",
+            (eid,), fetchone=True,
+        )
+        if not emp:
+            current_app.logger.warning(f"Avatar upload failed: employee {eid} not found")
+            return jsonify({'error': 'employee not found'}), 404
+        current_app.logger.debug(f"Found employee record: {eid}")
+    except Exception as exc:
+        current_app.logger.error(f"Database error querying employee {eid}: {exc}", exc_info=True)
+        return jsonify({'error': f'database error: {exc}'}), 500
 
     if 'file' not in request.files:
         return jsonify({'error': 'no file in request'}), 400
@@ -153,26 +162,55 @@ def upload_avatar(eid):
     if not blob:
         return jsonify({'error': 'empty file'}), 400
 
+    current_app.logger.debug(f"File read successfully: {len(blob)} bytes, filename: {f.filename}")
+
     sniffed_mime, ext = _sniff(blob[:16])
     if not sniffed_mime:
+        current_app.logger.warning(f"Avatar upload rejected: unsupported format for {eid}")
         return jsonify({'error': 'Unsupported image format. Use JPEG, PNG, or WebP.'}), 400
+
+    current_app.logger.debug(f"File validation passed: mime={sniffed_mime}, ext={ext}")
 
     # Persist new blob first, swap DB pointer, then unlink old blob.
     stored_name = f"{uuid.uuid4().hex}{ext}"
-    abs_path = os.path.join(_avatar_dir(), stored_name)
+
+    try:
+        avatar_dir = _avatar_dir()
+        current_app.logger.debug(f"Avatar storage directory: {avatar_dir}")
+    except Exception as exc:
+        current_app.logger.error(f"Failed to initialize avatar directory: {exc}", exc_info=True)
+        return jsonify({'error': f'storage directory error: {exc}'}), 500
+
+    abs_path = os.path.join(avatar_dir, stored_name)
+    current_app.logger.debug(f"Attempting to write avatar to: {abs_path}")
+
     try:
         with open(abs_path, 'wb') as out:
             out.write(blob)
+        current_app.logger.info(f"Avatar file written successfully: {abs_path}")
     except OSError as exc:
+        current_app.logger.error(f"File write error for {abs_path}: {exc}", exc_info=True)
         return jsonify({'error': f'storage write failed: {exc}'}), 500
 
     old_path = emp.get('AvatarPath')
-    app_pkg.db.execute(
-        """UPDATE dbo.Employee
-              SET AvatarPath=?, AvatarMime=?, AvatarUpdatedAt=GETDATE()
-            WHERE EmployeeID=?""",
-        (stored_name, sniffed_mime, eid),
-    )
+
+    try:
+        app_pkg.db.execute(
+            """UPDATE dbo.Employee
+                  SET AvatarPath=?, AvatarMime=?, AvatarUpdatedAt=GETDATE()
+                WHERE EmployeeID=?""",
+            (stored_name, sniffed_mime, eid),
+        )
+        current_app.logger.info(f"Database updated successfully for {eid}: {stored_name}")
+    except Exception as exc:
+        current_app.logger.error(f"Database update error for {eid}: {exc}", exc_info=True)
+        try:
+            os.remove(abs_path)
+            current_app.logger.debug(f"Rolled back file after DB error: {abs_path}")
+        except Exception as cleanup_exc:
+            current_app.logger.warning(f"Failed to cleanup file after DB error: {cleanup_exc}")
+        return jsonify({'error': f'database update failed: {exc}'}), 500
+
     _delete_blob_silent(old_path)
 
     return jsonify({

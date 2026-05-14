@@ -168,6 +168,26 @@ def ensure_db():
                     _worklog_open = row['value'] == '1'
             except Exception as exc:
                 print(f"Settings load note: {exc}")
+
+            # Diagnostics: Check avatar storage directory on startup
+            try:
+                avatar_dir = app.config.get('AVATAR_STORAGE_DIR')
+                app.logger.info(f"Avatar storage directory configured: {avatar_dir}")
+                if os.path.exists(avatar_dir):
+                    app.logger.info(f"Avatar storage directory exists")
+                    try:
+                        test_write = os.access(avatar_dir, os.W_OK)
+                        if test_write:
+                            app.logger.info(f"Avatar storage directory is writable")
+                        else:
+                            app.logger.warning(f"Avatar storage directory is NOT writable - permission denied")
+                    except Exception as e:
+                        app.logger.warning(f"Could not verify write permission for avatar storage: {e}")
+                else:
+                    app.logger.info(f"Avatar storage directory does not exist yet (will be created on first upload)")
+            except Exception as exc:
+                app.logger.error(f"Error checking avatar storage directory: {exc}", exc_info=True)
+
             app._db_initialized = True
 
 
