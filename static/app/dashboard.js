@@ -484,10 +484,14 @@ function _renderGridAvatar(m, canEdit) {
     const onclick  = canEdit
         ? `onclick="event.stopPropagation(); pickAvatar(${m.id})"`
         : '';
+    const removeBtn = (canEdit && m.avatar_url)
+        ? `<button type="button" class="avatar-remove" title="Remove photo" aria-label="Remove photo" onclick="event.stopPropagation(); removeAvatar(${m.id})">&times;</button>`
+        : '';
     if (m.avatar_url) {
         return `
             <div class="avatar-wrap avatar-grid ${editable}" ${title} ${onclick}>
                 <img src="${m.avatar_url}" alt="" class="avatar-img" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${fallback}',className:'avatar-letter'}))">
+                ${removeBtn}
             </div>`;
     }
     return `
@@ -505,8 +509,11 @@ function _renderDashAvatar(memberId, name, avatarUrl) {
     wrap.classList.toggle('avatar-editable', canEdit);
     wrap.title = canEdit ? 'Click to change photo' : '';
     wrap.onclick = canEdit ? () => pickAvatar(memberId) : null;
+    const removeBtn = (canEdit && avatarUrl)
+        ? `<button type="button" class="avatar-remove" title="Remove photo" aria-label="Remove photo" onclick="event.stopPropagation(); removeAvatar(${memberId})">&times;</button>`
+        : '';
     if (avatarUrl) {
-        wrap.innerHTML = `<img src="${avatarUrl}" alt="" class="avatar-img" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${fallback}',className:'avatar-letter text-indigo-600'}))">`;
+        wrap.innerHTML = `<img src="${avatarUrl}" alt="" class="avatar-img" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${fallback}',className:'avatar-letter text-indigo-600'}))">${removeBtn}`;
     } else {
         wrap.innerHTML = `<span id="dash-avatar" class="avatar-letter text-indigo-600">${fallback}</span>`;
     }
@@ -553,9 +560,36 @@ function pickAvatar(employeeId) {
     input.click();
 }
 
+async function removeAvatar(employeeId) {
+    if (!canEditAvatarFor(employeeId)) {
+        toast('You can only edit your own profile photo', 'error');
+        return;
+    }
+    if (!confirm('Remove your profile photo?')) return;
+    try {
+        const res = await fetch(`/api/avatars/${employeeId}`, {
+            method: 'DELETE', credentials: 'same-origin',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            toast(data.error || 'Remove failed', 'error');
+            return;
+        }
+        toast('Profile photo removed', 'success');
+        if (typeof loadMembers === 'function') await loadMembers();
+        if (currentMemberId == employeeId && typeof loadDashboard === 'function') {
+            await loadDashboard();
+        }
+        if (typeof loadOverallDashboard === 'function') await loadOverallDashboard();
+    } catch (e) {
+        toast('Remove failed: ' + e.message, 'error');
+    }
+}
+
 try {
     window.canEditAvatarFor = canEditAvatarFor;
     window.pickAvatar        = pickAvatar;
+    window.removeAvatar      = removeAvatar;
 } catch (e) {}
 
 // ── Worklogs ──
