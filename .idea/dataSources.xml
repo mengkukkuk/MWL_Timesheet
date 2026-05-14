@@ -8,5 +8,12 @@
       <jdbc-url>jdbc:sqlserver://localhost;database=MeterWorklog</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="SERVER_LAB1" uuid="b8026d1d-51c5-4a9d-bbe8-d1d0c7ec2f42">
+      <driver-ref>sqlserver.ms</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>com.microsoft.sqlserver.jdbc.SQLServerDriver</jdbc-driver>
+      <jdbc-url>jdbc:sqlserver://192.168.73.67;database=MWLTimesheet</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>

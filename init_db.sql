@@ -409,3 +409,14 @@ SET EmployeeID = RTRIM(EmployeeID)
 WHERE EmployeeID IS NOT NULL
   AND DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
 GO
+
+UPDATE ProjectAndBudget
+SET
+    Description = RTRIM(Description),
+    ProjectCode = RTRIM(ProjectCode)
+WHERE
+    (Description IS NOT NULL
+        AND DATALENGTH(Description) <> DATALENGTH(RTRIM(Description)))
+   OR
+    (ProjectCode IS NOT NULL
+        AND DATALENGTH(ProjectCode) <> DATALENGTH(RTRIM(ProjectCode)));
