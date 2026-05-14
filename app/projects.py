@@ -106,8 +106,14 @@ def _modify_project_member(pid, employee_id, role_type, action):
     """Shared body for assign/unassign. action ∈ {'add', 'remove'}."""
     if role_type not in ('main', 'support'):
         return jsonify({'error': 'type must be main or support'}), 400
+    # Normalise both sides of the self-assign check: session['member_id'] holds
+    # the NVARCHAR EmployeeID (string) and may still carry legacy trailing
+    # whitespace on older logins, while `employee_id` is already str-stripped
+    # by the caller. Compare as stripped strings so staff can assign themselves.
+    sess_mid = session.get('member_id')
+    sess_mid_str = str(sess_mid).strip() if sess_mid is not None else None
     if (session['role'] not in ELEVATED_ROLES
-            and session.get('member_id') != employee_id):
+            and sess_mid_str != employee_id):
         return jsonify({'error': 'permission denied'}), 403
 
     # Validate Employee exists
