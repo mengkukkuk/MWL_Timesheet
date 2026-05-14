@@ -169,6 +169,17 @@ body {
 /* Table hover */
 #worklog-body tr { transition: background 0.1s; }
 #worklog-body tr:hover { background: #f9fafb; }
+
+/* Project name cell — hover shows full name via title tooltip */
+.project-name-cell {
+    cursor: help;
+    border-bottom: 1px dotted transparent;
+    transition: border-color 0.15s, color 0.15s;
+}
+.project-name-cell:hover {
+    color: var(--indigo);
+    border-bottom-color: var(--indigo);
+}
 #dash-months tr { transition: background 0.1s; }
 #dash-months tr:hover { background: #f9fafb; }
 

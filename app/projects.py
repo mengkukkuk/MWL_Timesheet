@@ -27,7 +27,7 @@ PROJECT_MEMBER_COLUMN_WHITELIST = {'main': 'main_members', 'support': 'support_m
 def _load_projects():
     """Build the projects list. Pulled out so cached_list can call it lazily."""
     return app_pkg.db.query(
-        "SELECT id, name, main_members, support_members FROM projects ORDER BY name"
+        "SELECT id, name, Description, main_members, support_members FROM projects ORDER BY name"
     )
 
 

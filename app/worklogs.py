@@ -44,15 +44,18 @@ def get_worklogs():
 
     rows = app_pkg.db.query(
         """
-        SELECT id,
-               EmployeeID  AS member_id,   -- alias preserved for frontend payload
-               log_date, project, task,
-               CONVERT(VARCHAR(5), start_time, 108) as start_time,
-               CONVERT(VARCHAR(5), end_time, 108) as end_time,
-               hours, status, note
-        FROM worklogs
-        WHERE EmployeeID = ? AND log_date BETWEEN ? AND ?
-        ORDER BY log_date
+        SELECT w.id,
+               w.EmployeeID  AS member_id,   -- alias preserved for frontend payload
+               w.log_date, w.project, w.task,
+               CONVERT(VARCHAR(5), w.start_time, 108) as start_time,
+               CONVERT(VARCHAR(5), w.end_time, 108) as end_time,
+               w.hours, w.status, w.note,
+               pb.Description AS project_description
+        FROM worklogs w
+        LEFT JOIN dbo.ProjectAndBudget pb
+               ON pb.ProjectCode = w.project
+        WHERE w.EmployeeID = ? AND w.log_date BETWEEN ? AND ?
+        ORDER BY w.log_date
         """,
         (employee_id, first_day, last_day),
     )
@@ -98,7 +101,9 @@ def create_worklog():
     note = data.get('note', '')
     log_date = data.get('log_date', '').strip()
 
-    if len(project) > 200:
+    if project=='':
+        return jsonify({'error': 'Project name is required'}), 400
+    if len(project) > 500:
         return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
     if len(task) > 500:
         return jsonify({'error': 'Task must be 500 characters or fewer'}), 400
@@ -146,6 +151,17 @@ def create_worklog():
     ne = to_time(data.get('end_time'))
     if check_overlap(ns, ne, overlap_time):
         return jsonify({'error': 'Time range overlaps with another worklog'}), 400
+    if ne <= ns:
+        return jsonify({'error': 'End-time cannot less than Start-time'}), 400
+
+    #Mapping description and project code
+    project_code = None
+    if project:
+        mapp = app_pkg.db.query(
+            "SELECT ProjectCode FROM dbo.ProjectAndBudget WHERE Description=?",
+            (project,), fetchone=True,
+        )
+        project_code = mapp.get('ProjectCode')
 
     # EmployeeID is authoritative. The legacy member_id column is nullable after
     # migration and must not receive EmployeeID values because it used to FK to
@@ -153,14 +169,14 @@ def create_worklog():
     worklog_id = app_pkg.db.execute(
         """
         INSERT INTO worklogs
-            (member_id, EmployeeID, log_date, project, task, start_time, end_time, status, note)
+            (member_id, EmployeeID, log_date, project, Description, task, start_time, end_time, status, note)
         OUTPUT INSERTED.id
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             None,
             target_employee,
-            log_date, project, task,
+            log_date, project_code, project, task,
             data.get('start_time') or None,
             data.get('end_time') or None,
             status, note,
@@ -176,7 +192,7 @@ def update_worklog(wid):
         row = app_pkg.db.query(
             "SELECT EmployeeID FROM worklogs WHERE id=?", (wid,), fetchone=True
         )
-        if not row or row['EmployeeID'] != session['member_id']:
+        if not row or row['EmployeeID'] != str(session['member_id']):
             return jsonify({'error': 'You can only edit your own worklogs'}), 403
 
     data = request.json or {}
@@ -186,7 +202,9 @@ def update_worklog(wid):
     member_id = data.get('member_id')
 
     #Not necessary to check if the worklog is open, because the frontend will not allow to create a worklog if the worklog is not open
-    if len(project) > 200:
+    if project=='':
+        return jsonify({'error': 'Project name is required'}), 400
+    if len(project) > 500:
         return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
     if len(task) > 500:
         return jsonify({'error': 'Task must be 500 characters or fewer'}), 400
@@ -214,15 +232,27 @@ def update_worklog(wid):
     ne = to_time(data.get('end_time'))
     if check_overlap(ns, ne, overlap_time):
         return jsonify({'error': 'Time range overlaps with another worklog'}), 400
+    if ne <= ns:
+        return jsonify({'error': 'End-time cannot less than Start-time'}), 400
 
+    #Mapping description and project code
+    project_code = None
+    if project:
+        mapp = app_pkg.db.query(
+            "SELECT ProjectCode FROM dbo.ProjectAndBudget WHERE Description=?",
+            (project,), fetchone=True,
+        )
+        project_code = mapp.get('ProjectCode')
+
+    #All conditions are met, update the worklog
     app_pkg.db.execute(
     """
-    UPDATE worklogs SET log_date=?, project=?, task=?, start_time=?, end_time=?,
+    UPDATE worklogs SET log_date=?, project=?, Description=?, task=?, start_time=?, end_time=?,
            status=?, note=?, updated_at=GETDATE()
     WHERE id=?
     """,
     (
-        log_date, project, task,
+        log_date, project_code, project, task,
         data.get('start_time') or None,
         data.get('end_time') or None,
         status, note,
@@ -239,7 +269,7 @@ def delete_worklog(wid):
         row = app_pkg.db.query(
             "SELECT EmployeeID FROM worklogs WHERE id=?", (wid,), fetchone=True
         )
-        if not row or row['EmployeeID'] != session['member_id']:
+        if not row or row['EmployeeID'] != str(session['member_id']):
             return jsonify({'error': 'You can only delete your own worklogs'}), 403
 
     app_pkg.db.execute("DELETE FROM worklogs WHERE id=?", (wid,))

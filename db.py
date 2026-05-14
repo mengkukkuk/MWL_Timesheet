@@ -26,7 +26,7 @@ def get_connection():
     user = os.getenv('DB_USER', '')
     password = os.getenv('DB_PASSWORD', '')
     trust_cert = os.getenv('DB_TRUST_CERT', 'yes')
-    #print("Connecting to database:",server,database,trust_cert)
+
     if user and password:
         conn_str = f"DRIVER={driver};SERVER={server};DATABASE={database};UID={user};PWD={password};TrustServerCertificate={trust_cert}"
     else:

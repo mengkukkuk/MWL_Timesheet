@@ -162,7 +162,7 @@ function renderWorklogs(data) {
         tr.innerHTML = `
             ${cbCell}
             <td class="py-2 px-2 whitespace-nowrap">${dateStr}</td>
-            <td class="py-2 px-2">${esc(w.project || '')}</td>
+            <td class="py-2 px-2"><span class="project-name-cell" title="${esc(w.project_description || w.project || '')}">${esc(w.project || '')}</span></td>
             <td class="py-2 px-2">${esc(w.task || '')}</td>
             <td class="py-2 px-2 text-center">${w.start_time || ''}</td>
             <td class="py-2 px-2 text-center">${w.end_time || ''}</td>
@@ -496,7 +496,7 @@ function openAddWorklog() {
     document.getElementById('wl-task').value = '';
     setTimeInputs('wl-start', '08:30');
     setTimeInputs('wl-end', '');
-    document.getElementById('wl-status').value = 'Pending';
+    document.getElementById('wl-status').value = 'In Progress';
     document.getElementById('wl-note').value = '';
     setDateRangeMode(true);
     populateProjectDropdown();
@@ -513,7 +513,7 @@ function openAddWorklogMulti() {
     document.getElementById('wl-task').value = '';
     setTimeInputs('wl-start', '08:30');
     setTimeInputs('wl-end', '');
-    document.getElementById('wl-status').value = 'Pending';
+    document.getElementById('wl-status').value = 'In Progress';
     document.getElementById('wl-note').value = '';
     setDateRangeMode(true);
     populateProjectDropdown();
@@ -579,13 +579,15 @@ function closeModal() {
     document.getElementById('modal-overlay').classList.add('hidden');
 }
 
+//Edit Project dropdown (p.[field_name])
 function populateProjectDropdown() {
     const sel = document.getElementById('wl-project');
     const val = sel.value;
     sel.innerHTML = '<option value="">Select...</option>';
     projects.forEach(p => {
         const opt = document.createElement('option');
-        opt.value = p.name; opt.textContent = p.name;
+        //opt.value = p.name; opt.textContent = p.name;
+        opt.value = p.Description; opt.textContent = p.Description;
         sel.appendChild(opt);
     });
     sel.value = val;
