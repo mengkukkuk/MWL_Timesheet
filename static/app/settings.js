@@ -39,6 +39,7 @@ function _renderMembersList() {
     if (!ul) return;
     ul.innerHTML = '';
     _employeesCache.forEach(m => {
+        m.jg = undefined;
         const li = document.createElement('li');
         li.className = 'rounded-lg bg-gray-50 overflow-hidden';
         li.id = `member-row-${m.id}`;
@@ -70,6 +71,7 @@ function _renderMembersList() {
                     <input id="edit-m-dept-${m.id}"     value="${esc(m.department||'')}" placeholder="Department"         class="input-field text-sm">
                     <input id="edit-m-position-${m.id}" value="${esc(m.position||'')}"   placeholder="Position (optional)" class="input-field text-sm">
                     <input id="edit-m-level-${m.id}"    value="${esc(m.level||'')}"      placeholder="Level (e.g. O3)"     class="input-field text-sm">
+                    <input id="edit-m-jg-${m.id}"       value="${esc(m.jg||'')}"      placeholder="JG00"     class="input-field text-sm">
                 </div>
                 <p class="text-xs text-gray-400 mb-2">EmployeeID <strong>${esc(m.staff_id || String(m.id))}</strong> cannot be changed.</p>
                 <div class="flex justify-end gap-2">
@@ -91,11 +93,13 @@ async function saveMemberEdit(id) {
     const dept     = document.getElementById(`edit-m-dept-${id}`).value.trim();
     const position = document.getElementById(`edit-m-position-${id}`).value.trim();
     const level    = document.getElementById(`edit-m-level-${id}`).value.trim();
+    const jg    = document.getElementById(`edit-m-jg-${id}`).value.trim();
+
     if (!name) { toast('Name is required', 'error'); return; }
     // PUT /api/employees/<EmployeeID>
     const res = await api(`/api/employees/${id}`, {
         method: 'PUT',
-        body: { name, department: dept, position, level }
+        body: { name, department: dept, position, level ,jg}
     });
     if (!res) return;
     if (res.error) { toast(res.error, 'error'); return; }
@@ -110,20 +114,27 @@ async function addMember() {
     const deptInput     = document.getElementById('new-member-dept');
     const staffIdInput  = document.getElementById('new-member-staffid');
     const positionInput = document.getElementById('new-member-position');
+    const levelInput = document.getElementById('new-member-level');
+    const jgInput = document.getElementById('new-member-jg');
     const name       = nameInput.value.trim();
     const department = deptInput.value.trim();
     const staff_id   = staffIdInput.value.trim();   // = EmployeeID
     const position   = positionInput.value.trim();
+    const level   = levelInput.value.trim();
+    const jg   = jgInput.value.trim();
+
     if (!name) { toast('Name is required', 'error'); return; }
     if (!staff_id) { toast('Employee ID is required', 'error'); return; }
     if (!/^\d+$/.test(staff_id)) { toast('Employee ID must be a number', 'error'); return; }
-    const res = await api('/api/employees', { method: 'POST', body: { name, department, staff_id, position } });
+    const res = await api('/api/employees', { method: 'POST', body: { name, department, staff_id, position, level, jg } });
     if (!res) return;
     if (res.error) { toast(res.error, 'error'); return; }
     nameInput.value = '';
     deptInput.value = '';
     staffIdInput.value = '';
     positionInput.value = '';
+    levelInput.value = '';
+    jgInput.value = '';
     invalidateCache('/api/employees');
     invalidateCache('/api/members');
     await refreshMembersUI();
