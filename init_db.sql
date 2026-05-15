@@ -411,12 +411,13 @@ WHERE EmployeeID IS NOT NULL
 GO
 
 UPDATE ProjectAndBudget
-SET
-    Description = RTRIM(Description),
-    ProjectCode = RTRIM(ProjectCode)
-WHERE
-    (Description IS NOT NULL
-        AND DATALENGTH(Description) <> DATALENGTH(RTRIM(Description)))
-   OR
-    (ProjectCode IS NOT NULL
-        AND DATALENGTH(ProjectCode) <> DATALENGTH(RTRIM(ProjectCode)));
+SET Description = RTRIM(Description)
+WHERE Description IS NOT NULL
+  AND DATALENGTH(Description) <> DATALENGTH(RTRIM(Description));
+GO
+
+UPDATE ProjectAndBudget
+SET ProjectCode = RTRIM(ProjectCode)
+WHERE ProjectCode IS NOT NULL
+  AND DATALENGTH(ProjectCode) <> DATALENGTH(RTRIM(ProjectCode));
+GO

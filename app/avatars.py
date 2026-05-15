@@ -54,10 +54,19 @@ def _sniff(buf):
 
 def _can_write(employee_id):
     """Self-edit OR Super_Ultimate_ADMIN. Per PDPA: Leader/Admin cannot edit
-    others' photos."""
+    others' photos.
+
+    Comparison is normalised: session['member_id'] is the NVARCHAR EmployeeID
+    (string) and may carry legacy trailing whitespace on older logins; the URL
+    arg arrives stripped. Coerce both sides to stripped strings so the self-
+    edit branch fires reliably regardless of how the value was minted.
+    """
     if session.get('role') == ROLE_SUPER_ADMIN:
         return True
-    return session.get('member_id') == employee_id
+    sess = session.get('member_id')
+    if sess is None or employee_id is None:
+        return False
+    return str(sess).strip() == str(employee_id).strip()
 
 
 def _avatar_dir():

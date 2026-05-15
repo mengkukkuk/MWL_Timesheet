@@ -22,7 +22,14 @@ MAX_NAME_LEN = 120
 def _can_edit(member_id):
     if session.get('role') in ELEVATED_ROLES:
         return True
-    return session.get('member_id') == member_id
+    # Compare as stripped strings: the URL converter <int:mid> gives an int,
+    # while session['member_id'] is the NVARCHAR EmployeeID (string) — and old
+    # sessions may still carry the legacy trailing-whitespace pad. Normalise
+    # both sides so staff can edit their own skills.
+    sess = session.get('member_id')
+    if sess is None or member_id is None:
+        return False
+    return str(sess).strip() == str(member_id).strip()
 
 
 def _validate_payload(data):
