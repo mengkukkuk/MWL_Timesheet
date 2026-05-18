@@ -9,11 +9,10 @@
     </envs>
     <option name="SDK_HOME" value="" />
     <option name="SDK_NAME" value="Python 3.14 (MWL_Timesheet) (2)" />
-    <option name="WORKING_DIRECTORY" value="C:\Users\milln\CWN Work\MWL\MWL_Timesheet" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
     <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="true" />
     <option name="ADD_SOURCE_ROOTS" value="true" />
-    <option name="DEBUG_JUST_MY_CODE" value="true" />
     <option name="RUN_TOOL" value="" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/app.py" />
     <option name="PARAMETERS" value="" />

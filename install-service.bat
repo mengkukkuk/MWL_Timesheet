@@ -10,16 +10,16 @@ SET APP_DIR=%~dp0
 IF "%APP_DIR:~-1%"=="\" SET APP_DIR=%APP_DIR:~0,-1%
 
 SET PYTHON_EXE=%APP_DIR%\.venv\Scripts\python.exe
-SET NSSM_EXE=%APP_DIR%\ngrokv3\nssm.exe
-SET NGROK_EXE=%APP_DIR%\ngrokv3\ngrok.exe
+SET NSSM_EXE=C:\Windows\System32\nssm.exe
+SET NGROK_EXE=%APP_DIR%\deployer\ngrok.exe
 SET TAILSCALE_EXE=C:\Program Files\Tailscale\tailscale.exe
 SET SVC_APP=MeterWorklog
 SET SVC_NGROK=MeterWorklog-ngrok
 SET APP_PORT=5050
-SET DB_SERVER=192.168.73.67
-SET DB_NAME=MWLTimesheet
+SET DB_SERVER=localhost\SQLEXPRESS
+SET DB_NAME=MeterWorklog
 SET DB_DRIVER={ODBC Driver 17 for SQL Server}
-SET DB_TRUST_CERT=no
+SET DB_TRUST_CERT=yes
 SET SECRET_KEY=Metercenter
 SET NGROK_AUTHTOKEN=3DinmxLPcvA70ZuiOHbXblahP75_3ENVxYkKeDjQajAbCLfod
 SET NGROK_DOMAIN=unpreventively-inconvertible-rolande.ngrok-free.dev
@@ -33,9 +33,9 @@ REM this MUST be at least as large as FILE_UPLOAD_MAX_MB * 1024 * 1024.
 REM Default 5368709120 = 5 GB (matches FILE_UPLOAD_MAX_MB=5120 with no headroom).
 REM For larger uploads, raise both this and FILE_UPLOAD_MAX_MB.
 SET WAITRESS_MAX_REQUEST_BODY=5368709120
-REM Storage paths and limits for uploaded files and avatars. Override in .env if needed.
-SET FILE_STORAGE_DIR=D:\MWLStorage\files
-SET AVATAR_STORAGE_DIR=D:\MWLStorage\avatar
+REM Storage paths — recommended to use separate drive (e.g. D:\) for safety & backups
+SET FILE_STORAGE_DIR=D:\MeterWorklog_Storage\files
+SET AVATAR_STORAGE_DIR=D:\MeterWorklog_Storage\avatars
 SET FILE_UPLOAD_MAX_MB=5120
 SET FILE_STORAGE_CAP_MB=20480
 SET FILE_MIN_FREE_MB=8192
