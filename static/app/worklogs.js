@@ -10,7 +10,7 @@ async function loadWorklogs() {
     if (!data) return;
 
     worklogData = data;
-    holidayData = holiday;
+    holidayData = Array.isArray(holiday) ? holiday : [];
 
     document.getElementById('btn-add-worklog').classList.toggle('hidden', !canEditMember(currentMemberId));
 

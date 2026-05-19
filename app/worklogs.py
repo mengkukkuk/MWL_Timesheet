@@ -77,12 +77,8 @@ def get_worklogs():
 @worklogs_bp.route('/api/holidays', methods=['GET'])
 @login_required
 def get_holiday():
-    employee_id = request.args.get('member_id')
     year = request.args.get('year', type=int, default=date.today().year)
     month = request.args.get('month', type=int, default=date.today().month)
-
-    if not employee_id:
-        return jsonify({'error': 'member_id required'}), 400
 
     holidays_rows = app_pkg.db.query("""
             SELECT date, description
