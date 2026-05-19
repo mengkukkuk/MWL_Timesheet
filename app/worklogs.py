@@ -14,6 +14,8 @@ from flask import Blueprint
 from flask import jsonify
 from flask import request
 from flask import session
+from sympy.codegen.ast import continue_
+from torchgen.packaged.autograd.gen_trace_type import SELECT
 
 import app as app_pkg
 
@@ -71,6 +73,10 @@ def get_worklogs():
         for col in ('hours', 'regular_hours', 'OT1', 'OT1_5', 'OT3'):
             if row.get(col) is not None:
                 row[col] = float(row[col])
+<<<<<<< HEAD
+=======
+        print(row)
+>>>>>>> 03cede5a857aee0bc5e62aeab28f9d6c60887fa5
 
     return jsonify(rows)
 

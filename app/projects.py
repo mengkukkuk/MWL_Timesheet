@@ -32,8 +32,14 @@ def _load_projects():
 def _load_projects_description():
     """Load project description"""
     return app_pkg.db.query(
+<<<<<<< HEAD
         "SELECT Projectcode, Description, ProjectDepartment FROM ProjectAndBudget ORDER BY Projectcode"
     )
+=======
+        "SELECT Projectcode, Description FROM ProjectAndBudget ORDER BY Projectcode"
+    )
+
+>>>>>>> 03cede5a857aee0bc5e62aeab28f9d6c60887fa5
 
 @projects_bp.route('/api/projects', methods=['GET'])
 @login_required
@@ -44,6 +50,10 @@ def get_projects():
 @login_required
 def get_projects_description():
     return jsonify(cached_list('projects_description:list', _load_projects_description))
+<<<<<<< HEAD
+=======
+
+>>>>>>> 03cede5a857aee0bc5e62aeab28f9d6c60887fa5
 
 #Improve for add project description, status, department, budget
 @projects_bp.route('/api/projects', methods=['POST'])
