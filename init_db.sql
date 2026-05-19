@@ -388,8 +388,7 @@ GO
 ========================= */
 UPDATE dbo.Employee
 SET EmployeeID = RTRIM(EmployeeID)
-WHERE EmployeeID IS NOT NULL
-  AND DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
+WHERE DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
 GO
 
 UPDATE worklogs
@@ -411,13 +410,12 @@ WHERE EmployeeID IS NOT NULL
 GO
 
 UPDATE ProjectAndBudget
-SET Description = RTRIM(Description)
-WHERE Description IS NOT NULL
-  AND DATALENGTH(Description) <> DATALENGTH(RTRIM(Description));
-GO
-
-UPDATE ProjectAndBudget
-SET ProjectCode = RTRIM(ProjectCode)
-WHERE ProjectCode IS NOT NULL
-  AND DATALENGTH(ProjectCode) <> DATALENGTH(RTRIM(ProjectCode));
-GO
+SET
+    Description = RTRIM(Description),
+    ProjectCode = RTRIM(ProjectCode)
+WHERE
+    (Description IS NOT NULL
+        AND DATALENGTH(Description) <> DATALENGTH(RTRIM(Description)))
+   OR
+    (ProjectCode IS NOT NULL
+        AND DATALENGTH(ProjectCode) <> DATALENGTH(RTRIM(ProjectCode)));
