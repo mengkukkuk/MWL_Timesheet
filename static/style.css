@@ -313,6 +313,29 @@ body {
 .cal-cell.cal-missing:hover { background: #fee2e2; }
 .cal-cell.cal-missing .cal-day-num { color: #dc2626; font-weight: 700; }
 
+/* Holiday — warm orange background, distinct from missing-red and weekend-yellow */
+.cal-cell.cal-holiday              { background: #fff7ed; }
+.cal-cell.cal-holiday:hover        { background: #ffedd5; }
+.cal-cell.cal-holiday .cal-day-num { color: #c2410c; font-weight: 700; }
+/* Holiday + weekend: holiday wins (more informative) */
+.cal-cell.cal-weekend.cal-holiday  { background: #fff7ed; }
+.cal-cell.cal-weekend.cal-holiday:hover { background: #ffedd5; }
+
+.cal-holiday-label {
+    font-size: 0.6rem;
+    line-height: 1.25;
+    color: #c2410c;
+    font-weight: 600;
+    margin: 2px 0 3px;
+    padding: 1px 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;          /* clamp to 2 lines */
+    -webkit-box-orient: vertical;
+    word-break: break-word;          /* allow Thai text to wrap */
+}
+
 /* Today */
 .cal-cell.cal-today { background: #eef2ff; }
 .cal-cell.cal-today:hover { background: #e0e7ff; }

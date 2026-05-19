@@ -39,7 +39,8 @@ Logs land in `<app>\logs\` (rotated at 5 MB):
 3. **NSSM** at `C:\Windows\System32\nssm.exe` (download from https://nssm.cc/download).
 4. **ngrok v3** unpacked to `<app>\ngrokv3\ngrok.exe`. Sign in at ngrok.com and reserve a domain.
 5. **Tailscale** (optional) — install from https://tailscale.com/download/windows and `tailscale up`. HTTPS must be enabled in the tailnet admin panel before `tailscale serve` will work.
-6. **`.env`** at repo root with at minimum:
+6. **`.env`** at repo root. The **full** key list is in
+   [CLAUDE.md §10](CLAUDE.md). Minimum required:
    ```env
    SECRET_KEY=<random-long-string>
    DB_SERVER=localhost\SQLEXPRESS
@@ -50,12 +51,26 @@ Logs land in `<app>\logs\` (rotated at 5 MB):
    NGROK_DOMAIN=<your-reserved>.ngrok-free.app
    TAILSCALE_DOMAIN=<host>.<tailnet>.ts.net   # informational only
    APP_PORT=5050
+   PORT=5050                                  # legacy alias read by app.py
+   # Storage (highly recommended — separate drive)
+   FILE_STORAGE_DIR=D:\MeterWorklog_Storage\files
+   AVATAR_STORAGE_DIR=D:\MeterWorklog_Storage\avatars
    # Optional uploads tuning:
    WAITRESS_CHANNEL_TIMEOUT=3600
    WAITRESS_MAX_REQUEST_BODY=5368709120
    FILE_UPLOAD_MAX_MB=5120
+   # Optional — SMTP for Super_Ultimate_ADMIN unlock emails:
+   # SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD,
+   # MAIL_FROM, SUPER_ADMIN_UNLOCK_EMAIL, APP_BASE_URL
    ```
    `install-service.bat` reads these via `findstr` — keep `KEY=value` with no surrounding spaces or quotes.
+
+   > **WARNING:** [install-service.bat](install-service.bat) ships with
+   > **hardcoded** defaults for `SECRET_KEY`, `NGROK_AUTHTOKEN`,
+   > `NGROK_DOMAIN`, and `DB_SERVER` near the top of the file. They are
+   > overridden by `.env`, but they are in source control. Treat anything
+   > committed there as exposed: rotate it, replace the defaults with
+   > blanks, and rely on `.env` as the only source of truth.
 
 ## 3. Database bootstrap
 
@@ -69,6 +84,14 @@ sqlcmd -S localhost\SQLEXPRESS -E -Q "CREATE DATABASE MeterWorklog"
 The first user to register through `/register` is auto-promoted to `Super_Ultimate_ADMIN` if no admins exist (see `app/auth.py`). After that, role changes go through Settings → Users.
 
 If `init_db.sql` has migration batches that already ran, expect `[init_db] SQL batch #N FAILED` warnings — these are non-fatal idempotency complaints and the script continues.
+
+> **`init_db2.sql` is NOT auto-applied.** It is an older / alternate
+> schema variant kept in the repo for reference; `db.init_db()` only
+> runs `init_db.sql`. If you need DDL from it after pulling new code,
+> apply it manually:
+> ```cmd
+> sqlcmd -S localhost\SQLEXPRESS -d MeterWorklog -E -i init_db2.sql
+> ```
 
 ## 4. Install the services
 
@@ -89,6 +112,29 @@ What it does (verbatim from the script):
 8. Runs `tailscale serve --bg --https=443 http://localhost:5050` — survives reboots, safe to re-run.
 
 End-of-script summary prints local / public / tailnet URLs.
+
+**Post-install checklist (manual — the installer does NOT do these):**
+
+```cmd
+REM 1. Create storage directories (installer does NOT create them)
+mkdir D:\MeterWorklog_Storage\files
+mkdir D:\MeterWorklog_Storage\avatars
+
+REM 2. (Production) Lock down ACLs — see CLAUDE.md §10a for full commands
+icacls "D:\MeterWorklog_Storage" /reset
+icacls "D:\MeterWorklog_Storage" /grant:r "NT AUTHORITY\SYSTEM:(OI)(CI)F"
+icacls "D:\MeterWorklog_Storage" /inheritance:r
+
+REM 3. (If applicable) Apply init_db2.sql manually
+REM    sqlcmd -S <server> -d MeterWorklog -E -i init_db2.sql
+
+REM 4. Confirm both services are running
+nssm status MeterWorklog
+nssm status MeterWorklog-ngrok
+
+REM 5. Smoke test
+REM    open https://<NGROK_DOMAIN>/login — should render
+```
 
 ## 5. Run in dev mode (no service)
 
@@ -150,6 +196,10 @@ Stops + removes both NSSM services and runs `tailscale serve reset`. The `.venv`
 | `tailscale serve` non-zero exit | Not logged in, HTTPS feature disabled, port 443 in use | `tailscale status`, enable HTTPS in admin panel, free port 443 |
 | 413 / connection reset on big uploads | `WAITRESS_MAX_REQUEST_BODY` too low | Raise both Waitress and Flask limits, restart app service |
 | Browser sees `403 CSRF` on POST | Origin not in allow-list | App enforces origin-based CSRF (see `app/__init__.py`); add the new domain there |
+| File upload fails immediately, nothing in `app.log` | `FILE_STORAGE_DIR` or `AVATAR_STORAGE_DIR` doesn't exist, or write-denied | `mkdir` the paths from `.env`; verify `icacls` grants SYSTEM `(OI)(CI)F` |
+| Random 500s after pulling new code | `init_db.sql` ran but `init_db2.sql` (or a hand-rolled migration) hasn't | Apply migration manually: `sqlcmd … -i init_db2.sql` |
+| All users logged out / "Invalid session" after redeploy | `SECRET_KEY` was rotated; signed cookies are no longer valid | Expected — users must log in again. Keep `SECRET_KEY` stable across restarts |
+| `nssm.exe not found` on uninstall | `uninstall-service.bat` looks in `C:\Windows\System32\` while install ships one at `ngrokv3\nssm.exe` | Copy nssm.exe to `C:\Windows\System32\` (one-time, per prereq §2) |
 
 ## 10. Bootstrapping the first admin (if registration is locked)
 
@@ -172,5 +222,8 @@ Then have that user log out / in to refresh their session role.
 | [.env](.env) | Runtime config, read by both `install-service.bat` and the app at startup |
 | [db.py](db.py) | Connection (`get_connection`) + migration runner (`init_db`) |
 | [init_db.sql](init_db.sql) | Schema, executed batch-by-batch on `\nGO\n` |
+| [init_db2.sql](init_db2.sql) | Alternate/older variant — **NOT auto-applied**; manual `sqlcmd -i` only |
 | [app/__init__.py](app/__init__.py) | Flask app factory, CSRF/origin check, blueprint registration |
+| [app/cache.py](app/cache.py) | In-process TTLCache for list endpoints (no Redis needed) |
+| [logintest/](logintest) | Out-of-scope: ad-hoc SQL login-setup helpers, not used by deploy |
 | [logs/](logs) | Service stdout/stderr (auto-rotated at 5 MB) |

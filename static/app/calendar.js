@@ -16,6 +16,17 @@ function renderCalendar(data) {
         byDay[day].push(w);
     });
 
+    // Build holiday lookup: day-of-month -> trimmed description
+    const byHoliday = {};
+    (Array.isArray(holidayData) ? holidayData : []).forEach(h => {
+        if (!h || !h.date) return;
+        const parts = h.date.split('-').map(Number);
+        const [hy, hm, hd] = parts;
+        if (hy === year && hm === month) {
+            byHoliday[hd] = (h.description || '').trim();
+        }
+    });
+
     // Calendar math
     const firstOfMonth = new Date(year, month - 1, 1);
     const daysInMonth  = new Date(year, month, 0).getDate();
@@ -67,11 +78,22 @@ function renderCalendar(data) {
 
         if (!isOutside) {
             const entries = byDay[dayNum] || [];
+            const isHoliday = Object.prototype.hasOwnProperty.call(byHoliday, dayNum);
+            if (isHoliday) cell.classList.add('cal-holiday');
 
-            // Red background for weekdays with no entries (skip today — it keeps its own highlight)
+            // Red background for weekdays with no entries (skip today and holidays)
             const isToday = isThisMonth && dayNum === todayDay;
-            if (!isWeekend && !isToday && entries.length === 0) {
+            if (!isWeekend && !isToday && !isHoliday && entries.length === 0) {
                 cell.classList.add('cal-missing');
+            }
+
+            // Holiday description label (inserted right after day number, before entries)
+            if (isHoliday) {
+                const holEl = document.createElement('div');
+                holEl.className = 'cal-holiday-label';
+                holEl.textContent = byHoliday[dayNum];
+                holEl.title = byHoliday[dayNum];
+                cell.appendChild(holEl);
             }
 
             // Day hours: span from earliest start_time to latest end_time
@@ -134,8 +156,8 @@ function renderCalendar(data) {
 
             cell.appendChild(entriesContainer);
 
-            // Click on empty space to add entry
-            if (canEdit) {
+            // Click on empty space to add entry (suppressed on holidays)
+            if (canEdit && !isHoliday) {
                 const addBtn = document.createElement('button');
                 addBtn.className = 'cal-add-btn';
                 addBtn.textContent = '+';

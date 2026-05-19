@@ -49,12 +49,14 @@ def get_worklogs():
                w.log_date, w.project, w.task,
                CONVERT(VARCHAR(5), w.start_time, 108) as start_time,
                CONVERT(VARCHAR(5), w.end_time, 108) as end_time,
-               w.hours, w.status, w.note,
+               w.hours, w.regular_hours, w.OT1, w.OT1_5, w.OT3,
+               w.status, w.note,
                pb.Description AS project_description
         FROM worklogs w
         LEFT JOIN dbo.ProjectAndBudget pb
                ON pb.ProjectCode = w.project
         WHERE w.EmployeeID = ? AND w.log_date BETWEEN ? AND ?
+        AND pb.Description = w.Description
         ORDER BY w.log_date
         """,
         (employee_id, first_day, last_day),
@@ -66,10 +68,35 @@ def get_worklogs():
                 row['log_date'] = row['log_date'].strftime('%Y-%m-%d')
             else:
                 row['log_date'] = str(row['log_date'])
-        if row['hours'] is not None:
-            row['hours'] = float(row['hours'])
+        for col in ('hours', 'regular_hours', 'OT1', 'OT1_5', 'OT3'):
+            if row.get(col) is not None:
+                row[col] = float(row[col])
 
     return jsonify(rows)
+
+#Check holidays
+@worklogs_bp.route('/api/holidays', methods=['GET'])
+@login_required
+def get_holiday():
+    year = request.args.get('year', type=int, default=date.today().year)
+    month = request.args.get('month', type=int, default=date.today().month)
+
+    holidays_rows = app_pkg.db.query("""
+            SELECT date, description
+            FROM holiday WHERE YEAR(date) = ? AND MONTH(date) = ?
+        """,
+        (year, month),fetchone=False)
+
+    for hol in holidays_rows:
+        if hol['date']:
+            if isinstance(hol['date'], (date, datetime)):
+                hol['date'] = hol['date'].strftime('%Y-%m-%d')
+            else:
+                hol['date'] = str(hol['date'])
+
+    if not holidays_rows:
+        return jsonify({'error': 'no holiday'}), 400
+    return jsonify(holidays_rows)
 
 #Check if the input time range is overlap with existed time range
 def check_overlap(start_time, end_time, overlap_time):
@@ -91,6 +118,59 @@ def to_time(value):
                 pass
     raise ValueError(f"Invalid time value: {value!r}")
 #Check if the input time range is overlap with existed time range//
+
+# ── Overtime calculation ───────────────────────────────────────────────────────
+# Company rules:
+#   Normal worktime    : 08:30 – 17:30
+#   Lunch (excluded)   : 12:00 – 13:00
+#   Holiday  → OT1  for work inside normal window (minus lunch)
+#              OT3  for work outside normal window
+#   Non-holiday → OT1_5 for work outside normal window
+NORMAL_START = time(8, 30)
+NORMAL_END   = time(17, 30)
+LUNCH_START  = time(12, 0)
+LUNCH_END    = time(13, 0)
+
+
+def _minutes_between(a: time, b: time) -> int:
+    if b <= a:
+        return 0
+    return (b.hour * 60 + b.minute) - (a.hour * 60 + a.minute)
+
+
+def _overlap_minutes(s1: time, e1: time, s2: time, e2: time) -> int:
+    """Whole minutes that two time ranges [s1,e1) and [s2,e2) overlap."""
+    start = max(s1, s2)
+    end   = min(e1, e2)
+    return _minutes_between(start, end)
+
+
+def _calc_overtime(start: time, end: time, is_holiday: bool) -> dict:
+    """Compute OT1 / OT1_5 / OT3 in decimal hours for a single worklog entry."""
+    normal_min = _overlap_minutes(start, end, NORMAL_START, NORMAL_END)
+    lunch_in_normal = _overlap_minutes(
+        max(start, NORMAL_START), min(end, NORMAL_END),
+        LUNCH_START, LUNCH_END,
+    )
+    inside_normal = max(0, normal_min - lunch_in_normal)
+
+    early_min = _overlap_minutes(start, end, time(0, 0), NORMAL_START)
+    late_min  = _overlap_minutes(start, end, NORMAL_END, time(23, 59, 59))
+    outside_normal = early_min + late_min
+
+    if is_holiday:
+        return {'OT1': inside_normal / 60.0, 'OT3': outside_normal / 60.0, 'OT1_5': 0.0}
+    return {'OT1': 0.0, 'OT3': 0.0, 'OT1_5': outside_normal / 60.0}
+
+
+def _is_holiday(log_date) -> bool:
+    """Return True if log_date (YYYY-MM-DD string or date) is in dbo.holiday."""
+    row = app_pkg.db.query(
+        "SELECT 1 AS hit FROM dbo.holiday WHERE [date]=?",
+        (log_date,), fetchone=True,
+    )
+    return bool(row)
+
 
 @worklogs_bp.route('/api/worklogs', methods=['POST'])
 @login_required
@@ -163,15 +243,19 @@ def create_worklog():
         )
         project_code = mapp.get('ProjectCode')
 
+    # Tiered overtime (OT1 / OT1_5 / OT3) based on whether log_date is in dbo.holiday.
+    ot = _calc_overtime(ns, ne, _is_holiday(log_date))
+
     # EmployeeID is authoritative. The legacy member_id column is nullable after
     # migration and must not receive EmployeeID values because it used to FK to
     # members.id, which is a different key space.
     worklog_id = app_pkg.db.execute(
         """
         INSERT INTO worklogs
-            (member_id, EmployeeID, log_date, project, Description, task, start_time, end_time, status, note)
+            (member_id, EmployeeID, log_date, project, Description, task,
+             start_time, end_time, status, note, OT1, OT1_5, OT3)
         OUTPUT INSERTED.id
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             None,
@@ -180,6 +264,7 @@ def create_worklog():
             data.get('start_time') or None,
             data.get('end_time') or None,
             status, note,
+            ot['OT1'], ot['OT1_5'], ot['OT3'],
         ),
     )
     return jsonify({'id': worklog_id}), 201
@@ -244,11 +329,14 @@ def update_worklog(wid):
         )
         project_code = mapp.get('ProjectCode')
 
+    # Recompute OT columns on every edit — start/end/log_date may have changed.
+    ot = _calc_overtime(ns, ne, _is_holiday(log_date))
+
     #All conditions are met, update the worklog
     app_pkg.db.execute(
     """
     UPDATE worklogs SET log_date=?, project=?, Description=?, task=?, start_time=?, end_time=?,
-           status=?, note=?, updated_at=GETDATE()
+           status=?, note=?, OT1=?, OT1_5=?, OT3=?, updated_at=GETDATE()
     WHERE id=?
     """,
     (
@@ -256,6 +344,7 @@ def update_worklog(wid):
         data.get('start_time') or None,
         data.get('end_time') or None,
         status, note,
+        ot['OT1'], ot['OT1_5'], ot['OT3'],
         wid,
         ),
     )
@@ -324,6 +413,9 @@ def get_dashboard():
                ISNULL(SUM(CASE WHEN is_manday = 0 THEN day_hours ELSE 0 END), 0) AS total_hours,
                ISNULL(SUM(CASE WHEN is_manday = 0 THEN overtime_hours ELSE 0 END), 0) AS overtime_hours,
                ISNULL(SUM(CASE WHEN is_manday = 1 THEN day_hours ELSE 0 END), 0) AS man_day,
+               ISNULL(SUM(ot1_day),   0) AS total_ot1,
+               ISNULL(SUM(ot1_5_day), 0) AS total_ot1_5,
+               ISNULL(SUM(ot3_day),   0) AS total_ot3,
                SUM(done) AS done,
                SUM(in_progress) AS in_progress
         FROM (
@@ -344,15 +436,18 @@ def get_dashboard():
                    END AS day_hours,
                    CASE WHEN MIN(start_time) IS NOT NULL AND MAX(end_time) IS NOT NULL
                         THEN (
-                            (CASE WHEN MIN(start_time) < '08:30' THEN 
-                                DATEDIFF(MINUTE, MIN(start_time), CASE WHEN MAX(end_time) < '08:30' THEN MAX(end_time) ELSE '08:30' END) 
+                            (CASE WHEN MIN(start_time) < '08:30' THEN
+                                DATEDIFF(MINUTE, MIN(start_time), CASE WHEN MAX(end_time) < '08:30' THEN MAX(end_time) ELSE '08:30' END)
                              ELSE 0 END) +
-                            (CASE WHEN MAX(end_time) > '17:30' THEN 
-                                DATEDIFF(MINUTE, CASE WHEN MIN(start_time) > '17:30' THEN MIN(start_time) ELSE '17:30' END, MAX(end_time)) 
+                            (CASE WHEN MAX(end_time) > '17:30' THEN
+                                DATEDIFF(MINUTE, CASE WHEN MIN(start_time) > '17:30' THEN MIN(start_time) ELSE '17:30' END, MAX(end_time))
                              ELSE 0 END)
                         ) / 60.0
                         ELSE 0
                    END AS overtime_hours,
+                   ISNULL(SUM(OT1),   0) AS ot1_day,
+                   ISNULL(SUM(OT1_5), 0) AS ot1_5_day,
+                   ISNULL(SUM(OT3),   0) AS ot3_day,
                    SUM(CASE WHEN status = 'Done' THEN 1 ELSE 0 END) AS done,
                    SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress
             FROM worklogs
@@ -373,20 +468,29 @@ def get_dashboard():
     total_done = 0
     total_in_progress = 0
     total_man_day = 0
+    total_ot1 = 0
+    total_ot1_5 = 0
+    total_ot3 = 0
 
     for month_number in range(1, 13):
-        row = month_map.get(month_number, {'total_hours': 0, 'overtime_hours': 0, 'done': 0, 'in_progress': 0, 'man_day': 0})
+        row = month_map.get(month_number, {'total_hours': 0, 'overtime_hours': 0, 'done': 0, 'in_progress': 0, 'man_day': 0, 'total_ot1': 0, 'total_ot1_5': 0, 'total_ot3': 0})
         hours = float(row['total_hours']) if row['total_hours'] else 0
         ot = float(row['overtime_hours']) if row.get('overtime_hours') else 0
         done = int(row['done']) if row['done'] else 0
         in_progress = int(row['in_progress']) if row['in_progress'] else 0 #Keep
         man_day = float(row['man_day']) if row['man_day'] else 0
+        ot1   = float(row.get('total_ot1')   or 0)
+        ot1_5 = float(row.get('total_ot1_5') or 0)
+        ot3   = float(row.get('total_ot3')   or 0)
 
         months.append({
             'month': month_number,
             'name': calendar.month_name[month_number],
             'total_hours': round(hours, 2),
             'overtime_hours': round(ot, 2),
+            'OT1':   round(ot1, 2),
+            'OT1_5': round(ot1_5, 2),
+            'OT3':   round(ot3, 2),
             'done': done,
             'in_progress': in_progress, #Keep
             'man_day': round(man_day, 2),
@@ -396,12 +500,18 @@ def get_dashboard():
         total_done += done
         total_in_progress += in_progress
         total_man_day += man_day
+        total_ot1 += ot1
+        total_ot1_5 += ot1_5
+        total_ot3 += ot3
 
     return jsonify({
         'member': member,
         'year': year,
         'total_hours': round(total_hours, 2),
         'total_overtime': round(total_overtime, 2),
+        'total_OT1':   round(total_ot1, 2),
+        'total_OT1_5': round(total_ot1_5, 2),
+        'total_OT3':   round(total_ot3, 2),
         'avg_monthly_hours': round(total_hours / 12, 2),
         'total_done': total_done,
         #'total_in_progress': total_in_progress,
