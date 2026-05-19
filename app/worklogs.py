@@ -14,6 +14,8 @@ from flask import Blueprint
 from flask import jsonify
 from flask import request
 from flask import session
+from sympy.codegen.ast import continue_
+from torchgen.packaged.autograd.gen_trace_type import SELECT
 
 import app as app_pkg
 
@@ -70,6 +72,34 @@ def get_worklogs():
             row['hours'] = float(row['hours'])
 
     return jsonify(rows)
+
+#Check holidays
+@worklogs_bp.route('/api/holidays', methods=['GET'])
+@login_required
+def get_holiday():
+    employee_id = request.args.get('member_id')
+    year = request.args.get('year', type=int, default=date.today().year)
+    month = request.args.get('month', type=int, default=date.today().month)
+
+    if not employee_id:
+        return jsonify({'error': 'member_id required'}), 400
+
+    holidays_rows = app_pkg.db.query("""
+            SELECT date, description
+            FROM holiday WHERE YEAR(date) = ? AND MONTH(date) = ?
+        """,
+        (year, month),fetchone=False)
+
+    for hol in holidays_rows:
+        if hol['date']:
+            if isinstance(hol['date'], (date, datetime)):
+                hol['date'] = hol['date'].strftime('%Y-%m-%d')
+            else:
+                hol['date'] = str(hol['date'])
+
+    if not holidays_rows:
+        return jsonify({'error': 'no holiday'}), 400
+    return jsonify(holidays_rows)
 
 #Check if the input time range is overlap with existed time range
 def check_overlap(start_time, end_time, overlap_time):
