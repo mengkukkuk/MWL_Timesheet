@@ -118,6 +118,39 @@ CREATE TABLE worklogs (
                                   END
                               ) PERSISTED,
 
+                          -- regular_hours: portion of work inside 08:30-17:30 minus lunch overlap.
+                          -- Pure function of start/end time (no holiday lookup needed).
+                          regular_hours AS (
+                              CASE
+                                  WHEN start_time IS NOT NULL AND end_time IS NOT NULL
+                                       AND end_time   > TIMEFROMPARTS(8,30,0,0,0)
+                                       AND start_time < TIMEFROMPARTS(17,30,0,0,0)
+                                      THEN CAST((
+                                                    DATEDIFF(
+                                                        MINUTE,
+                                                        CASE WHEN start_time > TIMEFROMPARTS(8,30,0,0,0)
+                                                                 THEN start_time ELSE TIMEFROMPARTS(8,30,0,0,0) END,
+                                                        CASE WHEN end_time   < TIMEFROMPARTS(17,30,0,0,0)
+                                                                 THEN end_time   ELSE TIMEFROMPARTS(17,30,0,0,0) END
+                                                    )
+                                                    -
+                                                    CASE
+                                                        WHEN start_time < TIMEFROMPARTS(13,0,0,0,0)
+                                                            AND end_time   > TIMEFROMPARTS(12,0,0,0,0)
+                                                            THEN DATEDIFF(
+                                                                MINUTE,
+                                                                CASE WHEN start_time > TIMEFROMPARTS(12,0,0,0,0)
+                                                                         THEN start_time ELSE TIMEFROMPARTS(12,0,0,0,0) END,
+                                                                CASE WHEN end_time < TIMEFROMPARTS(13,0,0,0,0)
+                                                                         THEN end_time ELSE TIMEFROMPARTS(13,0,0,0,0) END
+                                                                 )
+                                                        ELSE 0
+                                                        END
+                                                    ) / 60.0 AS DECIMAL(5,2))
+                                  ELSE 0
+                                  END
+                              ) PERSISTED,
+
                           status NVARCHAR(50) CHECK (status IN ('Done','In Progress','Pending','Man day')),
                           note NVARCHAR(1000),
 
@@ -132,6 +165,18 @@ GO
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_worklogs_employee_date')
 CREATE NONCLUSTERED INDEX IX_worklogs_employee_date
     ON worklogs(EmployeeID, log_date);
+GO
+
+/* =========================
+   HOLIDAY (referenced by app/worklogs.py for OT calculation)
+========================= */
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'holiday')
+CREATE TABLE dbo.holiday (
+    id          INT IDENTITY(1,1) PRIMARY KEY,
+    [date]      DATE NOT NULL UNIQUE,
+    description NVARCHAR(500) NULL,
+    created_at  DATETIME2 DEFAULT GETDATE()
+);
 GO
 
 /* =========================
@@ -419,3 +464,62 @@ WHERE
    OR
     (ProjectCode IS NOT NULL
         AND DATALENGTH(ProjectCode) <> DATALENGTH(RTRIM(ProjectCode)));
+GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- OT tier columns and regular_hours computed column (added 2026-05).
+-- Idempotent — safe to re-run via init_db().
+-- ════════════════════════════════════════════════════════════════════════════
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'OT1')
+    ALTER TABLE worklogs ADD OT1 DECIMAL(5,2) NULL;
+GO
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'OT1_5')
+    ALTER TABLE worklogs ADD OT1_5 DECIMAL(5,2) NULL;
+GO
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'OT3')
+    ALTER TABLE worklogs ADD OT3 DECIMAL(5,2) NULL;
+GO
+
+-- Use EXEC() so the IF NOT EXISTS wrapper does not interfere with
+-- T-SQL parsing of the "AS (...) PERSISTED" computed-column expression.
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'regular_hours')
+    EXEC('ALTER TABLE worklogs ADD regular_hours AS (
+        CASE
+            WHEN start_time IS NOT NULL AND end_time IS NOT NULL
+                 AND end_time   > TIMEFROMPARTS(8,30,0,0,0)
+                 AND start_time < TIMEFROMPARTS(17,30,0,0,0)
+                THEN CAST((
+                    DATEDIFF(
+                        MINUTE,
+                        CASE WHEN start_time > TIMEFROMPARTS(8,30,0,0,0)
+                                 THEN start_time ELSE TIMEFROMPARTS(8,30,0,0,0) END,
+                        CASE WHEN end_time   < TIMEFROMPARTS(17,30,0,0,0)
+                                 THEN end_time   ELSE TIMEFROMPARTS(17,30,0,0,0) END
+                    )
+                    -
+                    CASE
+                        WHEN start_time < TIMEFROMPARTS(13,0,0,0,0)
+                             AND end_time > TIMEFROMPARTS(12,0,0,0,0)
+                            THEN DATEDIFF(
+                                MINUTE,
+                                CASE WHEN start_time > TIMEFROMPARTS(12,0,0,0,0)
+                                         THEN start_time ELSE TIMEFROMPARTS(12,0,0,0,0) END,
+                                CASE WHEN end_time < TIMEFROMPARTS(13,0,0,0,0)
+                                         THEN end_time ELSE TIMEFROMPARTS(13,0,0,0,0) END
+                            )
+                        ELSE 0
+                    END
+                ) / 60.0 AS DECIMAL(5,2))
+            ELSE CAST(0 AS DECIMAL(5,2))
+        END
+    ) PERSISTED');
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'holiday' AND SCHEMA_NAME(schema_id) = 'dbo')
+CREATE TABLE dbo.holiday (
+    id          INT IDENTITY(1,1) PRIMARY KEY,
+    [date]      DATE NOT NULL UNIQUE,
+    description NVARCHAR(500) NULL,
+    created_at  DATETIME2 DEFAULT GETDATE()
+);
+GO
