@@ -30,11 +30,22 @@ def _load_projects():
         "SELECT id, name, Description, main_members, support_members FROM projects ORDER BY name"
     )
 
+def _load_projects_description():
+    """Load project description"""
+    return app_pkg.db.query(
+        "SELECT Projectcode, Description FROM ProjectAndBudget ORDER BY Projectcode"
+    )
+
 
 @projects_bp.route('/api/projects', methods=['GET'])
 @login_required
 def get_projects():
     return jsonify(cached_list('projects:list', _load_projects))
+
+@projects_bp.route('/api/description', methods=['GET'])
+@login_required
+def get_projects_description():
+    return jsonify(cached_list('projects_description:list', _load_projects_description))
 
 
 @projects_bp.route('/api/projects', methods=['POST'])

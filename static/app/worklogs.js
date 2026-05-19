@@ -597,7 +597,8 @@ function populateProjectDropdown() {
     const sel = document.getElementById('wl-project');
     const val = sel.value;
     sel.innerHTML = '<option value="">Select...</option>';
-    projects.forEach(p => {
+    //data.foreach(p => {})
+    pdes.forEach(p => {
         const opt = document.createElement('option');
         //opt.value = p.name; opt.textContent = p.name;
         opt.value = p.Description; opt.textContent = p.Description;
@@ -677,8 +678,14 @@ async function deleteWorklog(id) {
 
 // ── Projects ──
 async function loadProjects() {
-    const data = await cachedApi('/api/projects');
+
+    [data, description]  = await Promise.all([
+        api(`/api/projects`),
+        api(`/api/description`)
+    ]);
+
     if (data) projects = data;
+    if (description) pdes = description;
 }
 
 function loadProjectsList() {
