@@ -2,10 +2,16 @@ async function loadWorklogs() {
     if (!currentMemberId) return;
     const year  = document.getElementById('year-select').value;
     const month = document.getElementById('month-select').value;
-    const data  = await api(`/api/worklogs?member_id=${currentMemberId}&year=${year}&month=${month}`);
+
+    const [data, holiday]  = await Promise.all([
+            api(`/api/worklogs?member_id=${currentMemberId}&year=${year}&month=${month}`),
+            api(`/api/holidays?member_id=${currentMemberId}&year=${year}&month=${month}`)
+    ]);
     if (!data) return;
 
     worklogData = data;
+    holidayData = holiday;
+
     document.getElementById('btn-add-worklog').classList.toggle('hidden', !canEditMember(currentMemberId));
 
     updateMissingEntryCount();
@@ -69,15 +75,22 @@ function updateMissingEntryCount() {
     const daysInMonth = new Date(year, month, 0).getDate();
 
     const daysWithEntry = new Set();
+    const holidayWithEntry = new Set();
     worklogData.forEach(w => {
         if (!w.log_date) return;
         daysWithEntry.add(parseInt(w.log_date.split('-')[2]));
     });
 
+    holidayData.forEach(h => {
+        if (!h.date) return;
+        holidayWithEntry.add(parseInt(h.date.split('-')[2]));
+    });
+
     let missing = 0;
     for (let d = 1; d <= daysInMonth; d++) {
         const dow = new Date(year, month - 1, d).getDay(); // 0=Sun, 6=Sat
-        if (dow === 0 || dow === 6) continue;
+        if (dow === 0 || dow === 6) continue;        // skip weekends
+        if (holidayWithEntry.has(d)) continue;       // skip holidays
         if (!daysWithEntry.has(d)) missing++;
     }
 
