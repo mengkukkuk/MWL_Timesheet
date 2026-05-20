@@ -15,6 +15,7 @@
     <script defer src="/static/app/dashboard.js?v={{ static_v('app/dashboard.js') }}"></script>
     <script defer src="/static/app/worklogs.js?v={{ static_v('app/worklogs.js') }}"></script>
     <script defer src="/static/app/calendar.js?v={{ static_v('app/calendar.js') }}"></script>
+    <script defer src="/static/app/allowance.js?v={{ static_v('app/allowance.js') }}"></script>
     <script defer src="/static/app/export.js?v={{ static_v('app/export.js') }}"></script>
     <!-- Bootstrap shim runs last among defers — fires `modulesLoaded` event for legacy listeners. -->
     <script defer src="/static/app.js?v={{ static_v('app.js') }}"></script>
@@ -81,6 +82,7 @@
             <div class="flex items-center gap-1 flex-wrap flex-1 justify-center min-w-0 py-0.5">
                 <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn active px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.dashboard">Dashboard</button>
                 <button onclick="showTab('worklog')" id="tab-worklog" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.worklog">Work Log</button>
+                <button onclick="showTab('allowance')" id="tab-allowance" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.allowance">Allowance</button>
                 <button onclick="showTab('files')" id="tab-files" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.files">File Share</button>
                 <button onclick="showTab('projects-summary')" id="tab-projects-summary" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium hidden" data-i18n="nav.projects_summary">Projects Summary</button>
                 <button onclick="showTab('settings')" id="tab-settings" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium relative">
@@ -403,6 +405,48 @@
                 </div>
             </div>
             </div><!-- /worklog-content -->
+        </div>
+
+        <!-- Allowance View -->
+        <div id="view-allowance" class="hidden">
+            <div id="allowance-no-member" class="text-center py-16 text-gray-400 hidden">
+                <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <p class="text-lg" data-i18n="al.no_member_title">Select a team member to view allowance</p>
+                <p class="text-sm mt-1" data-i18n="wl.no_member_hint">Choose a member from the selector above</p>
+            </div>
+            <div id="allowance-content" class="hidden">
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <div class="flex items-center gap-2 flex-none">
+                        <label class="text-sm font-medium text-gray-600" data-i18n="al.month_label">Month:</label>
+                        <select id="allowance-month-select" onchange="loadAllowance()" class="input-field w-36"></select>
+                    </div>
+                    <div class="flex-1"></div>
+                    <button onclick="openAddAllowance()" class="btn-primary flex-none" id="btn-add-allowance">
+                        <svg class="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        <span data-i18n="al.add_entry">+ Add Allowance</span>
+                    </button>
+                </div>
+                <div class="card bg-white p-0 overflow-x-auto">
+                    <table class="w-full text-sm" id="allowance-table">
+                        <thead class="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="text-left py-2 px-3 font-medium text-gray-700" data-i18n="al.col_date">Date</th>
+                                <th class="text-left py-2 px-3 font-medium text-gray-700" data-i18n="al.col_project">Project</th>
+                                <th class="text-left py-2 px-3 font-medium text-gray-700" data-i18n="al.col_type">Type</th>
+                                <th class="text-right py-2 px-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="allowance-body"></tbody>
+                    </table>
+                    <div id="allowance-empty" class="hidden text-center py-10 text-gray-400">
+                        <p data-i18n="al.no_entries">No allowance entries for this month yet</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- File Share View -->
@@ -1273,6 +1317,44 @@
             </div>
         </header>
         <div id="upload-panel-body" class="upload-panel-body"></div>
+    </div>
+
+    <!-- Allowance Add/Edit Modal -->
+    <div id="allowance-modal-overlay" class="modal-overlay hidden" onclick="closeAllowanceModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="allowance-modal-title" class="text-lg font-semibold text-gray-800" data-i18n="al.modal_add_title">Add Allowance</h3>
+                <button onclick="closeAllowanceModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="allowance-form" onsubmit="saveAllowance(event)">
+                <input type="hidden" id="al-id">
+                <div class="grid grid-cols-1 gap-3">
+                    <div>
+                        <label class="label" data-i18n="modal.date">Date</label>
+                        <input type="date" id="al-date" class="input-field w-full" required>
+                    </div>
+                    <div>
+                        <label class="label" data-i18n="modal.project">Project</label>
+                        <select id="al-project" class="input-field w-full" required></select>
+                    </div>
+                    <div>
+                        <label class="label hidden" data-i18n="al.type_label">Type</label>
+                        <select id="al-type" class="input-field w-full hidden" required>
+                            <option value="Normal" data-i18n="al.type_normal">Normal</option>
+                            <option value="Special" data-i18n="al.type_special">Special</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-5">
+                    <button type="button" onclick="closeAllowanceModal()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                    <button type="submit" class="btn-primary" data-i18n="modal.save">Save</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Toast Notification -->

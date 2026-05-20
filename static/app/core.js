@@ -113,7 +113,7 @@ async function initializeApp() {
     // Restore last selected tab from previous session (if available)
     try {
         const last = localStorage.getItem('lastTab');
-        const allowedTabs = new Set(['dashboard', 'worklog', 'files', 'projects-summary', 'settings']);
+        const allowedTabs = new Set(['dashboard', 'worklog', 'allowance', 'files', 'projects-summary', 'settings']);
         let toShow = allowedTabs.has(last) ? last : 'dashboard';
         // protect against unauthorized tabs
         if (toShow === 'settings' && !isElevated()) toShow = 'dashboard';
@@ -165,7 +165,7 @@ function populateMonthSelect() {
 async function showTab(name) {
     if (name === 'settings' && !isElevated()) return;
     if (name === 'projects-summary' && !isElevated()) return;
-    ['dashboard', 'worklog', 'files', 'projects-summary', 'settings'].forEach(t => {
+    ['dashboard', 'worklog', 'allowance', 'files', 'projects-summary', 'settings'].forEach(t => {
         const viewEl = document.getElementById('view-' + t);
         const tabEl  = document.getElementById('tab-' + t);
         if (viewEl) viewEl.classList.toggle('hidden', t !== name);
@@ -190,6 +190,22 @@ async function showTab(name) {
             if (tableView) tableView.classList.toggle('hidden', currentWorklogView !== 'table');
             if (calView)   calView.classList.toggle('hidden',   currentWorklogView !== 'calendar');
             loadWorklogs();
+        }
+        return;
+    }
+
+    // Allowance: mirrors worklog "no member" handling
+    if (name === 'allowance') {
+        const noMemberEl = document.getElementById('allowance-no-member');
+        const contentEl  = document.getElementById('allowance-content');
+        if (!currentMemberId) {
+            if (noMemberEl) noMemberEl.classList.remove('hidden');
+            if (contentEl)  contentEl.classList.add('hidden');
+        } else {
+            if (noMemberEl) noMemberEl.classList.add('hidden');
+            if (contentEl)  contentEl.classList.remove('hidden');
+            if (typeof populateAllowanceMonthSelect === 'function') populateAllowanceMonthSelect();
+            if (typeof loadAllowance === 'function') loadAllowance();
         }
         return;
     }
@@ -283,6 +299,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     const overlays = [
         'modal-overlay',
+        'allowance-modal-overlay',
         'bulk-export-overlay',
         'add-project-role-overlay',
         'month-filter-overlay',
@@ -358,6 +375,14 @@ function onContextChange() {
         if (tableView)  tableView.classList.toggle('hidden', currentWorklogView !== 'table');
         if (calView)    calView.classList.toggle('hidden',   currentWorklogView !== 'calendar');
         loadWorklogs();
+    }
+    else if (active && active.id === 'tab-allowance') {
+        const noMemberEl = document.getElementById('allowance-no-member');
+        const contentEl  = document.getElementById('allowance-content');
+        if (noMemberEl) noMemberEl.classList.add('hidden');
+        if (contentEl)  contentEl.classList.remove('hidden');
+        if (typeof populateAllowanceMonthSelect === 'function') populateAllowanceMonthSelect();
+        if (typeof loadAllowance === 'function') loadAllowance();
     }
 }
 

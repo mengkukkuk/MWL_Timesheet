@@ -256,6 +256,7 @@ def _upload_too_large(_exc):
     return jsonify({'error': f'File exceeds maximum size of {mb} MB'}), 413
 
 
+from .allowance import allowance_bp  # noqa: E402
 from .auth import auth_bp  # noqa: E402
 from .avatars import avatars_bp  # noqa: E402
 from .core import core_bp  # noqa: E402
@@ -277,5 +278,6 @@ app.register_blueprint(employees_bp)
 app.register_blueprint(projects_bp)
 app.register_blueprint(skills_bp)
 app.register_blueprint(worklogs_bp)
+app.register_blueprint(allowance_bp)
 app.register_blueprint(export_bp)
 app.register_blueprint(files_bp)

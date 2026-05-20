@@ -4,6 +4,7 @@ const _i18n = {
         // Nav
         'nav.dashboard': 'Dashboard',
         'nav.worklog': 'Work Log',
+        'nav.allowance': 'Allowance',
         'nav.files': 'File Share',
         'nav.projects_summary': 'Projects Summary',
         'nav.settings': 'Settings',
@@ -113,6 +114,26 @@ const _i18n = {
         'wl.bulk_delete': 'Bulk Delete',
         'wl.bulk_edit_title': 'Bulk Edit Selected Entries',
         'wl.bulk_edit_hint': 'Only checked fields will be applied to all selected entries.',
+
+        // Allowance
+        'al.title': 'Allowance',
+        'al.no_member_title': 'Select a team member to view allowance',
+        'al.month_label': 'Month:',
+        'al.add_entry': 'Add Allowance',
+        'al.col_date': 'Date',
+        'al.col_project': 'Project',
+        'al.col_type': 'Type',
+        'al.no_entries': 'No allowance entries for this month yet',
+        'al.type_label': 'Type',
+        'al.type_normal': 'Normal',
+        'al.type_special': 'Special',
+        'al.modal_add_title': 'Add Allowance',
+        'al.modal_edit_title': 'Edit Allowance',
+        'al.confirm_delete': 'Delete this allowance entry?',
+        'al.locked_msg': 'This row is locked and cannot be edited',
+        'al.toast_added': 'Allowance added',
+        'al.toast_updated': 'Allowance updated',
+        'al.toast_deleted': 'Allowance deleted',
 
         // Calendar day-of-week
         'cal.mon': 'Mon', 'cal.tue': 'Tue', 'cal.wed': 'Wed',
@@ -276,6 +297,7 @@ const _i18n = {
         // Nav
         'nav.dashboard': 'แดชบอร์ด',
         'nav.worklog': 'บันทึกงาน',
+        'nav.allowance': 'เบี้ยเลี้ยง',
         'nav.files': 'แชร์ไฟล์',
         'nav.projects_summary': 'สรุปโปรเจกต์',
         'nav.settings': 'ตั้งค่า',
@@ -385,6 +407,26 @@ const _i18n = {
         'wl.bulk_delete': 'ลบหลายรายการ',
         'wl.bulk_edit_title': 'แก้ไขรายการที่เลือก',
         'wl.bulk_edit_hint': 'จะนำไปใช้กับทุกรายการที่เลือกเฉพาะฟิลด์ที่ติ๊กถูก',
+
+        // Allowance
+        'al.title': 'เบี้ยเลี้ยง',
+        'al.no_member_title': 'เลือกพนักงานเพื่อดูข้อมูลเบี้ยเลี้ยง',
+        'al.month_label': 'เดือน:',
+        'al.add_entry': 'เพิ่มเบี้ยเลี้ยง',
+        'al.col_date': 'วันที่',
+        'al.col_project': 'โปรเจกต์',
+        'al.col_type': 'ประเภท',
+        'al.no_entries': 'ยังไม่มีรายการเบี้ยเลี้ยงในเดือนนี้',
+        'al.type_label': 'ประเภท',
+        'al.type_normal': 'ปกติ',
+        'al.type_special': 'พิเศษ',
+        'al.modal_add_title': 'เพิ่มเบี้ยเลี้ยง',
+        'al.modal_edit_title': 'แก้ไขเบี้ยเลี้ยง',
+        'al.confirm_delete': 'ลบรายการเบี้ยเลี้ยงนี้?',
+        'al.locked_msg': 'รายการนี้ถูกล็อคและไม่สามารถแก้ไขได้',
+        'al.toast_added': 'เพิ่มเบี้ยเลี้ยงแล้ว',
+        'al.toast_updated': 'อัปเดตเบี้ยเลี้ยงแล้ว',
+        'al.toast_deleted': 'ลบเบี้ยเลี้ยงแล้ว',
 
         // Calendar day-of-week
         'cal.mon': 'จ.', 'cal.tue': 'อ.', 'cal.wed': 'พ.',

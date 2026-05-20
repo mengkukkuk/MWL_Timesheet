@@ -73,7 +73,6 @@ def get_worklogs():
         for col in ('hours', 'regular_hours', 'OT1', 'OT1_5', 'OT3'):
             if row.get(col) is not None:
                 row[col] = float(row[col])
-        print(row)
 
     return jsonify(rows)
 
@@ -167,11 +166,17 @@ def _calc_overtime(start: time, end: time, is_holiday: bool) -> dict:
 
 
 def _is_holiday(log_date) -> bool:
-    """Return True if log_date (YYYY-MM-DD string or date) is in dbo.holiday."""
+    """Return True if log_date (YYYY-MM-DD string or date) is in dbo.holiday or saturday/sunday"""
     row = app_pkg.db.query(
         "SELECT 1 AS hit FROM dbo.holiday WHERE [date]=?",
         (log_date,), fetchone=True,
     )
+    if not row:
+        date_obj = datetime.strptime(log_date, "%Y-%m-%d")
+        if date_obj.weekday() in [5, 6]:
+            return True
+        else:
+            return False
     return bool(row)
 
 
