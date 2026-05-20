@@ -23,7 +23,6 @@ from .helpers import parse_member_ids
 projects_bp = Blueprint('projects', __name__)
 PROJECT_MEMBER_COLUMN_WHITELIST = {'main': 'main_members', 'support': 'support_members'}
 
-
 def _load_projects():
     """Build the projects list. Pulled out so cached_list can call it lazily."""
     return app_pkg.db.query(
@@ -33,7 +32,7 @@ def _load_projects():
 def _load_projects_description():
     """Load project description"""
     return app_pkg.db.query(
-        "SELECT Projectcode, Description FROM ProjectAndBudget ORDER BY Projectcode"
+        "SELECT Projectcode, Description, ProjectDepartment FROM ProjectAndBudget ORDER BY Projectcode"
     )
 
 
@@ -47,7 +46,7 @@ def get_projects():
 def get_projects_description():
     return jsonify(cached_list('projects_description:list', _load_projects_description))
 
-
+#Improve for add project description, status, department, budget
 @projects_bp.route('/api/projects', methods=['POST'])
 @elevated_required
 def create_project():

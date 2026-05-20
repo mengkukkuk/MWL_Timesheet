@@ -40,16 +40,17 @@ Python deps live in [requirements.txt](requirements.txt). Install via
 mwl deploy/
 ├── app.py                  # Entry point — runs `app:app` Flask instance
 ├── db.py                   # pyodbc wrapper, thread-local connection
-├── init_db.sql             # Full schema (tables, indexes, defaults)
-├── init_db2.sql            # Migration / additive DDL
+├── init_db.sql             # Full schema (tables, indexes, defaults) — auto-applied by db.init_db()
+├── init_db2.sql            # Alternate / older schema variant — NOT used by db.init_db(); kept for reference only
 ├── migrate_to_employee.py  # One-shot migration: members.id → EmployeeID
 │
 ├── app/                    # Flask app package — blueprints
 │   ├── __init__.py         # Flask factory, config, CSRF, blueprint reg
 │   ├── auth.py             # Login, logout, decorators (@login_required, @elevated_required, @admin_required)
+│   ├── cache.py            # In-process TTLCache (cachetools) for /api/members, /api/projects, /api/employees
 │   ├── constants.py        # Roles, ELEVATED_ROLES tuple
 │   ├── core.py             # /api/me, settings, misc plumbing
-│   ├── members.py          # Legacy members table CRUD (kept for migration)
+│   ├── members.py          # Legacy members table — GET only (POST/PUT/DELETE disabled; use /api/employees)
 │   ├── employees.py        # dbo.Employee CRUD (HR directory — authoritative)
 │   ├── projects.py         # Projects + per-employee role assignments
 │   ├── skills.py           # Per-employee skill records
@@ -61,20 +62,27 @@ mwl deploy/
 │   └── helpers.py          # parse_time, parse_members, format_members
 │
 ├── static/
-│   ├── app.js              # Sequential script loader for /static/app/*.js
+│   ├── app.js              # Bootstrap shim — fires `modulesLoaded` event after defer scripts run
+│   ├── app.js.bak          # LEGACY pre-modularization monolith — should be deleted
 │   ├── style.css           # Custom CSS (extends Tailwind CDN)
 │   ├── mwllogo.png
-│   └── app/                # Frontend modules (loaded in this order)
-│       ├── i18n.js         # TH / EN translation tables
-│       ├── core.js         # Tab router (showTab), api(), session state
-│       ├── dashboard.js    # Per-employee monthly dashboard
-│       ├── projects-summary.js  # Projects Summary tab (elevated only)
-│       ├── worklogs.js     # Worklog table CRUD UI
-│       ├── calendar.js     # Calendar view of worklogs
-│       ├── export.js       # Single + bulk Excel export
-│       ├── settings.js     # Admin settings panel
-│       ├── files.js        # File-share UI
-│       └── draft.js        # Squad Draft side panel
+│   └── app/                # Frontend modules — eager via <script defer> + lazy via loadModuleOnce()
+│       ├── i18n.js         # TH / EN translation tables                      [EAGER]
+│       ├── core.js         # Tab router (showTab), api(), session, loader    [EAGER]
+│       ├── dashboard.js    # Per-employee monthly dashboard                  [EAGER]
+│       ├── worklogs.js     # Worklog table CRUD UI                           [EAGER]
+│       ├── calendar.js     # Calendar view of worklogs                       [EAGER]
+│       ├── export.js       # Single + bulk Excel export                      [EAGER]
+│       ├── settings.js     # Admin settings panel                            [LAZY]
+│       ├── files.js        # File-share UI                                   [LAZY]
+│       ├── projects-summary.js  # Projects Summary tab (elevated only)       [LAZY]
+│       └── draft.js        # Squad Draft side panel                          [LAZY]
+│
+├── logintest/              # Ad-hoc SQL helpers (SYSTEM login setup) — NOT part of deploy pipeline
+│   ├── setup_system_login.sql   # Idempotent SYSTEM login setup (preferred if needed)
+│   ├── setup_login.sql          # Older duplicate of setup_system_login.sql
+│   ├── checklogin.sql           # Verification query
+│   └── worklog_deployaaaa.txt   # Stale chat-dump notes (candidate for deletion)
 │
 ├── templates/
 │   ├── index.html          # Single-page app shell (all tabs + modals)
@@ -111,6 +119,10 @@ Single point of contact: [db.py](db.py).
 - `init_db()` — runs `init_db.sql` split on `\nGO\n`. Safe to call
   repeatedly (the SQL guards each `CREATE TABLE` with `IF NOT EXISTS`).
   It is invoked once on the first request via the `before_request` hook.
+- **`init_db2.sql` is NOT executed automatically** — it is an older /
+  alternate schema variant kept in the repo for reference. Do not assume
+  it has been applied. If you need DDL from it, run it manually with
+  `sqlcmd -S <server> -d MeterWorklog -i init_db2.sql`.
 
 ### Connection settings (env vars)
 
@@ -214,15 +226,24 @@ sent (SMTP config required).
 - Single page: [templates/index.html](templates/index.html) — contains
   every tab's HTML (`view-dashboard`, `view-worklog`, `view-files`,
   `view-projects-summary`, `view-settings`) plus all modals.
-- Loaded by [static/app.js](static/app.js), which sequentially injects
-  the `<script>` tags for `static/app/*.js` (dependency order matters:
-  `i18n` → `core` → feature modules). Fires a `modulesLoaded` event when
-  the last script finishes.
+- **Eager modules** are loaded by `<script defer>` tags directly in
+  [templates/index.html](templates/index.html) (lines ~13–18) in strict
+  dependency order: `i18n` → `core` → `dashboard` → `worklogs` →
+  `calendar` → `export`. Cache-busted via `?v={{ static_v('app/<file>.js') }}`
+  (mtime-based, no build step).
+- [static/app.js](static/app.js) is the **bootstrap shim** — after the
+  deferred scripts run, it fires a `modulesLoaded` event that other
+  modules await for cross-module globals.
+- **Lazy modules** (`settings`, `files`, `projects-summary`, `draft`)
+  are injected on demand by `loadModuleOnce(name)` in
+  [static/app/core.js](static/app/core.js) (script tag with
+  `?v=<STATIC_V[name]>` cache token, async=false to preserve init order).
 - Tab switching: `showTab(name)` in [static/app/core.js](static/app/core.js).
   Permission-gated tabs (`settings`, `projects-summary`) early-return
   unless `isElevated()`. Last selected tab persisted in `localStorage`.
 - API calls: `api(url, opts)` in [core.js](static/app/core.js). Auto-redirects
-  to `/login` on 401, toasts on 403/5xx, returns parsed JSON.
+  to `/login` on 401, toasts on 403/5xx, returns parsed JSON. Prefer
+  `api()` over raw `fetch()` so error handling stays consistent.
 - i18n: `t(key)` in [static/app/i18n.js](static/app/i18n.js); `data-i18n`
   attributes on HTML elements get translated on language toggle (TH ↔ EN).
 
@@ -261,6 +282,19 @@ Optional: if `C:\Program Files\Tailscale\tailscale.exe` exists, also runs
 `tailscale serve --bg --https=443 http://localhost:%APP_PORT%` to expose
 the app over the tailnet on HTTPS.
 
+> **Important — manual steps the installer does NOT do:**
+> 1. **It does not create `FILE_STORAGE_DIR` / `AVATAR_STORAGE_DIR`.**
+>    Create them by hand before first upload, e.g.
+>    `mkdir D:\MeterWorklog_Storage\files` and `mkdir D:\MeterWorklog_Storage\avatars`.
+> 2. **It does not apply the ACL lockdown** from §10a — run those
+>    `icacls` commands manually as Administrator.
+> 3. **It does not run `init_db2.sql`** — only `init_db.sql` is auto-applied.
+> 4. **The script ships with hardcoded defaults** for `SECRET_KEY`,
+>    `NGROK_AUTHTOKEN`, `DB_SERVER`, `NGROK_DOMAIN` near the top of
+>    [install-service.bat](install-service.bat). These are overridden by
+>    `.env`, but the defaults are checked into source — **rotate any
+>    leaked values and replace the script defaults with blanks** for prod.
+
 ### Uninstall — [uninstall-service.bat](uninstall-service.bat) (Run as Admin)
 
 Stops + removes both NSSM services and runs `tailscale serve reset`.
@@ -294,40 +328,66 @@ windows. Reads `APP_PORT`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN` from `.env`.
 
 ## 10. Required environment variables
 
-Minimal `.env` for production install:
+This is the **complete** set of env vars consumed by
+[app/__init__.py](app/__init__.py) and the install scripts. Anything not
+listed here is not read by the app.
 
 ```
-SECRET_KEY=<32-byte hex>
+# ── Required (app will not start without these) ─────────────────────────
+SECRET_KEY=<32-byte hex>             # fail-fast if missing
 DB_SERVER=localhost\SQLEXPRESS
 DB_NAME=MeterWorklog
 DB_DRIVER={ODBC Driver 17 for SQL Server}
 DB_TRUST_CERT=yes
+DB_USER=                             # blank → Trusted_Connection (Windows Auth)
+DB_PASSWORD=
 
+# ── Public access ───────────────────────────────────────────────────────
 NGROK_AUTHTOKEN=<your-token>
 NGROK_DOMAIN=<your-subdomain>.ngrok-free.dev
 TAILSCALE_DOMAIN=<machine>.<tailnet>.ts.net   # optional
 
-# Optional tuning
-APP_PORT=5050
-FILE_UPLOAD_MAX_MB=5120
+# ── Server tuning ───────────────────────────────────────────────────────
+APP_PORT=5050                        # used by install-service.bat + dev.bat
+PORT=5050                            # legacy alias read by app.py — keep equal to APP_PORT
+FLASK_DEBUG=                         # set "true" only for dev.bat; never in prod
+SESSION_COOKIE_SECURE=               # blank → auto-on when NGROK_DOMAIN or TAILSCALE_DOMAIN set
 WAITRESS_CHANNEL_TIMEOUT=3600
-WAITRESS_MAX_REQUEST_BODY=5368709120
+WAITRESS_MAX_REQUEST_BODY=5368709120 # bytes; MUST be ≥ FILE_UPLOAD_MAX_MB * 1024 * 1024
 
-# Storage (RECOMMENDED: use separate drive for safety & independent backups)
-FILE_STORAGE_DIR=D:\MeterWorklog_Storage\files        # General file-share uploads
-AVATAR_STORAGE_DIR=D:\MeterWorklog_Storage\avatars    # Profile photos (separate for backup strategy)
-FILE_STORAGE_CAP_MB=20480                             # Total quota across all files
-FILE_MIN_FREE_MB=8192                                 # Stop uploads if free space drops below
+# ── File / avatar storage ───────────────────────────────────────────────
+# Strongly recommended: separate drive from code (see §10a).
+# NOTE: install-service.bat currently ships with `D:\MWLStorage\files` and
+#       `D:\MWLStorage\avatar` (singular!) as built-in defaults. Override
+#       in .env to the canonical paths below and align both ends.
+FILE_STORAGE_DIR=D:\MeterWorklog_Storage\files
+AVATAR_STORAGE_DIR=D:\MeterWorklog_Storage\avatars
+FILE_UPLOAD_MAX_MB=5120              # Flask MAX_CONTENT_LENGTH
+FILE_STORAGE_CAP_MB=20480            # total quota across all files
+FILE_MIN_FREE_MB=8192                # stop uploads if free space < this
 
-# Optional SMTP (Super_Ultimate_ADMIN unlock emails)
+# ── Super_Ultimate_ADMIN login throttling ───────────────────────────────
+SUPER_ADMIN_MAX_LOGIN_ATTEMPTS=3
+SUPER_ADMIN_LOGIN_WINDOW_MINUTES=15
+SUPER_ADMIN_LOCKOUT_MINUTES=30
+SUPER_ADMIN_UNLOCK_TOKEN_MINUTES=30
+SUPER_ADMIN_UNLOCK_EMAIL_COOLDOWN_SECONDS=300
+
+# ── SMTP (required only if you want Super_Ultimate_ADMIN unlock emails) ─
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=...
 SMTP_PASSWORD=...
 MAIL_FROM=...
-SUPER_ADMIN_UNLOCK_EMAIL=...
-APP_BASE_URL=https://<your-subdomain>.ngrok-free.dev
+SUPER_ADMIN_UNLOCK_EMAIL=...         # destination for unlock-link emails
+APP_BASE_URL=https://<your-subdomain>.ngrok-free.dev   # used to build unlock URLs
 ```
+
+> Storage-path drift to watch for: `install-service.bat:37-38` ships
+> `D:\MWLStorage\…` defaults (and `avatar` is singular), while §10a
+> recommends `D:\MeterWorklog_Storage\…`. Pick one set and align the
+> install script's defaults to match, otherwise an operator following
+> §10a will lock down the wrong directory.
 
 ---
 
@@ -342,9 +402,11 @@ Storing user files (`FILE_STORAGE_DIR`, `AVATAR_STORAGE_DIR`) **outside the proj
 - **Permission isolation**: Storage directory can be restricted to SYSTEM account only, preventing accidental web access
 - **Disk management**: User data and code can grow independently; file quotas can be tuned separately
 
-### Recommended Windows Deployment
+### Recommended Windows Deployment (MANUAL — not automated by the installer)
 
-After running `install-service.bat`, lock down storage permissions (run as Administrator):
+`install-service.bat` does **not** create the storage directories and
+does **not** apply ACLs. After running it, perform these steps by hand
+as Administrator:
 
 ```batch
 REM Create the storage directory if it doesn't exist
@@ -397,6 +459,23 @@ If you need to restore from backup:
   query — `db.query()` and `db.execute()` both accept a `params` tuple.
 - **Use `EmployeeID`, not `member_id`,** for any new worklog/skill code.
   The legacy `member_id` column stays NULL.
+- **Coerce `EmployeeID` to `int` at the request boundary.** The DB column
+  is NVARCHAR and SQL Server papers over the int/str mismatch with
+  implicit conversion, but mixing types in auth comparisons (`row['EmployeeID']
+  != str(session['member_id'])`) is fragile. `create_worklog` already does
+  this; mirror that pattern in every new endpoint.
+- **Choose `@elevated_required` over `@admin_required`** for any setting
+  that affects all employees (e.g. global toggles in `/api/settings/*`).
+  Reserve `@admin_required` for Super_Ultimate_ADMIN-only operations
+  (role changes, account approval).
+- **Frontend module convention** (revised): pick eager or lazy.
+  - **Eager** → add a `<script defer src="…?v={{ static_v(…) }}">` tag
+    to [templates/index.html](templates/index.html) in the right
+    dependency slot. Use this when the module is needed on first paint.
+  - **Lazy** → register the module name in `STATIC_V` in
+    [static/app/core.js](static/app/core.js) and call
+    `loadModuleOnce('<name>')` from `showTab()`. Use this for tabs that
+    aren't visible until the user clicks into them.
 - **Time math** for daily aggregates uses
   `((max(end) - min(start)) - lunch_overlap) / 60`
   with lunch = 12:00–13:00. See `get_dashboard()` and
@@ -404,17 +483,20 @@ If you need to restore from backup:
 - **Decorators stack in order**: `@blueprint.route(...)` →
   `@login_required` → `@elevated_required`/`@admin_required` →
   function definition.
-- **Frontend module convention**: filename is hyphenated
-  (`projects-summary.js`, not `projectsSummary.js`); the loader expects
-  it in [static/app.js](static/app.js).
+- **Frontend filename convention**: hyphenated (`projects-summary.js`,
+  not `projectsSummary.js`).
 - **Add a new tab**:
   1. Nav button + view div in [templates/index.html](templates/index.html).
-  2. New module in `static/app/<name>.js`, registered in
-     [static/app.js](static/app.js).
-  3. Add the name to `showTab()`'s tab list, the `allowedTabs` Set, and
+  2. New module in `static/app/<name>.js`.
+  3. **Eager** load → add a `<script defer src="/static/app/<name>.js?v={{ static_v('app/<name>.js') }}">`
+     tag in [templates/index.html](templates/index.html) (head section);
+     **lazy** load → add `<name>` to `STATIC_V` in
+     [static/app/core.js](static/app/core.js) and call
+     `loadModuleOnce('<name>')` from `showTab()`.
+  4. Add the name to `showTab()`'s tab list, the `allowedTabs` Set, and
      the `if (name === ...)` data-loading branch in
      [static/app/core.js](static/app/core.js).
-  4. If admin-only, gate the nav button in `initializeApp()` and add a
+  5. If admin-only, gate the nav button in `initializeApp()` and add a
      guard at the top of `showTab()`.
 - **Add a new API route**: pick the right blueprint (or create one),
   decorate with `@login_required` (+ `@elevated_required` if
@@ -433,5 +515,37 @@ If you need to restore from backup:
 - After editing `.env`: re-run `install-service.bat` (it writes env vars
   into the NSSM service config) **or** edit via `nssm edit MeterWorklog`.
 - Port 5050 in use → set `APP_PORT` in `.env` and re-run install script.
+  Note: `app.py` currently reads `PORT` (not `APP_PORT`); keep both equal
+  in `.env` until that is unified.
+- File upload fails with no Flask log entry → either `FILE_STORAGE_DIR`
+  does not exist, or `WAITRESS_MAX_REQUEST_BODY` is smaller than
+  `FILE_UPLOAD_MAX_MB * 1024 * 1024` (Waitress rejects before Flask sees
+  the request).
 - Bootstrapping the first admin: register normally, then in SSMS run
   `UPDATE users SET role='Super_Ultimate_ADMIN' WHERE username='...';`
+
+---
+
+## 13. Known drift / TODOs (as of 2026-05-18 code review)
+
+These are real issues caught by the project-wide code review. Docs were
+updated to flag them; code fixes are still pending and intentionally
+out-of-scope for that review.
+
+| # | Where | Issue | Severity |
+|---|-------|-------|----------|
+| 1 | [install-service.bat](install-service.bat):19-26 | `SECRET_KEY`, `NGROK_AUTHTOKEN`, `DB_SERVER`, `NGROK_DOMAIN` hardcoded as `SET` defaults; will leak into NSSM env if `.env` is missing any key. Rotate the exposed ngrok token + `SECRET_KEY` and blank the defaults. | Critical |
+| 2 | [app/worklogs.py](app/worklogs.py) `update_worklog()` | `member_id` from JSON is **not** `int()`-coerced (unlike `create_worklog()`); auth comparison mixes str/int. | Critical |
+| 3 | [app/core.py](app/core.py) `/api/settings/worklog-visibility` | Uses `@admin_required` (Super_Ultimate_ADMIN only); should be `@elevated_required` so Admin/Leader can toggle. | High |
+| 4 | install-service.bat | Does not create `FILE_STORAGE_DIR` / `AVATAR_STORAGE_DIR`; first upload fails. Add `mkdir` calls. | High |
+| 5 | install-service.bat defaults | Storage paths drift from §10a (`D:\MWLStorage\…` and `avatar` singular vs `D:\MeterWorklog_Storage\…` and `avatars`). Pick one and align. | High |
+| 6 | db.init_db() / docs | `init_db2.sql` is **not** auto-applied. Either delete it or document that it requires manual `sqlcmd -i`. | High |
+| 7 | [uninstall-service.bat](uninstall-service.bat) | Looks for nssm in `C:\Windows\System32\` while install-service.bat ships one at `ngrokv3\nssm.exe`; standardize the location. | Medium |
+| 8 | [.env.example](.env.example) | Missing ~20 vars the app actually reads (all `SUPER_ADMIN_*`, all `SMTP_*`, `MAIL_FROM`, `APP_BASE_URL`, `PORT`, `FLASK_DEBUG`, `FILE_STORAGE_DIR`). | Medium |
+| 9 | [app/auth.py](app/auth.py) `/api/employee-lookup` | Intentionally public; rate-limiting TODO never landed — employee enumeration possible. | Medium |
+| 10 | [app/avatars.py](app/avatars.py) | Returns raw exception text to clients on error paths (e.g. line 151). Sanitize for prod. | Medium |
+| 11 | [static/app.js.bak](static/app.js.bak) | 1226-line legacy monolith superseded by modular split. Delete or `.gitignore`. | Low |
+| 12 | `logintest/` | Undocumented, duplicates SETUP.txt content, `.gitignore` already excludes it → committed files are stale. Clean up. | Low |
+| 13 | [requirements.txt](requirements.txt) | `cachetools>=5.3` lacks an upper bound. Pin `<6.0` for reproducibility. | Low |
+| 14 | [.gitignore](.gitignore):228 | Malformed `. e n v` (spaced characters) — does nothing, just clutter. | Low |
+| 15 | Frontend `esc()` / `_psEsc()` | Duplicate HTML-escape helpers in `worklogs.js` and `projects-summary.js` — consolidate into `core.js`. | Low |
