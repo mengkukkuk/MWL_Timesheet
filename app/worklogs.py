@@ -173,10 +173,7 @@ def _is_holiday(log_date) -> bool:
     )
     if not row:
         date_obj = datetime.strptime(log_date, "%Y-%m-%d")
-        if date_obj.weekday() in [5, 6]:
-            return True
-        else:
-            return False
+        return True if date_obj.weekday() in [5, 6] else False
     return bool(row)
 
 
