@@ -14,8 +14,6 @@ from flask import Blueprint
 from flask import jsonify
 from flask import request
 from flask import session
-from sympy.codegen.ast import continue_
-from torchgen.packaged.autograd.gen_trace_type import SELECT
 
 import app as app_pkg
 
@@ -165,11 +163,14 @@ def _calc_overtime(start: time, end: time, is_holiday: bool) -> dict:
 
 
 def _is_holiday(log_date) -> bool:
-    """Return True if log_date (YYYY-MM-DD string or date) is in dbo.holiday."""
+    """Return True if log_date (YYYY-MM-DD string or date) is in dbo.holiday or saturday/sunday"""
     row = app_pkg.db.query(
         "SELECT 1 AS hit FROM dbo.holiday WHERE [date]=?",
         (log_date,), fetchone=True,
     )
+    if not row:
+        date_obj = datetime.strptime(log_date, "%Y-%m-%d")
+        return True if date_obj.weekday() in [5, 6] else False
     return bool(row)
 
 

@@ -140,7 +140,7 @@ function editAllowance(a) {
     document.getElementById('allowance-modal-title').textContent = t('al.modal_edit_title');
     document.getElementById('al-id').value   = a.ID;
     document.getElementById('al-date').value = a.log_date || '';
-    document.getElementById('al-type').value = a.type || 'Normal';
+    document.getElementById('al-type').value = 'Normal';
     _populateAllowanceProjectDropdown(a.Description || '');
     document.getElementById('allowance-modal-overlay').classList.remove('hidden');
 }

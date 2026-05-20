@@ -122,8 +122,8 @@ def create_allowance():
         return jsonify({'error': 'Project is required'}), 400
     if len(project) > 500:
         return jsonify({'error': 'Project name must be 500 characters or fewer'}), 400
-    if al_type not in VALID_TYPES:
-        return jsonify({'error': 'Invalid type (must be Normal or Special)'}), 400
+    #if al_type not in VALID_TYPES:
+    #    return jsonify({'error': 'Invalid type (must be Normal or Special)'}), 400
     if not log_date:
         return jsonify({'error': 'log_date is required'}), 400
     try:
@@ -213,8 +213,8 @@ def update_allowance(aid):
         return jsonify({'error': 'Project is required'}), 400
     if len(project) > 500:
         return jsonify({'error': 'Project name must be 500 characters or fewer'}), 400
-    if al_type not in VALID_TYPES:
-        return jsonify({'error': 'Invalid type (must be Normal or Special)'}), 400
+    #if al_type not in VALID_TYPES:
+    #    return jsonify({'error': 'Invalid type (must be Normal or Special)'}), 400
     if not log_date:
         return jsonify({'error': 'log_date is required'}), 400
     try:
