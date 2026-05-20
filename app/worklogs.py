@@ -71,6 +71,7 @@ def get_worklogs():
         for col in ('hours', 'regular_hours', 'OT1', 'OT1_5', 'OT3'):
             if row.get(col) is not None:
                 row[col] = float(row[col])
+
     return jsonify(rows)
 
 #Check holidays

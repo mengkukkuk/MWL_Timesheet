@@ -135,7 +135,6 @@ const _i18n = {
         'al.toast_updated': 'Allowance updated',
         'al.toast_deleted': 'Allowance deleted',
 
-
         // Calendar day-of-week
         'cal.mon': 'Mon', 'cal.tue': 'Tue', 'cal.wed': 'Wed',
         'cal.thu': 'Thu', 'cal.fri': 'Fri', 'cal.sat': 'Sat', 'cal.sun': 'Sun',

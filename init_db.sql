@@ -523,3 +523,27 @@ CREATE TABLE dbo.holiday (
     created_at  DATETIME2 DEFAULT GETDATE()
 );
 GO
+
+-- Allowance table --
+USE MWLTimesheet
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.tables
+    WHERE name = 'Allowance'
+      AND schema_id = SCHEMA_ID('dbo')
+)
+    BEGIN
+        CREATE TABLE dbo.Allowance
+        (
+            ID INT IDENTITY(1,1) PRIMARY KEY,
+            log_date DATE NOT NULL,
+            EmployeeID VARCHAR(50) NOT NULL,
+            ProjectCode VARCHAR(50),
+            Description VARCHAR(255),
+            type VARCHAR(50),
+            CreateAt DATETIME2 DEFAULT GETDATE(),
+            UpdateAt DATETIME2 DEFAULT GETDATE(),
+            IsEditRow BIT DEFAULT 1
+        );
+    END
+GO
