@@ -439,6 +439,7 @@ GO
    parameter before SQL binding, so this backfill only matters for rows
    written before that fix landed.
 ========================= */
+USE MWLTimesheet
 UPDATE dbo.Employee
 SET EmployeeID = RTRIM(EmployeeID)
 WHERE DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
@@ -473,6 +474,12 @@ WHERE
     (ProjectCode IS NOT NULL
         AND DATALENGTH(ProjectCode) <> DATALENGTH(RTRIM(ProjectCode)));
 GO
+
+Update projects
+SET name = RTRIM(name)
+WHERE name IS NOT NULL
+  AND DATALENGTH(name) <> DATALENGTH(RTRIM(name));
+go      
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- OT tier columns and regular_hours computed column (added 2026-05).
@@ -533,7 +540,7 @@ CREATE TABLE dbo.holiday (
 GO
 
 -- Allowance table --
-USE MeterWorklog
+USE MWLTimesheet
 IF NOT EXISTS (
     SELECT 1
     FROM sys.tables
