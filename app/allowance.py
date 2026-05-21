@@ -152,6 +152,14 @@ def create_allowance():
     if not emp:
         return jsonify({'error': 'Employee not found'}), 404
 
+    #check if log_date is already exist
+    exist_row = app_pkg.db.query(
+        "SELECT ID FROM dbo.Allowance WHERE EmployeeID=? AND log_date=?",
+        (target_employee, log_date), fetchone=True,
+    )
+    if exist_row:
+        return jsonify({'error': 'log_date already exist'}), 400
+
     # Mapping Description → ProjectCode (mirrors worklogs.py).
     project_code = None
     mapp = app_pkg.db.query(
@@ -230,6 +238,14 @@ def update_allowance(aid):
     )
     if mapp:
         project_code = mapp.get('ProjectCode')
+
+    #check if log_date is already exist
+    exist_row = app_pkg.db.query(
+        "SELECT ID FROM dbo.Allowance WHERE ID<>? AND log_date=?",
+        (aid, log_date), fetchone=True,
+    )
+    if exist_row:
+        return jsonify({'error': 'log_date already exist'}), 400
 
     al_type = 'S' if _is_holiday(log_date) else 'N'
 

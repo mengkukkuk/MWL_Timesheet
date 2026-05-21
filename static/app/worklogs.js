@@ -162,10 +162,11 @@ function renderWorklogs(data) {
         const dateStr   = formatDate(w.log_date);
         const statusCls = w.status === 'Done' ? 'badge-done' : w.status === 'In Progress' ? 'badge-progress' : w.status === 'Man day' ? 'badge-manday' : 'badge-pending';
         const isSelected = worklogSelectedIds.has(w.id);
-        const cbCell = canEdit
+        const rowEditable = canEdit && Number(w.IsEditRow) !== 0;
+        const cbCell = rowEditable
             ? `<td class="py-2 px-2 text-center"><input type="checkbox" data-wl-cb="${w.id}" ${isSelected ? 'checked' : ''} onclick="onWorklogRowToggle(event, ${w.id})" class="rounded"></td>`
-            : '';
-        const actions   = canEdit ? `
+            : (canEdit ? `<td></td>` : '');
+        const actions   = rowEditable ? `
                 <button class="btn-icon" onclick='editWorklog(${JSON.stringify(w)})' title="Edit">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 </button>

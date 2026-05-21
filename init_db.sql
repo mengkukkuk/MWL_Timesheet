@@ -382,6 +382,14 @@ IF NOT EXISTS (SELECT 1 FROM file_folders WHERE parent_id IS NULL AND name = 'Sh
 
 GO
 
+-- Add IsEditRow row-lock flag to worklogs (mirrors dbo.Allowance pattern)
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID('dbo.worklogs') AND name = 'IsEditRow'
+)
+    ALTER TABLE worklogs ADD IsEditRow BIT NOT NULL DEFAULT 1;
+GO
+
 -- ── P0 performance indexes (added 2026-05-12) ────────────────────────────────
 -- Auto-applied by db.init_db() on first request. Idempotent via IF NOT EXISTS.
 
@@ -483,7 +491,7 @@ GO
 -- Use EXEC() so the IF NOT EXISTS wrapper does not interfere with
 -- T-SQL parsing of the "AS (...) PERSISTED" computed-column expression.
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'regular_hours')
-    EXEC('ALTER TABLE worklogs ADD regular_hours AS (
+    ALTER TABLE worklogs ADD regular_hours AS (
         CASE
             WHEN start_time IS NOT NULL AND end_time IS NOT NULL
                  AND end_time   > TIMEFROMPARTS(8,30,0,0,0)
@@ -512,7 +520,7 @@ IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs')
                 ) / 60.0 AS DECIMAL(5,2))
             ELSE CAST(0 AS DECIMAL(5,2))
         END
-    ) PERSISTED');
+    ) PERSISTED;
 GO
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'holiday' AND SCHEMA_NAME(schema_id) = 'dbo')
@@ -525,7 +533,7 @@ CREATE TABLE dbo.holiday (
 GO
 
 -- Allowance table --
-USE MWLTimesheet
+USE MeterWorklog
 IF NOT EXISTS (
     SELECT 1
     FROM sys.tables

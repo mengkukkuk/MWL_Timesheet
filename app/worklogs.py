@@ -51,6 +51,7 @@ def get_worklogs():
                CONVERT(VARCHAR(5), w.end_time, 108) as end_time,
                w.hours, w.regular_hours, w.OT1, w.OT1_5, w.OT3,
                w.status, w.note,
+               ISNULL(w.IsEditRow, 1) AS IsEditRow,
                pb.Description AS project_description
         FROM worklogs w
         LEFT JOIN dbo.ProjectAndBudget pb
@@ -71,6 +72,10 @@ def get_worklogs():
         for col in ('hours', 'regular_hours', 'OT1', 'OT1_5', 'OT3'):
             if row.get(col) is not None:
                 row[col] = float(row[col])
+        if row.get('IsEditRow') is not None:
+            row['IsEditRow'] = int(row['IsEditRow'])
+        else:
+            row['IsEditRow'] = 1
 
     return jsonify(rows)
 
