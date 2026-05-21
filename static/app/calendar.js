@@ -137,7 +137,7 @@ function renderCalendar(data) {
                 chip.className = 'cal-chip ' + cls;
                 chip.innerHTML = `<span class="cal-chip-dot"></span><span class="cal-chip-text">${esc(w.project || w.task || 'Entry')}</span>`;
                 chip.title = `${w.project || ''} — ${w.task || ''}\n${w.start_time || ''} - ${w.end_time || ''}${w.hours ? ' (' + w.hours.toFixed(1) + 'h)' : ''}`;
-                if (canEdit) {
+                if (canEdit && Number(w.IsEditRow) !== 0) {
                     chip.onclick = (e) => { e.stopPropagation(); editWorklog(w); };
                 }
                 entriesContainer.appendChild(chip);
@@ -255,7 +255,7 @@ function openDayPopover(event, day, entries, year, month) {
         const hours = w.hours ? w.hours.toFixed(1) + 'h' : '';
         const meta = [time, hours].filter(Boolean).join(' · ');
         html += `
-            <div class="cal-popover-entry" ${canEdit ? `onclick="closeDayPopover(); editWorklog(worklogData.find(x=>x.id===${w.id}))"` : ''}>
+            <div class="cal-popover-entry" ${canEdit && Number(w.IsEditRow) !== 0 ? `onclick="closeDayPopover(); editWorklog(worklogData.find(x=>x.id===${w.id}))"` : ''}>
                 <span class="cal-popover-entry-dot" style="background:${dotColor}"></span>
                 <div class="cal-popover-entry-content">
                     <div class="cal-popover-entry-project">${esc(w.project || '(no project)')}</div>
