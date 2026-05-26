@@ -494,6 +494,11 @@ GO
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'OT3')
     ALTER TABLE worklogs ADD OT3 DECIMAL(5,2) NULL;
 GO
+-- is_allowance flag: when 1, OT1/OT1_5/OT3 are NOT calculated (forced to 0).
+-- Used for "allowance" worklog entries that should not earn overtime pay.
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'is_allowance')
+    ALTER TABLE worklogs ADD is_allowance BIT NOT NULL CONSTRAINT DF_worklogs_is_allowance DEFAULT 0;
+GO
 
 -- Use EXEC() so the IF NOT EXISTS wrapper does not interfere with
 -- T-SQL parsing of the "AS (...) PERSISTED" computed-column expression.

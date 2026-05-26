@@ -52,6 +52,7 @@ def get_worklogs():
                w.hours, w.regular_hours, w.OT1, w.OT1_5, w.OT3,
                w.status, w.note,
                ISNULL(w.IsEditRow, 1) AS IsEditRow,
+               ISNULL(w.is_allowance, 0) AS is_allowance,
                pb.Description AS project_description
         FROM worklogs w
         LEFT JOIN dbo.ProjectAndBudget pb
@@ -76,6 +77,10 @@ def get_worklogs():
             row['IsEditRow'] = int(row['IsEditRow'])
         else:
             row['IsEditRow'] = 1
+        if row.get('is_allowance') is not None:
+            row['is_allowance'] = int(row['is_allowance'])
+        else:
+            row['is_allowance'] = 0
 
     return jsonify(rows)
 
@@ -251,8 +256,13 @@ def create_worklog():
         )
         project_code = mapp.get('ProjectCode')
 
-    # Tiered overtime (OT1 / OT1_5 / OT3) based on whether log_date is in dbo.holiday.
-    ot = _calc_overtime(ns, ne, _is_holiday(log_date))
+    # When is_allowance=True, the entry is treated as an allowance day and
+    # earns NO overtime — skip the tiered OT calc and store zeros.
+    is_allowance = bool(data.get('is_allowance'))
+    if is_allowance:
+        ot = {'OT1': 0.0, 'OT1_5': 0.0, 'OT3': 0.0}
+    else:
+        ot = _calc_overtime(ns, ne, _is_holiday(log_date))
 
     # EmployeeID is authoritative. The legacy member_id column is nullable after
     # migration and must not receive EmployeeID values because it used to FK to
@@ -261,9 +271,9 @@ def create_worklog():
         """
         INSERT INTO worklogs
             (member_id, EmployeeID, log_date, project, Description, task,
-             start_time, end_time, status, note, OT1, OT1_5, OT3)
+             start_time, end_time, status, note, OT1, OT1_5, OT3, is_allowance)
         OUTPUT INSERTED.id
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             None,
@@ -273,6 +283,7 @@ def create_worklog():
             data.get('end_time') or None,
             status, note,
             ot['OT1'], ot['OT1_5'], ot['OT3'],
+            1 if is_allowance else 0,
         ),
     )
     return jsonify({'id': worklog_id}), 201
@@ -338,13 +349,18 @@ def update_worklog(wid):
         project_code = mapp.get('ProjectCode')
 
     # Recompute OT columns on every edit — start/end/log_date may have changed.
-    ot = _calc_overtime(ns, ne, _is_holiday(log_date))
+    # is_allowance=True forces OT to zero (entry treated as allowance, not OT).
+    is_allowance = bool(data.get('is_allowance'))
+    if is_allowance:
+        ot = {'OT1': 0.0, 'OT1_5': 0.0, 'OT3': 0.0}
+    else:
+        ot = _calc_overtime(ns, ne, _is_holiday(log_date))
 
     #All conditions are met, update the worklog
     app_pkg.db.execute(
     """
     UPDATE worklogs SET log_date=?, project=?, Description=?, task=?, start_time=?, end_time=?,
-           status=?, note=?, OT1=?, OT1_5=?, OT3=?, updated_at=GETDATE()
+           status=?, note=?, OT1=?, OT1_5=?, OT3=?, is_allowance=?, updated_at=GETDATE()
     WHERE id=?
     """,
     (
@@ -353,6 +369,7 @@ def update_worklog(wid):
         data.get('end_time') or None,
         status, note,
         ot['OT1'], ot['OT1_5'], ot['OT3'],
+        1 if is_allowance else 0,
         wid,
         ),
     )

@@ -511,6 +511,8 @@ function openAddWorklog() {
     setTimeInputs('wl-start', '08:30');
     setTimeInputs('wl-end', '');
     document.getElementById('wl-status').value = 'In Progress';
+    const cb1 = document.getElementById('wl-is-allowance');
+    if (cb1) cb1.checked = false;
     document.getElementById('wl-note').value = '';
     setDateRangeMode(true);
     populateProjectDropdown();
@@ -528,6 +530,8 @@ function openAddWorklogMulti() {
     setTimeInputs('wl-start', '08:30');
     setTimeInputs('wl-end', '');
     document.getElementById('wl-status').value = 'In Progress';
+    const cb2 = document.getElementById('wl-is-allowance');
+    if (cb2) cb2.checked = false;
     document.getElementById('wl-note').value = '';
     setDateRangeMode(true);
     populateProjectDropdown();
@@ -576,6 +580,8 @@ function editWorklog(w) {
     setTimeInputs('wl-start', w.start_time || '');
     setTimeInputs('wl-end',   w.end_time   || '');
     document.getElementById('wl-status').value = w.status || 'Pending';
+    const cbEdit = document.getElementById('wl-is-allowance');
+    if (cbEdit) cbEdit.checked = Number(w.is_allowance) === 1;
     document.getElementById('wl-note').value = w.note || '';
     renderExistingRanges();
     document.getElementById('modal-overlay').classList.remove('hidden');
@@ -623,6 +629,7 @@ async function saveWorklog(e) {
         end_time:   getTimeInputValue('wl-end')   || null,
         status:     document.getElementById('wl-status').value,
         note:       document.getElementById('wl-note').value,
+        is_allowance: !!document.getElementById('wl-is-allowance')?.checked,
     };
 
     if (id) {
