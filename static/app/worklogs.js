@@ -258,11 +258,12 @@ function openBulkEditModal() {
     setVal('bulk-note',   '');
     setVal('bulk-status', 'Done');
     const sel = document.getElementById('bulk-project');
+    //pdes p.Description
     if (sel) {
         sel.innerHTML = '<option value="">Select...</option>';
-        projects.forEach(p => {
+        pdes.forEach(p => {
             const opt = document.createElement('option');
-            opt.value = p.name; opt.textContent = p.name;
+            opt.value = p.Description; opt.textContent = p.Description;
             sel.appendChild(opt);
         });
     }
@@ -296,7 +297,7 @@ async function confirmBulkEdit(ev) {
         const memberId = isElevated() ? currentMemberId : currentUser.member_id;
         const payload = {
             log_date:   w.log_date,
-            project:    applyProj   ? newProj   : (w.project || ''),
+            project:    applyProj   ? newProj   : (w.projects || ''),
             task:       w.task || '',
             start_time: w.start_time || null,
             end_time:   w.end_time   || null,

@@ -161,6 +161,26 @@ function populateMonthSelect() {
     }
 }
 
+// Month selector for the Overall Dashboard (separate from the worklog #month-select).
+// Idempotent — only populates once.
+function populateOverallMonthSelect() {
+    const sel = document.getElementById('overall-month-select');
+    if (!sel || sel.options.length > 0) return;
+    const now = new Date().getMonth() + 1;
+    for (let m = 1; m <= 12; m++) {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = MONTHS[m];
+        if (m === now) opt.selected = true;
+        sel.appendChild(opt);
+    }
+}
+
+function onOverallMonthChange() {
+    if (currentMemberId) return;   // only relevant in Overall view
+    if (typeof loadOverallDashboard === 'function') loadOverallDashboard();
+}
+try { window.onOverallMonthChange = onOverallMonthChange; } catch (e) {}
+
 // ── Tabs ──
 async function showTab(name) {
     if (name === 'settings' && !isElevated()) return;
@@ -347,6 +367,9 @@ function onMemberChange() {
     currentMemberId = sel.value || null;   // keep as string — EmployeeID is NVARCHAR
     // when a member is explicitly selected, ensure year-select is enabled
     const ys = document.getElementById('year-select'); if (ys) ys.disabled = false;
+    // hide the overall-only month selector
+    const mwrap = document.getElementById('overall-month-wrap');
+    if (mwrap) mwrap.style.display = 'none';
     onContextChange();
 }
 
@@ -356,10 +379,17 @@ function onContextChange() {
         document.getElementById('no-member-msg').classList.add('hidden');
         document.getElementById('dashboard-content').classList.add('hidden');
         document.getElementById('overall-dashboard').classList.remove('hidden');
+        // Reveal + populate the Overall month selector (idempotent)
+        const mwrap = document.getElementById('overall-month-wrap');
+        if (mwrap) mwrap.style.display = '';
+        if (typeof populateOverallMonthSelect === 'function') populateOverallMonthSelect();
         if (!active || active.id === 'tab-dashboard') loadOverallDashboard();
         return;
     }
     document.getElementById('overall-dashboard').classList.add('hidden');
+    // Hide the Overall month selector when a specific member is in scope
+    const mwrap = document.getElementById('overall-month-wrap');
+    if (mwrap) mwrap.style.display = 'none';
     document.getElementById('no-member-msg').classList.add('hidden');
     document.getElementById('dashboard-content').classList.remove('hidden');
 
@@ -393,6 +423,10 @@ function selectOverall() {
     currentMemberId = null;
     // disable year-select to avoid linking year to overall view
     const ys = document.getElementById('year-select'); if (ys) ys.disabled = true;
+    // reveal + populate the Overall-only month selector
+    const mwrap = document.getElementById('overall-month-wrap');
+    if (mwrap) mwrap.style.display = '';
+    if (typeof populateOverallMonthSelect === 'function') populateOverallMonthSelect();
     showTab('dashboard');
 }
 

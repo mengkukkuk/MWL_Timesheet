@@ -54,6 +54,8 @@ const _i18n = {
         'dash.has_project': 'Has project',
         'dash.no_project': 'No project',
         'dash.members_count': n => `${n} member${n !== 1 ? 's' : ''}`,
+        'dash.overall_month_label': 'Month:',
+        'dash.missing_n_days': n => `Missing ${n} day${n !== 1 ? 's' : ''}`,
 
         // Dashboard cards
         'dash.total_hours': 'Total Hours',
@@ -71,6 +73,7 @@ const _i18n = {
         'dash.col_hours': 'Hours',
         'dash.col_done': 'Done',
         'dash.col_in_progress': 'In Progress',
+        'dash.col_missing': 'Missing entry',
         'dash.col_man_day': 'Man day',
 
         // Export
@@ -348,6 +351,8 @@ const _i18n = {
         'dash.has_project': 'มีโปรเจกต์',
         'dash.no_project': 'ไม่มีโปรเจกต์',
         'dash.members_count': n => `${n} คน`,
+        'dash.overall_month_label': 'เดือน:',
+        'dash.missing_n_days': n => `ขาดการบันทึก ${n} วัน`,
 
         // Dashboard cards
         'dash.total_hours': 'ชั่วโมงรวม',
@@ -365,6 +370,7 @@ const _i18n = {
         'dash.col_hours': 'ชั่วโมง',
         'dash.col_done': 'เสร็จ',
         'dash.col_in_progress': 'กำลังทำ',
+        'dash.col_missing': 'ขาดบันทึก',
         'dash.col_man_day': 'Man day',
 
         // Export

@@ -9,6 +9,7 @@ import calendar
 
 from datetime import date
 from datetime import datetime,time
+from datetime import timedelta
 
 from flask import Blueprint
 from flask import jsonify
@@ -249,12 +250,14 @@ def create_worklog():
 
     #Mapping description and project code
     project_code = None
+    project_dep = None
     if project:
         mapp = app_pkg.db.query(
-            "SELECT ProjectCode FROM dbo.ProjectAndBudget WHERE Description=?",
+            "SELECT ProjectCode,ProjectDepartment FROM dbo.ProjectAndBudget WHERE Description=?",
             (project,), fetchone=True,
         )
         project_code = mapp.get('ProjectCode')
+        project_dep = mapp.get('ProjectDepartment')
 
     # When is_allowance=True, the entry is treated as an allowance day and
     # earns NO overtime — skip the tiered OT calc and store zeros.
@@ -270,15 +273,15 @@ def create_worklog():
     worklog_id = app_pkg.db.execute(
         """
         INSERT INTO worklogs
-            (member_id, EmployeeID, log_date, project, Description, task,
+            (member_id, EmployeeID, log_date, project, ProjectDepartment, Description, task,
              start_time, end_time, status, note, OT1, OT1_5, OT3, is_allowance)
         OUTPUT INSERTED.id
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             None,
             target_employee,
-            log_date, project_code, project, task,
+            log_date, project_code, project_dep , project, task,
             data.get('start_time') or None,
             data.get('end_time') or None,
             status, note,
@@ -300,15 +303,16 @@ def update_worklog(wid):
             return jsonify({'error': 'You can only edit your own worklogs'}), 403
 
     data = request.json or {}
-    project = data.get('project', '')
+    project_des = data.get('project', '') #Description from frontend
     task = data.get('task', '')
     note = data.get('note', '')
     member_id = data.get('member_id')
 
-    #Not necessary to check if the worklog is open, because the frontend will not allow to create a worklog if the worklog is not open
-    if project=='':
-        return jsonify({'error': 'Project name is required'}), 400
-    if len(project) > 500:
+    #Not necessary to check if the worklog is open, because the frontend will not allow creating a worklog if the worklog is not open
+    """if project_des=='':
+        project_des = app_pkg.db.execute("SELECT project FROM worklogs WHERE id=?", (wid,))
+     """
+    if len(project_des) > 500:
         return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
     if len(task) > 500:
         return jsonify({'error': 'Task must be 500 characters or fewer'}), 400
@@ -326,7 +330,6 @@ def update_worklog(wid):
     except ValueError:
         return jsonify({'error': 'Invalid date format, expected YYYY-MM-DD'}), 400
 
-
     #Check if input time range is overlap with existed time range
     overlap_time = app_pkg.db.query(
         "SELECT start_time, end_time FROM worklogs WHERE EmployeeID = ? AND log_date = ? AND id != ?",
@@ -340,13 +343,25 @@ def update_worklog(wid):
         return jsonify({'error': 'End-time cannot less than Start-time'}), 400
 
     #Mapping description and project code
-    project_code = None
-    if project:
+    project_code, project_dep = None, None
+    if project_des != '':
         mapp = app_pkg.db.query(
-            "SELECT ProjectCode FROM dbo.ProjectAndBudget WHERE Description=?",
-            (project,), fetchone=True,
+            "SELECT ProjectCode, ProjectDepartment FROM dbo.ProjectAndBudget WHERE Description=?",
+            (project_des,), fetchone=True,
         )
         project_code = mapp.get('ProjectCode')
+        project_dep = mapp.get('ProjectDepartment')
+
+    else:
+        wl_des = app_pkg.db.query("SELECT Description FROM worklogs WHERE id=?", (wid,), fetchone=True)
+        project_des = wl_des.get('Description')
+        mapp = app_pkg.db.query(
+            "SELECT ProjectCode, ProjectDepartment FROM dbo.ProjectAndBudget WHERE Description=?",
+            (project_des,), fetchone=True,
+        )
+        project_code = mapp.get('ProjectCode')
+        project_dep = mapp.get('ProjectDepartment')
+        print(project_dep, project_code, project_des)
 
     # Recompute OT columns on every edit — start/end/log_date may have changed.
     # is_allowance=True forces OT to zero (entry treated as allowance, not OT).
@@ -359,12 +374,12 @@ def update_worklog(wid):
     #All conditions are met, update the worklog
     app_pkg.db.execute(
     """
-    UPDATE worklogs SET log_date=?, project=?, Description=?, task=?, start_time=?, end_time=?,
+    UPDATE worklogs SET log_date=?, project=?, Description=?, ProjectDepartment=?, task=?, start_time=?, end_time=?,
            status=?, note=?, OT1=?, OT1_5=?, OT3=?, is_allowance=?, updated_at=GETDATE()
     WHERE id=?
     """,
     (
-        log_date, project_code, project, task,
+        log_date, project_code, project_des, project_dep, task,
         data.get('start_time') or None,
         data.get('end_time') or None,
         status, note,
@@ -486,6 +501,41 @@ def get_dashboard():
         (employee_id, year),
     )
 
+    # ── Missing-entry days per month for this employee ──────────────────
+    # Definition: weekday in month, NOT a holiday, AND employee has no worklog row that day.
+    first_yr = date(year, 1, 1)
+    last_yr  = date(year, 12, 31)
+
+    holiday_rows = app_pkg.db.query(
+        "SELECT [date] FROM dbo.holiday WHERE [date] BETWEEN ? AND ?",
+        (first_yr, last_yr),
+    )
+    holiday_set = set()
+    for hr in holiday_rows:
+        hd = hr['date']
+        if isinstance(hd, datetime):
+            hd = hd.date()
+        holiday_set.add(hd)
+
+    expected_per_month = {mm: 0 for mm in range(1, 13)}
+    for mm in range(1, 13):
+        d = date(year, mm, 1)
+        while d.month == mm:
+            if d.weekday() < 5 and d not in holiday_set:
+                expected_per_month[mm] += 1
+            d += timedelta(days=1)
+
+    logged_rows = app_pkg.db.query(
+        """
+        SELECT MONTH(log_date) AS m, COUNT(DISTINCT log_date) AS days_logged
+        FROM worklogs
+        WHERE EmployeeID = ? AND YEAR(log_date) = ?
+        GROUP BY MONTH(log_date)
+        """,
+        (employee_id, year),
+    )
+    logged_per_month = {int(r['m']): int(r['days_logged']) for r in logged_rows}
+
     month_map = {row['month']: row for row in monthly}
     months = []
     total_hours = 0
@@ -508,6 +558,10 @@ def get_dashboard():
         ot1_5 = float(row.get('total_ot1_5') or 0)
         ot3   = float(row.get('total_ot3')   or 0)
 
+        expected = expected_per_month.get(month_number, 0)
+        logged   = logged_per_month.get(month_number, 0)
+        missing  = max(0, expected - logged)
+
         months.append({
             'month': month_number,
             'name': calendar.month_name[month_number],
@@ -518,6 +572,7 @@ def get_dashboard():
             'OT3':   round(ot3, 2),
             'done': done,
             'in_progress': in_progress, #Keep
+            'missing': missing,
             'man_day': round(man_day, 2),
         })
         total_hours += hours
@@ -544,6 +599,82 @@ def get_dashboard():
         'total_man_day': round(total_man_day, 2),
         'months': months,
     })
+
+
+@worklogs_bp.route('/api/dashboard/missing', methods=['GET'])
+@login_required
+def get_overall_missing():
+    """Return {EmployeeID: missing_day_count} for a given year+month.
+
+    A missing day = a weekday (Mon-Fri) within the month, NOT a holiday,
+    AND the employee has no worklog entry on that date.
+
+    Non-elevated callers receive only their own row (privacy).
+    """
+    year  = request.args.get('year',  type=int, default=date.today().year)
+    month = request.args.get('month', type=int, default=date.today().month)
+    if not (1 <= month <= 12):
+        return jsonify({'error': 'month must be 1-12'}), 400
+
+    first_day = date(year, month, 1)
+    last_day  = date(year, month, calendar.monthrange(year, month)[1])
+
+    # 1) Weekdays in month (Mon..Fri)
+    workdays = set()
+    d = first_day
+    while d <= last_day:
+        if d.weekday() < 5:
+            workdays.add(d)
+        d += timedelta(days=1)
+
+    # 2) Holidays in month → drop from workdays
+    holiday_rows = app_pkg.db.query(
+        "SELECT [date] FROM dbo.holiday WHERE [date] BETWEEN ? AND ?",
+        (first_day, last_day),
+    )
+    for r in holiday_rows:
+        hd = r['date']
+        if isinstance(hd, datetime):
+            hd = hd.date()
+        if hd in workdays:
+            workdays.discard(hd)
+
+    expected = len(workdays)
+    if expected == 0:
+        return jsonify({})
+
+    # 3) Per-employee distinct log_date count within the working-day set
+    placeholders = ','.join(['?'] * len(workdays))
+    params = [first_day, last_day, *list(workdays)]
+    rows = app_pkg.db.query(
+        f"""
+        SELECT EmployeeID, COUNT(DISTINCT log_date) AS days_logged
+        FROM worklogs
+        WHERE log_date BETWEEN ? AND ?
+          AND log_date IN ({placeholders})
+        GROUP BY EmployeeID
+        """,
+        tuple(params),
+    )
+    logged_map = {
+        str(r['EmployeeID']): int(r['days_logged'])
+        for r in rows if r['EmployeeID']
+    }
+
+    # 4) For every Employee in HR, compute expected - logged
+    emp_rows = app_pkg.db.query("SELECT EmployeeID FROM dbo.Employee")
+    out = {}
+    for er in emp_rows:
+        eid = str(er['EmployeeID'])
+        logged = logged_map.get(eid, 0)
+        out[eid] = max(0, expected - logged)
+
+    # Non-elevated → restrict to own row only
+    if session.get('role') not in ELEVATED_ROLES:
+        my = str(session.get('member_id') or '')
+        out = {my: out.get(my, 0)} if my else {}
+
+    return jsonify(out)
 
 
 @worklogs_bp.route('/api/projects-summary', methods=['GET'])

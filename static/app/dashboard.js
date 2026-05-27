@@ -48,7 +48,9 @@ async function loadDashboard() {
             <td class="py-2 px-3 font-medium">${t('months.full')[m.month] || m.name}</td>
             <td class="py-2 px-3 text-right">${m.total_hours}</td>
             <td class="py-2 px-3 text-right"><span class="badge badge-done">${m.done}</span></td>
-            <td class="py-2 px-3 text-right"><span class="badge badge-progress">${m.in_progress}</span></td>
+            <td class="py-2 px-3 text-right">${(m.missing && m.missing > 0)
+                ? `<span class="inline-flex items-center text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5">${m.missing}</span>`
+                : `<span class="text-gray-400 text-xs">0</span>`}</td>
             <td class="py-2 px-3 text-right"><span class="badge badge-manday">${m.man_day}</span></td>
             <td class="py-2 px-3 text-right text-gray-400">
                 <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,12 +212,24 @@ function _renderMemberSkillsBox(memberId, canEdit, limit = SKILL_PREVIEW_COUNT) 
 }
 
 async function loadOverallDashboard() {
-    // Fetch all skills in one call (avoids N+1 across members)
+    // Resolve year + month for the missing-entry per-card badge
+    const yrEl = document.getElementById('year-select');
+    const moEl = document.getElementById('overall-month-select');
+    const yr = (yrEl && yrEl.value) ? parseInt(yrEl.value) : new Date().getFullYear();
+    const mo = (moEl && moEl.value) ? parseInt(moEl.value) : (new Date().getMonth() + 1);
+
+    // Fetch skills and missing-entry map in parallel
+    let _missingMap = {};
     try {
-        const skills = await api('/api/skills');
+        const [skills, missing] = await Promise.all([
+            api('/api/skills'),
+            api(`/api/dashboard/missing?year=${yr}&month=${mo}`),
+        ]);
         _skillsByMember = skills && typeof skills === 'object' ? skills : {};
+        _missingMap = (missing && typeof missing === 'object' && !Array.isArray(missing)) ? missing : {};
     } catch (e) {
         _skillsByMember = {};
+        _missingMap = {};
     }
 
     // Build member→projects map from the already-loaded projects array (no extra API calls)
@@ -264,6 +278,22 @@ async function loadOverallDashboard() {
         const skillsHTML = _renderMemberSkillsBox(m.id, canEditThis);
         const avatarHTML = _renderGridAvatar(m, canEditAvatar);
 
+        // Per-card "Missing N days" badge (hidden if 0 or no row in map)
+        const eidKey = String(m.staff_id || '');
+        const missCount = (_missingMap && _missingMap[eidKey]) ? Number(_missingMap[eidKey]) : 0;
+        const missingLabel = (typeof t === 'function')
+            ? t('dash.missing_n_days', missCount)
+            : `Missing ${missCount} day${missCount !== 1 ? 's' : ''}`;
+        const missingHTML = missCount > 0 ? `
+            <div class="mt-2 flex justify-center">
+                <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5">
+                    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    ${esc(missingLabel)}
+                </span>
+            </div>` : '';
+
         card.innerHTML = `
             ${avatarHTML}
             <div class="font-semibold text-sm leading-tight mb-1">${esc(m.name)}</div>
@@ -274,6 +304,7 @@ async function loadOverallDashboard() {
                 <div class="flex gap-1"><span class="opacity-70 shrink-0">Support :</span><span class="font-medium truncate">${suppText}</span></div>
             </div>
             ${skillsHTML}
+            ${missingHTML}
         `;
 
         card.onclick = () => {

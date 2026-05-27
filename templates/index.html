@@ -120,6 +120,11 @@
                 <label for="year-select" class="text-sm font-medium text-gray-600" data-i18n="sel.year">Year:</label>
                 <select id="year-select" onchange="onContextChange()" class="input-field w-24"></select>
             </div>
+            <!-- Month selector for Overall Dashboard (hidden by default; toggled in core.js) -->
+            <div class="flex items-center gap-2 flex-none" id="overall-month-wrap" style="display:none;">
+                <label for="overall-month-select" class="text-sm font-medium text-gray-600" data-i18n="dash.overall_month_label">Month:</label>
+                <select id="overall-month-select" onchange="onOverallMonthChange()" class="input-field w-28"></select>
+            </div>
         </div>
 
         <!-- Dashboard View -->
@@ -247,7 +252,7 @@
                                     <th class="text-left py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_month">Month</th>
                                     <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_hours">Hours</th>
                                     <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_done">Done</th>
-                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_in_progress">In Progress</th>
+                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_missing">Missing entry</th>
                                     <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_man_day">Man day</th>
                                     <th class="py-2 px-3"></th>
                                 </tr>
