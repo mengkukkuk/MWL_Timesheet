@@ -500,6 +500,22 @@ IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs')
     ALTER TABLE worklogs ADD is_allowance BIT NOT NULL CONSTRAINT DF_worklogs_is_allowance DEFAULT 0;
 GO
 
+-- allowance_overtime: per-day OT bucket for JG06-JG08 employees. Populated by
+-- app/worklogs.py::_rebalance_day_allowance_ot on the row with MAX(id) for
+-- each (EmployeeID, log_date); all other rows of that day carry 0.
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'allowance_overtime')
+    ALTER TABLE worklogs ADD allowance_overtime DECIMAL(5,2) NULL;
+GO
+
+-- ProjectDepartment / Description: free-text fields mirrored from
+-- dbo.ProjectAndBudget at the time of the worklog entry.
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'ProjectDepartment')
+    ALTER TABLE worklogs ADD ProjectDepartment NVARCHAR(100) NULL;
+GO
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'Description')
+    ALTER TABLE worklogs ADD Description NVARCHAR(500) NULL;
+GO
+
 -- Use EXEC() so the IF NOT EXISTS wrapper does not interfere with
 -- T-SQL parsing of the "AS (...) PERSISTED" computed-column expression.
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'regular_hours')

@@ -185,23 +185,84 @@ def _is_holiday(log_date) -> bool:
         return True if date_obj.weekday() in [5, 6] else False
     return bool(row)
 
-def jg_check(emp_id,ot):
-    jg = app_pkg.db.query(
+def _employee_jg_num(emp_id):
+    """Return the numeric suffix of dbo.Employee.JG (e.g. 'JG06' -> 6), or None
+    if unset or unparseable."""
+    row = app_pkg.db.query(
         "SELECT JG FROM dbo.Employee WHERE EmployeeID=?",
         (emp_id,), fetchone=True,
     )
-    jg = jg.get('JG')
-    num_jg = jg[-2:]
-    num_jg = int(num_jg)
+    jg = (row or {}).get('JG') or ''
+    try:
+        return int(jg[-2:])
+    except (TypeError, ValueError):
+        return None
 
-    allow_ot =0.0
-    if 6 <= num_jg <= 8:
-        allow_ot = ot['OT1'] + ot['OT1_5'] + ot['OT3']
-        ot = {'OT1': 0.0, 'OT1_5': 0.0, 'OT3': 0.0}
-    if num_jg > 8:
-        ot = {'OT1': 0.0, 'OT1_5': 0.0, 'OT3': 0.0}
 
-    return allow_ot,ot
+def jg_check(emp_id, ot):
+    """Zero per-row OT columns for JG06+ employees.
+
+    For JG06-JG08 the day-total OT is computed by `_rebalance_day_allowance_ot`
+    and written to the row with MAX(id) of that day, so any per-row value here
+    is just a placeholder. For JG>=9 no OT is earned at all. JG<6 keep the
+    per-row OT values from `_calc_overtime`.
+    """
+    num_jg = _employee_jg_num(emp_id)
+    allow_ot = 0.0
+    if num_jg is None:
+        return allow_ot, ot
+    if 6 <= num_jg <= 8 or num_jg >= 9:
+        ot = {'OT1': 0.0, 'OT1_5': 0.0, 'OT3': 0.0}
+    return allow_ot, ot
+
+
+def _rebalance_day_allowance_ot(emp_id, log_date):
+    """Re-derive day-total OT for a JG06-JG08 employee and write it to the row
+    with the latest `end_time` for that (EmployeeID, log_date). If two rows
+    end at the same time, the one with the higher `id` wins. All other rows of
+    that day have `allowance_overtime` cleared to 0.
+
+    No-op for JG<6 (per-row OT already correct) and JG>=9 (no OT at all).
+    Also a no-op when the employee has no remaining rows for that date.
+    """
+    num_jg = _employee_jg_num(emp_id)
+    if num_jg is None or num_jg < 6 or num_jg >= 9:
+        return
+
+    rows = app_pkg.db.query(
+        """SELECT id, start_time, end_time FROM worklogs
+           WHERE EmployeeID=? AND log_date=?
+             AND start_time IS NOT NULL AND end_time IS NOT NULL
+           ORDER BY id""",
+        (emp_id, log_date), fetchone=False,
+    )
+    if not rows:
+        return
+
+    total_min = 0
+    lunch_min = 0
+    for r in rows:
+        st, et = r['start_time'], r['end_time']
+        total_min += _minutes_between(st, et)
+        lunch_min += _overlap_minutes(st, et, LUNCH_START, LUNCH_END)
+    day_hours    = max(0, total_min - lunch_min) / 60.0
+    day_overtime = max(0.0, day_hours - 8.0)
+
+    # Pick the row with the latest end_time (id as tiebreaker for equal ends).
+    last_row = max(rows, key=lambda r: (r['end_time'], r['id']))
+    last_id = last_row['id']
+
+    # That row carries the day's overtime.
+    app_pkg.db.execute(
+        "UPDATE worklogs SET allowance_overtime=? WHERE id=?",
+        (day_overtime, last_id),
+    )
+    # Clear everyone else for that day.
+    app_pkg.db.execute(
+        """UPDATE worklogs SET allowance_overtime=0
+           WHERE EmployeeID=? AND log_date=? AND id<>?""",
+        (emp_id, log_date, last_id),
+    )
 
 @worklogs_bp.route('/api/worklogs', methods=['POST'])
 @login_required
@@ -310,6 +371,9 @@ def create_worklog():
             1 if is_allowance else 0, allow_ot
         ),
     )
+    # JG06-JG08: day-total allowance OT is recomputed across all rows for this
+    # (EmployeeID, log_date) and written to the MAX(id) row.
+    _rebalance_day_allowance_ot(target_employee, log_date)
     return jsonify({'id': worklog_id}), 201
 
 
@@ -350,6 +414,13 @@ def update_worklog(wid):
         datetime.strptime(log_date, '%Y-%m-%d')
     except ValueError:
         return jsonify({'error': 'Invalid date format, expected YYYY-MM-DD'}), 400
+
+    # Capture the OLD log_date before the UPDATE so we can rebalance the old
+    # day too, if the user is moving this entry to a different date.
+    prior = app_pkg.db.query(
+        "SELECT log_date FROM worklogs WHERE id=?", (wid,), fetchone=True,
+    )
+    prior_log_date = prior.get('log_date') if prior else None
 
     #Check if input time range is overlap with existed time range
     overlap_time = app_pkg.db.query(
@@ -412,20 +483,38 @@ def update_worklog(wid):
         wid,
         ),
     )
+    # JG06-JG08: rebalance the day this row now belongs to, plus the day it
+    # used to belong to (if the user just moved it to a different date).
+    _rebalance_day_allowance_ot(member_id, log_date)
+    if prior_log_date is not None:
+        prior_log_date_str = (
+            prior_log_date.strftime('%Y-%m-%d')
+            if isinstance(prior_log_date, (date, datetime))
+            else str(prior_log_date)
+        )
+        if prior_log_date_str != log_date:
+            _rebalance_day_allowance_ot(member_id, prior_log_date_str)
     return jsonify({'ok': True})
 
 
 @worklogs_bp.route('/api/worklogs/<int:wid>', methods=['DELETE'])
 @login_required
 def delete_worklog(wid):
+    # Pull EmployeeID + log_date BEFORE the delete so we can rebalance the
+    # surviving rows of that day afterwards (JG06-JG08 employees).
+    target = app_pkg.db.query(
+        "SELECT EmployeeID, log_date FROM worklogs WHERE id=?",
+        (wid,), fetchone=True,
+    )
     if session['role'] not in ELEVATED_ROLES:
-        row = app_pkg.db.query(
-            "SELECT EmployeeID FROM worklogs WHERE id=?", (wid,), fetchone=True
-        )
-        if not row or row['EmployeeID'] != str(session['member_id']):
+        if not target or target['EmployeeID'] != str(session['member_id']):
             return jsonify({'error': 'You can only delete your own worklogs'}), 403
 
     app_pkg.db.execute("DELETE FROM worklogs WHERE id=?", (wid,))
+    if target:
+        d = target['log_date']
+        d_str = d.strftime('%Y-%m-%d') if isinstance(d, (date, datetime)) else str(d)
+        _rebalance_day_allowance_ot(target['EmployeeID'], d_str)
     return jsonify({'ok': True})
 
 
