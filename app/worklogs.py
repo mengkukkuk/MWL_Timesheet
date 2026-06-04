@@ -185,6 +185,23 @@ def _is_holiday(log_date) -> bool:
         return True if date_obj.weekday() in [5, 6] else False
     return bool(row)
 
+def jg_check(emp_id,ot):
+    jg = app_pkg.db.query(
+        "SELECT JG FROM dbo.Employee WHERE EmployeeID=?",
+        (emp_id,), fetchone=True,
+    )
+    jg = jg.get('JG')
+    num_jg = jg[-2:]
+    num_jg = int(num_jg)
+
+    allow_ot =0.0
+    if 6 <= num_jg <= 8:
+        allow_ot = ot['OT1'] + ot['OT1_5'] + ot['OT3']
+        ot = {'OT1': 0.0, 'OT1_5': 0.0, 'OT3': 0.0}
+    if num_jg > 8:
+        ot = {'OT1': 0.0, 'OT1_5': 0.0, 'OT3': 0.0}
+
+    return allow_ot,ot
 
 @worklogs_bp.route('/api/worklogs', methods=['POST'])
 @login_required
@@ -262,10 +279,14 @@ def create_worklog():
     # When is_allowance=True, the entry is treated as an allowance day and
     # earns NO overtime — skip the tiered OT calc and store zeros.
     is_allowance = bool(data.get('is_allowance'))
-    if is_allowance:
+    if is_allowance :
         ot = {'OT1': 0.0, 'OT1_5': 0.0, 'OT3': 0.0}
     else:
         ot = _calc_overtime(ns, ne, _is_holiday(log_date))
+
+    #If 6 <= JG <= 8. All OT = 0, but add overtime_hours to allowance_overtime instead of OT1,OT1_5,OT3
+    #If JG > 8 got nothing at all.
+    allow_ot,ot = jg_check(target_employee,ot)
 
     # EmployeeID is authoritative. The legacy member_id column is nullable after
     # migration and must not receive EmployeeID values because it used to FK to
@@ -274,9 +295,9 @@ def create_worklog():
         """
         INSERT INTO worklogs
             (member_id, EmployeeID, log_date, project, ProjectDepartment, Description, task,
-             start_time, end_time, status, note, OT1, OT1_5, OT3, is_allowance)
+             start_time, end_time, status, note, OT1, OT1_5, OT3, is_allowance ,allowance_overtime)
         OUTPUT INSERTED.id
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             None,
@@ -286,7 +307,7 @@ def create_worklog():
             data.get('end_time') or None,
             status, note,
             ot['OT1'], ot['OT1_5'], ot['OT3'],
-            1 if is_allowance else 0,
+            1 if is_allowance else 0, allow_ot
         ),
     )
     return jsonify({'id': worklog_id}), 201
@@ -361,7 +382,6 @@ def update_worklog(wid):
         )
         project_code = mapp.get('ProjectCode')
         project_dep = mapp.get('ProjectDepartment')
-        print(project_dep, project_code, project_des)
 
     # Recompute OT columns on every edit — start/end/log_date may have changed.
     # is_allowance=True forces OT to zero (entry treated as allowance, not OT).
@@ -371,11 +391,15 @@ def update_worklog(wid):
     else:
         ot = _calc_overtime(ns, ne, _is_holiday(log_date))
 
+    # If 6 <= JG <= 8. All OT = 0, but add overtime_hours to allowance_overtime instead of OT1,OT1_5,OT3
+    # If JG > 8 got nothing at all.
+    allow_ot,ot = jg_check(member_id,ot)
+
     #All conditions are met, update the worklog
     app_pkg.db.execute(
     """
     UPDATE worklogs SET log_date=?, project=?, Description=?, ProjectDepartment=?, task=?, start_time=?, end_time=?,
-           status=?, note=?, OT1=?, OT1_5=?, OT3=?, is_allowance=?, updated_at=GETDATE()
+           status=?, note=?, OT1=?, OT1_5=?, OT3=?, is_allowance=?, updated_at=GETDATE(), allowance_overtime=?
     WHERE id=?
     """,
     (
@@ -384,7 +408,7 @@ def update_worklog(wid):
         data.get('end_time') or None,
         status, note,
         ot['OT1'], ot['OT1_5'], ot['OT3'],
-        1 if is_allowance else 0,
+        1 if is_allowance else 0, allow_ot,
         wid,
         ),
     )
@@ -747,7 +771,7 @@ def get_projects_summary():
                 total -= overlap
                 if total > 480.00 :
                     total = 480.00
-            #print(f"total: {total:.2f} (overlap: {overlap:.2f})")
+
         return max(0.0, total / 60.0)
 
     # Aggregate per (project, employee), summing the per-day capped hours.

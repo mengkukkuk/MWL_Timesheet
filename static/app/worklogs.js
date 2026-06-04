@@ -298,6 +298,7 @@ async function confirmBulkEdit(ev) {
         const payload = {
             log_date:   w.log_date,
             project:    applyProj   ? newProj   : (w.projects || ''),
+            project_des:    applyProj   ? newProj   : (w.description || ''),
             task:       w.task || '',
             start_time: w.start_time || null,
             end_time:   w.end_time   || null,
