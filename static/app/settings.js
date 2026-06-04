@@ -387,6 +387,7 @@ function showSettingsPanel(name) {
     const btn = document.querySelector(`.settings-nav-item[data-panel="${name}"]`);
     if (btn) btn.classList.add('active');
     localStorage.setItem('settings_panel', name);
+    if (name === 'time-presets') loadTimePresetsPanel();
 }
 
 // ── Worklog Visibility Settings (Super Admin only) ──
@@ -424,3 +425,56 @@ async function toggleWorklogVisibility() {
     });
     if (res && res.ok) renderVisibilityToggle(res.worklog_open);
 }
+
+// ── Time Presets Settings ──
+let _presetsData = { start: [], end: [] };
+
+async function loadTimePresetsPanel() {
+    const data = await api('/api/settings/time-presets');
+    if (!data) return;
+    _presetsData = data;
+    _renderPresetChips('start');
+    _renderPresetChips('end');
+}
+
+function _renderPresetChips(kind) {
+    const container = document.getElementById('preset-chips-' + kind);
+    if (!container) return;
+    container.innerHTML = '';
+    (_presetsData[kind] || []).forEach((p, i) => {
+        const chip = document.createElement('div');
+        chip.className = 'flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-100';
+        chip.innerHTML = `<span>${esc(p.label)}</span><button type="button" onclick="removeTimePreset('${kind}',${i})" class="ml-1 text-indigo-300 hover:text-red-500 font-bold leading-none">&times;</button>`;
+        container.appendChild(chip);
+    });
+}
+
+async function addTimePreset(kind) {
+    const valueEl = document.getElementById('new-preset-' + kind + '-value');
+    const labelEl = document.getElementById('new-preset-' + kind + '-label');
+    const raw = (valueEl ? valueEl.value : '').trim();
+    if (!raw) { toast('Select a time', 'error'); return; }
+    // <input type="time"> returns HH:MM in 24h format
+    const value = raw.substring(0, 5);
+    const label = labelEl && labelEl.value.trim() ? labelEl.value.trim() : value;
+    _presetsData = { ..._presetsData, [kind]: [...(_presetsData[kind] || []), { label, value }] };
+    const res = await api('/api/settings/time-presets', { method: 'PUT', body: _presetsData });
+    if (!res || !res.ok) { toast('Failed to save preset', 'error'); return; }
+    _renderPresetChips(kind);
+    if (typeof window._invalidateTimePresetsCache === 'function') window._invalidateTimePresetsCache();
+    if (valueEl) valueEl.value = '';
+    if (labelEl) labelEl.value = '';
+}
+
+async function removeTimePreset(kind, index) {
+    _presetsData = { ..._presetsData, [kind]: (_presetsData[kind] || []).filter((_, i) => i !== index) };
+    const res = await api('/api/settings/time-presets', { method: 'PUT', body: _presetsData });
+    if (!res || !res.ok) { toast('Failed to save preset', 'error'); return; }
+    _renderPresetChips(kind);
+    if (typeof window._invalidateTimePresetsCache === 'function') window._invalidateTimePresetsCache();
+}
+
+try {
+    window.addTimePreset    = addTimePreset;
+    window.removeTimePreset = removeTimePreset;
+} catch (e) {}

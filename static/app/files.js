@@ -253,9 +253,11 @@ function _renderFileList() {
                        onclick="onFileCheckboxToggle(event, ${f.id})">
             </div>
             <div class="file-row-name">
-                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
+                ${isImg
+                    ? `<img class="file-row-thumb" src="/api/files/${f.id}/download?inline=1" alt="" loading="lazy" onclick="openFilePreview(${f.id})">`
+                    : `<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                       </svg>`}
                 <span class="file-row-name-text" title="${esc(f.original_name)}"
                       ${isImg ? `onclick="openFilePreview(${f.id})"` : `onclick="window.location='/api/files/${f.id}/download'"`}
                       >${esc(f.original_name)}</span>
@@ -422,6 +424,12 @@ function openFilePreview(id) {
     const dl    = document.getElementById('file-preview-download');
     if (!modal || !img) return;
     img.src = `/api/files/${id}/download?inline=1`;
+    img.classList.remove('zoomed');
+    img.onclick = () => {
+        img.classList.toggle('zoomed');
+        const body = modal.querySelector('.file-preview-body');
+        if (body) body.classList.toggle('preview-zoomed', img.classList.contains('zoomed'));
+    };
     if (name) name.textContent = f.original_name || '';
     if (dl)   dl.href = `/api/files/${id}/download`;
     modal.classList.remove('hidden');
@@ -435,7 +443,9 @@ function closeFilePreview(ev) {
     const modal = document.getElementById('file-preview-modal');
     const img   = document.getElementById('file-preview-img');
     if (modal) modal.classList.add('hidden');
-    if (img) img.src = '';
+    if (img) { img.src = ''; img.classList.remove('zoomed'); }
+    const body = modal && modal.querySelector('.file-preview-body');
+    if (body) body.classList.remove('preview-zoomed');
 }
 
 // ── Folder stats (shown in header) ──

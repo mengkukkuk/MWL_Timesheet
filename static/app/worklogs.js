@@ -332,33 +332,69 @@ function formatDate(dateStr) {
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
-// ── Time select helpers (custom hour/min/ampm controls) ──
-function _populateTimeSelectsOnce() {
+// ── Time input helpers (native <input type="time">, 24-hour) ──
+
+// ── Time preset rendering (dynamic, loaded from API) ──
+let _timePresetsCache = null;
+
+async function _loadAndRenderPresets() {
     try {
-        if (document._timeSelectsPopulated) return;
-        document._timeSelectsPopulated = true;
-    } catch (err) {
-        console.error('Time select init error', err);
-        return;
+        if (!_timePresetsCache) {
+            _timePresetsCache = await api('/api/settings/time-presets');
+        }
+        _renderPresetButtons('start', _timePresetsCache && _timePresetsCache.start);
+        _renderPresetButtons('end',   _timePresetsCache && _timePresetsCache.end);
+    } catch (e) {
+        // silently skip — buttons just won't appear
     }
-    const hours = [];
-    for (let h = 1; h <= 12; h++) hours.push(String(h).padStart(2, '0'));
-    // 5-minute intervals — 12 options instead of 60
-    const mins = [];
-    for (let m = 0; m < 60; m += 5) mins.push(String(m).padStart(2, '0'));
-    ['start','end'].forEach(kind => {
-        const hh = document.getElementById(`wl-${kind}-hour`);
-        const mm = document.getElementById(`wl-${kind}-min`);
-        if (!hh || !mm) return;
-        // add empty option to allow blank (no time)
-        const emptyH = document.createElement('option'); emptyH.value = ''; emptyH.textContent = '';
-        const emptyM = document.createElement('option'); emptyM.value = ''; emptyM.textContent = '';
-        hh.appendChild(emptyH);
-        mm.appendChild(emptyM);
-        hours.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; hh.appendChild(o); });
-        mins.forEach(v =>  { const o = document.createElement('option'); o.value = v; o.textContent = v; mm.appendChild(o); });
+}
+
+function _renderPresetButtons(kind, presets) {
+    const container = document.getElementById(`wl-${kind}-presets`);
+    if (!container) return;
+    container.innerHTML = '';
+    (presets || []).forEach(p => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'time-preset-btn';
+        btn.textContent = p.label;
+        btn.addEventListener('click', () => setTimePreset(`wl-${kind}`, p.value));
+        container.appendChild(btn);
     });
 }
+
+// Called by settings.js when admin saves changes so next modal open re-fetches
+window._invalidateTimePresetsCache = () => { _timePresetsCache = null; };
+
+// Auto-advance HH→MM on 2 digits; clamp values on blur
+function _initTimeInputBehavior() {
+    ['start', 'end'].forEach(kind => {
+        const hhEl = document.getElementById(`wl-${kind}-hh`);
+        const mmEl = document.getElementById(`wl-${kind}-mm`);
+        if (!hhEl || !mmEl) return;
+
+        hhEl.addEventListener('input', () => {
+            // strip non-digits
+            hhEl.value = hhEl.value.replace(/\D/g, '');
+            const v = parseInt(hhEl.value, 10);
+            if (hhEl.value.length === 2 || v > 2) mmEl.focus();
+        });
+        mmEl.addEventListener('input', () => {
+            mmEl.value = mmEl.value.replace(/\D/g, '');
+        });
+        hhEl.addEventListener('blur', () => {
+            if (hhEl.value === '') return;
+            hhEl.value = String(Math.min(23, Math.max(0, parseInt(hhEl.value, 10) || 0))).padStart(2, '0');
+        });
+        mmEl.addEventListener('blur', () => {
+            if (mmEl.value === '') return;
+            mmEl.value = String(Math.min(59, Math.max(0, parseInt(mmEl.value, 10) || 0))).padStart(2, '0');
+        });
+        // select all on focus for quick overwrite
+        [hhEl, mmEl].forEach(el => el.addEventListener('focus', () => el.select()));
+    });
+}
+_initTimeInputBehavior();
 
 // Ensure functions are reachable from inline onclick handlers
 try {
@@ -372,38 +408,17 @@ try {
 }
 
 function setTimeInputs(prefix, timeStr) {
-    _populateTimeSelectsOnce();
-    const hourEl = document.getElementById(prefix + '-hour');
-    const minEl  = document.getElementById(prefix + '-min');
-    const apEl   = document.getElementById(prefix + '-ampm');
-    if (!hourEl || !minEl || !apEl) return;
+    const hhEl = document.getElementById(prefix + '-hh');
+    const mmEl = document.getElementById(prefix + '-mm');
+    if (!hhEl || !mmEl) return;
     if (!timeStr) {
-        // default: for start use 08:30, for end clear to empty
-        if (prefix === 'wl-start') {
-            hourEl.value = '08'; minEl.value = '30'; apEl.value = 'AM';
-        } else {
-            hourEl.value = ''; minEl.value = ''; apEl.value = 'AM';
-        }
+        if (prefix === 'wl-start') { hhEl.value = '08'; mmEl.value = '30'; }
+        else { hhEl.value = ''; mmEl.value = ''; }
         return;
     }
-    // timeStr expected 'HH:MM' (24-hour)
     const parts = timeStr.split(':');
-    if (parts.length < 2) return;
-    let hh = parseInt(parts[0], 10);
-    const mm = parts[1].padStart(2,'0');
-    let ap = 'AM';
-    if (hh === 0) { hh = 12; ap = 'AM'; }
-    else if (hh === 12) { ap = 'PM'; }
-    else if (hh > 12) { hh = hh - 12; ap = 'PM'; }
-    hourEl.value = String(hh).padStart(2,'0');
-    // if mm is not a 5-min interval option, insert it dynamically
-    if (minEl.value !== mm) {
-        const opt = document.createElement('option');
-        opt.value = mm; opt.textContent = mm;
-        minEl.insertBefore(opt, minEl.options[1] || null);
-    }
-    minEl.value  = mm;
-    apEl.value   = ap;
+    hhEl.value = parts[0] !== undefined ? String(parseInt(parts[0], 10) || 0).padStart(2, '0') : '';
+    mmEl.value = parts[1] !== undefined ? String(parseInt(parts[1], 10) || 0).padStart(2, '0') : '';
 }
 
 function setTimePreset(prefix, timeStr24) {
@@ -411,19 +426,12 @@ function setTimePreset(prefix, timeStr24) {
 }
 
 function getTimeInputValue(prefix) {
-    _populateTimeSelectsOnce();
-    const hourEl = document.getElementById(prefix + '-hour');
-    const minEl  = document.getElementById(prefix + '-min');
-    const apEl   = document.getElementById(prefix + '-ampm');
-    if (!hourEl || !minEl || !apEl) return null;
-    const h = parseInt(hourEl.value || '0', 10);
-    const m = (minEl.value || '00').padStart(2,'0');
-    const ap = apEl.value || 'AM';
-    if (!hourEl.value) return null;
-    let hh = h % 12;
-    if (ap === 'PM') hh += 12;
-    const hhStr = String(hh).padStart(2,'0');
-    return `${hhStr}:${m}`;
+    const hhEl = document.getElementById(prefix + '-hh');
+    const mmEl = document.getElementById(prefix + '-mm');
+    if (!hhEl || !mmEl || hhEl.value === '') return null;
+    const hh = String(Math.min(23, Math.max(0, parseInt(hhEl.value, 10) || 0))).padStart(2, '0');
+    const mm = String(Math.min(59, Math.max(0, parseInt(mmEl.value, 10) || 0))).padStart(2, '0');
+    return `${hh}:${mm}`;
 }
 
 function esc(s) {
@@ -519,6 +527,7 @@ function openAddWorklog() {
     setDateRangeMode(true);
     populateProjectDropdown();
     renderExistingRanges();
+    _loadAndRenderPresets();
     document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -541,6 +550,7 @@ function openAddWorklogMulti() {
     document.getElementById('multi-member-section').classList.remove('hidden');
     document.getElementById('modal-save-btn').textContent = t('modal.save_selected');
     renderExistingRanges();
+    _loadAndRenderPresets();
     document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -586,6 +596,7 @@ function editWorklog(w) {
     if (cbEdit) cbEdit.checked = Number(w.is_allowance) === 1;
     document.getElementById('wl-note').value = w.note || '';
     renderExistingRanges();
+    _loadAndRenderPresets();
     document.getElementById('modal-overlay').classList.remove('hidden');
 }
 

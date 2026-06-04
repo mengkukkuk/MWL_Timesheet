@@ -553,36 +553,28 @@ body {
     color: #9ca3af;
     flex-shrink: 0;
 }
-.time-sel {
+.time-num {
     border: none;
     background: transparent;
-    padding: 0.45rem 0.25rem;
-    font-size: 0.875rem;
-    outline: none;
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
-    text-align: center;
-    color: #1f2937;
-}
-.time-sel:focus { background: #f5f3ff; }
-.time-hour { width: 2.8rem; }
-.time-min  { width: 2.8rem; }
-.time-ampm {
-    width: 3.4rem;
-    border-left: 1px solid #e5e7eb;
-    padding-left: 0.4rem;
-    color: #6b7280;
-    font-weight: 600;
-    font-size: 0.8rem;
-    background: #f9fafb;
-}
-.time-sep {
+    padding: 0.4rem 0.2rem;
     font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    outline: none;
+    width: 2.2rem;
+    text-align: center;
+    letter-spacing: 0.04em;
+}
+.time-num::placeholder { color: #d1d5db; font-weight: 400; font-size: 0.8rem; }
+.time-num:focus { background: #f5f3ff; border-radius: 0.25rem; }
+.time-colon {
+    font-size: 1.1rem;
     font-weight: 700;
-    color: #9ca3af;
+    color: #6b7280;
     user-select: none;
     flex-shrink: 0;
+    padding: 0 0.05rem;
+    line-height: 1;
 }
 .time-presets {
     display: flex;
@@ -2028,6 +2020,32 @@ body {
     transition: opacity 0.15s ease;
 }
 .avatar-editable:hover::after { opacity: 1; }
+
+/* ── File list image thumbnail ───────────────────────────────────────────── */
+.file-row-thumb {
+    width: 2.25rem;
+    height: 2.25rem;
+    object-fit: cover;
+    border-radius: 0.25rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    border: 1px solid #e5e7eb;
+    background: #f3f4f6;
+}
+
+/* ── File preview lightbox zoom ──────────────────────────────────────────── */
+#file-preview-img { cursor: zoom-in; }
+#file-preview-img.zoomed {
+    max-width: none;
+    max-height: none;
+    width: auto;
+    height: auto;
+    cursor: zoom-out;
+}
+.file-preview-body.preview-zoomed {
+    align-items: flex-start;
+    justify-content: flex-start;
+}
 
 .avatar-remove {
     position: absolute;
