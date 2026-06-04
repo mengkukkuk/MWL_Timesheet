@@ -17,7 +17,7 @@ SET SVC_APP=MeterWorklog
 SET SVC_NGROK=MeterWorklog-ngrok
 SET APP_PORT=5050
 SET DB_SERVER=localhost\SQLEXPRESS
-SET DB_NAME=MeterWorklog
+SET DB_NAME=MWLTimesheet
 SET DB_DRIVER={ODBC Driver 17 for SQL Server}
 SET DB_TRUST_CERT=yes
 SET SECRET_KEY=Metercenter
@@ -34,10 +34,10 @@ REM Default 5368709120 = 5 GB (matches FILE_UPLOAD_MAX_MB=5120 with no headroom)
 REM For larger uploads, raise both this and FILE_UPLOAD_MAX_MB.
 SET WAITRESS_MAX_REQUEST_BODY=5368709120
 REM Storage paths — recommended to use separate drive (e.g. D:\) for safety & backups
-SET FILE_STORAGE_DIR=D:\MeterWorklog_Storage\files
-SET AVATAR_STORAGE_DIR=D:\MeterWorklog_Storage\avatars
+SET FILE_STORAGE_DIR=E:\MeterWorklog_Storage\files
+SET AVATAR_STORAGE_DIR=E:\MeterWorklog_Storage\avatars
 SET FILE_UPLOAD_MAX_MB=5120
-SET FILE_STORAGE_CAP_MB=20480
+SET FILE_STORAGE_CAP_MB=614400
 SET FILE_MIN_FREE_MB=8192
 
 REM Load settings from .env if present
