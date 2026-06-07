@@ -40,18 +40,14 @@ def set_worklog_visibility():
 
 _DEFAULT_TIME_PRESETS = {
     'start': [
-        {'label': '7:30',  'value': '07:30'},
-        {'label': '8:00',  'value': '08:00'},
-        {'label': '8:30',  'value': '08:30'},
-        {'label': '9:00',  'value': '09:00'},
-        {'label': '13:00', 'value': '13:00'},
+        {'label': '8:30',  'value': '08:30'},  
+        {'label': '13:30', 'value': '13:30'},
     ],
     'end': [
-        {'label': '12:00', 'value': '12:00'},
-        {'label': '13:00', 'value': '13:00'},
-        {'label': '17:00', 'value': '17:00'},
+        {'label': '10:30', 'value': '10:30'},
+        {'label': '13:30', 'value': '13:30'},
         {'label': '17:30', 'value': '17:30'},
-        {'label': '18:00', 'value': '18:00'},
+        {'label': '18:30', 'value': '18:30'},
     ],
 }
 
