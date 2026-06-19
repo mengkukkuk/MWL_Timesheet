@@ -94,7 +94,7 @@ function _psRenderBarChart(projects) {
 
     if (_psBarChart) { _psBarChart.destroy(); _psBarChart = null; }
 
-    const labels = projects.map(p => p.project_name);
+    const labels = projects.map(p => p.project_department);
     const values = projects.map(p => p.total_hours);
     const colors = projects.map((_, i) => PS_COLORS[i % PS_COLORS.length]);
 
@@ -125,6 +125,10 @@ function _psRenderBarChart(projects) {
                     padding: 10,
                     cornerRadius: 8,
                     callbacks: {
+                        title: ctx => {
+                            const proj = projects[ctx[0].dataIndex];
+                            return proj.project_description || proj.project_department;
+                        },
                         label: ctx => `  ${ctx.raw.toFixed(1)} hours`
                     }
                 }
@@ -169,10 +173,10 @@ function _psRenderDonutChart(projects, totalHours) {
     let items      = [...projects];
     if (items.length > TOP_N) {
         const othersH = items.slice(TOP_N).reduce((s, p) => s + p.total_hours, 0);
-        items = [...items.slice(0, TOP_N), { project_name: 'Others', total_hours: othersH }];
+        items = [...items.slice(0, TOP_N), { project_department: 'Others', total_hours: othersH }];
     }
 
-    const labels = items.map(p => p.project_name);
+    const labels = items.map(p => p.project_department);
     const values = items.map(p => p.total_hours);
     const colors = items.map((_, i) => PS_COLORS[i % PS_COLORS.length]);
 
@@ -205,6 +209,10 @@ function _psRenderDonutChart(projects, totalHours) {
                     padding: 10,
                     cornerRadius: 8,
                     callbacks: {
+                        title: ctx => {
+                            const item = items[ctx[0].dataIndex];
+                            return item.project_description || item.project_department;
+                        },
                         label: ctx => {
                             const pct = totalHours > 0
                                 ? (ctx.raw / totalHours * 100).toFixed(1) : '0.0';
@@ -220,9 +228,9 @@ function _psRenderDonutChart(projects, totalHours) {
         legendEl.innerHTML = items.map((p, i) => {
             const pct = totalHours > 0
                 ? (p.total_hours / totalHours * 100).toFixed(1) : '0.0';
-            return `<div class="ps-legend-item">
+            return `<div class="ps-legend-item" title="${_psEsc(p.project_description || '')}">
                 <span class="ps-legend-swatch" style="background:${colors[i]}"></span>
-                <span class="ps-legend-name">${_psEsc(p.project_name)}</span>
+                <span class="ps-legend-name">${_psEsc(p.project_department)}</span>
                 <span class="ps-legend-pct">${pct}%</span>
             </div>`;
         }).join('');
@@ -237,15 +245,15 @@ function _psRenderTable(projects, totalHours) {
     tbody.innerHTML = '';
 
     projects.forEach((p, idx) => {
-        const isOpen    = _psExpanded.has(p.project_name);
+        const isOpen    = _psExpanded.has(p.project_department);
         const color     = PS_COLORS[idx % PS_COLORS.length];
         const sharePct  = totalHours > 0 ? (p.total_hours / totalHours * 100) : 0;
 
         const projTr = document.createElement('tr');
         projTr.className = 'ps-proj-row' + (isOpen ? ' expanded' : '');
         projTr.onclick = () => {
-            if (_psExpanded.has(p.project_name)) _psExpanded.delete(p.project_name);
-            else _psExpanded.add(p.project_name);
+            if (_psExpanded.has(p.project_department)) _psExpanded.delete(p.project_department);
+            else _psExpanded.add(p.project_department);
             _psRenderTable(projects, totalHours);
         };
         projTr.innerHTML = `
@@ -257,7 +265,7 @@ function _psRenderTable(projects, totalHours) {
             <td class="py-3 px-4">
                 <span class="inline-flex items-center gap-2">
                     <span class="ps-proj-color-bar" style="background:${color};height:1.1em;align-self:stretch;"></span>
-                    <span style="font-size:.875rem;font-weight:600;color:#1e293b;">${_psEsc(p.project_name)}</span>
+                    <span class="project-name-cell" style="font-size:.875rem;font-weight:600;color:#1e293b;" title="${_psEsc(p.project_description || '')}">${_psEsc(p.project_department)}</span>
                 </span>
             </td>
             <td class="py-3 px-4 text-right">

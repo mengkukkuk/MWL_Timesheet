@@ -819,21 +819,23 @@ def get_projects_summary():
 
     rows = app_pkg.db.query(
         """
-        SELECT w.EmployeeID    AS employee_id,
-               e.EmployeeName  AS employee_name,
-               w.log_date      AS log_date,
-               w.project       AS project_name,
-               SUM(w.hours)    AS raw_hours,
+        SELECT w.EmployeeID        AS employee_id,
+               e.EmployeeName      AS employee_name,
+               w.log_date          AS log_date,
+               w.ProjectDepartment AS project_department,
+               w.Description       AS project_description,
+               SUM(w.hours)        AS raw_hours,
                CONVERT(VARCHAR(5), MIN(w.start_time), 108) AS s,
                CONVERT(VARCHAR(5), MAX(w.end_time),   108) AS e
         FROM worklogs w
         LEFT JOIN dbo.Employee e ON e.EmployeeID = w.EmployeeID
         WHERE YEAR(w.log_date) = ?
           AND MONTH(w.log_date) = ?
-          AND w.project IS NOT NULL
-          AND LTRIM(RTRIM(w.project)) <> ''
+          AND w.ProjectDepartment IS NOT NULL
+          AND LTRIM(RTRIM(w.ProjectDepartment)) <> ''
           AND ISNULL(w.hours, 0) > 0
-        GROUP BY w.EmployeeID, e.EmployeeName, w.log_date, w.project
+        GROUP BY w.EmployeeID, e.EmployeeName, w.log_date,
+                 w.ProjectDepartment, w.Description
         """,
         (year, month),
     )
@@ -863,8 +865,9 @@ def get_projects_summary():
 
         return max(0.0, total / 60.0)
 
-    # Aggregate per (project, employee), summing the per-day capped hours.
-    acc = {}   # (project_name, employee_id) -> {'name', 'hours'}
+    # Aggregate per (department, employee), summing the per-day capped hours.
+    dept_descriptions = {}  # project_department -> set of descriptions
+    acc = {}                # (project_department, employee_id) -> {'name', 'hours'}
     for r in rows:
         raw = float(r['raw_hours']) if r['raw_hours'] is not None else 0.0
         cap = span_with_lunch(to_min(r['s']), to_min(r['e']))
@@ -872,7 +875,14 @@ def get_projects_summary():
         if capped <= 0:
             continue
 
-        key = (r['project_name'], r['employee_id'])
+        dept = r['project_department']
+        desc = r['project_description']
+        if dept not in dept_descriptions:
+            dept_descriptions[dept] = set()
+        if desc:
+            dept_descriptions[dept].add(desc)
+
+        key = (dept, r['employee_id'])
         entry = acc.setdefault(key, {
             'employee_id': r['employee_id'],
             'name': r['employee_name'] or f"(unknown #{r['employee_id']})",
@@ -880,11 +890,13 @@ def get_projects_summary():
         })
         entry['hours'] += capped
 
-    # Roll up into per-project buckets
+    # Roll up into per-department buckets
     by_project = {}
-    for (proj_name, _emp_id), entry in acc.items():
-        bucket = by_project.setdefault(proj_name, {
-            'project_name': proj_name,
+    for (dept, _emp_id), entry in acc.items():
+        descs = sorted(dept_descriptions.get(dept, set()))
+        bucket = by_project.setdefault(dept, {
+            'project_department': dept,
+            'project_description': ', '.join(descs),
             'total_hours': 0.0,
             'employees': [],
         })
