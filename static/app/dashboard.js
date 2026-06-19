@@ -168,6 +168,7 @@ function _renderMemberSkillsBox(memberId, canEdit, limit = SKILL_PREVIEW_COUNT) 
     const skills = _sortSkills(_skillsByMember[memberId] || []);
     const visible  = skills.slice(0, limit);
     const overflow = skills.length - visible.length;
+    const maxLen = skills.reduce((m, s) => Math.max(m, Math.min(15, s.name.length)), 4);
 
     const editBtn = canEdit
         ? `<button class="skill-action-btn" onclick="event.stopPropagation(); openSkillsManager(${memberId})" title="Manage skills">
@@ -201,7 +202,7 @@ function _renderMemberSkillsBox(memberId, canEdit, limit = SKILL_PREVIEW_COUNT) 
     const listClass = limit > SKILL_PREVIEW_COUNT ? 'skill-list-matrix' : 'skill-list';
 
     return `
-        <div class="member-skills-box">
+        <div class="member-skills-box" style="--skill-name-w:${maxLen}ch">
             <div class="member-skills-head">
                 <span class="skill-title">Skills</span>
                 <span class="flex items-center gap-1">${sortBtn}${editBtn}</span>

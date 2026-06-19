@@ -609,7 +609,7 @@ body {
     line-height: 1;
 }
 .skill-name {
-    width: 80px;
+    width: var(--skill-name-w, 7ch);
     flex-shrink: 0;
     overflow: hidden;
     text-overflow: ellipsis;
