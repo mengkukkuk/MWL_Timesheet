@@ -38,7 +38,7 @@ def _safe_export_name(name):
     return safe or 'member'
 
 
-def _copy_row_style(worksheet, source_row, target_row, num_cols=8):
+def _copy_row_style(worksheet, source_row, target_row, num_cols=10):
     """Copy cell styles when the template needs more rows."""
     for column in range(1, num_cols + 1):
         src = worksheet.cell(row=source_row, column=column)
@@ -60,7 +60,7 @@ def generate_excel_bytes(employee_id, member, year, months=None):
     last_day = date(year, 12, 31)
     worklogs = app_pkg.db.query(
         """
-        SELECT log_date, project, task,
+        SELECT log_date, project, task, projectdepartment, description,
                CONVERT(VARCHAR(5), start_time, 108) as start_time,
                CONVERT(VARCHAR(5), end_time,   108) as end_time,
                hours, status, note
@@ -126,17 +126,19 @@ def generate_excel_bytes(employee_id, member, year, months=None):
                 continue
 
             worksheet.cell(row=row_number, column=2).value = entry['project'] or ''
-            worksheet.cell(row=row_number, column=3).value = entry['task'] or ''
-            worksheet.cell(row=row_number, column=4).value = parse_time(entry['start_time'])
-            worksheet.cell(row=row_number, column=5).value = parse_time(entry['end_time'])
-            if worksheet.cell(row=row_number, column=4).value:
-                worksheet.cell(row=row_number, column=4).number_format = 'h:mm'
-            if worksheet.cell(row=row_number, column=5).value:
-                worksheet.cell(row=row_number, column=5).number_format = 'h:mm'
+            worksheet.cell(row=row_number, column=3).value = entry['projectdepartment'] or ''
+            worksheet.cell(row=row_number, column=4).value = entry['description'] or ''
+            worksheet.cell(row=row_number, column=5).value = entry['task'] or ''
+            worksheet.cell(row=row_number, column=6).value = parse_time(entry['start_time'])
+            worksheet.cell(row=row_number, column=7).value = parse_time(entry['end_time'])
+            if worksheet.cell(row=row_number, column=6).value:
+                worksheet.cell(row=row_number, column=6).number_format = 'h:mm'
+            if worksheet.cell(row=row_number, column=7).value:
+                worksheet.cell(row=row_number, column=7).number_format = 'h:mm'
             if entry.get('hours') is not None:
-                worksheet.cell(row=row_number, column=6).value = float(entry['hours'])
-            worksheet.cell(row=row_number, column=7).value = entry['status'] or ''
-            worksheet.cell(row=row_number, column=8).value = entry['note'] or ''
+                worksheet.cell(row=row_number, column=8).value = float(entry['hours'])
+            worksheet.cell(row=row_number, column=9).value = entry['status'] or ''
+            worksheet.cell(row=row_number, column=10).value = entry['note'] or ''
 
     if 'empty' in workbook.sheetnames:
         del workbook['empty']
