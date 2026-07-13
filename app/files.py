@@ -70,6 +70,36 @@ def _is_descendant(candidate_id, ancestor_id):
     return False
 
 
+def _is_elevated():
+    """True if the current session role may view/manage classified items."""
+    return session.get('role') in ELEVATED_ROLES
+
+
+def _folder_hidden_for_staff(fid):
+    """True if folder fid or any of its ancestors is classified.
+
+    Classified folders hide their entire subtree from non-elevated (Staff)
+    users. Walks up the parent chain (guarded against cycles). Root (None)
+    is never hidden.
+    """
+    if fid is None:
+        return False
+    cur = fid
+    seen = set()
+    while cur is not None and cur not in seen:
+        seen.add(cur)
+        row = app_pkg.db.query(
+            "SELECT parent_id, is_classified FROM file_folders WHERE id=?",
+            (cur,), fetchone=True,
+        )
+        if not row:
+            return False
+        if row.get('is_classified'):
+            return True
+        cur = row.get('parent_id')
+    return False
+
+
 def _storage_snapshot():
     """Return dict of used_bytes, cap_bytes, free_disk_bytes, file_count, folder_count."""
     row = app_pkg.db.query(
@@ -112,15 +142,21 @@ def get_stats():
 def get_tree():
     """Return the full folder tree as a nested list. Root nodes have parent_id=None."""
     rows = app_pkg.db.query(
-        "SELECT id, name, parent_id FROM file_folders ORDER BY name"
+        "SELECT id, name, parent_id, is_classified FROM file_folders ORDER BY name"
     ) or []
 
+    elevated = _is_elevated()
     by_parent = {}
     for r in rows:
+        # Staff never see classified folders. Dropping the node here also makes
+        # its entire subtree unreachable (children can't attach to a missing id).
+        if not elevated and r.get('is_classified'):
+            continue
         by_parent.setdefault(r['parent_id'], []).append({
             'id': r['id'],
             'name': r['name'],
             'parent_id': r['parent_id'],
+            'is_classified': bool(r.get('is_classified')),
             'children': [],
         })
 
@@ -142,34 +178,46 @@ def get_folder_contents(fid=None):
     if fid is not None and not _folder_exists(fid):
         return jsonify({'error': 'folder not found'}), 404
 
+    elevated = _is_elevated()
+    # Staff cannot open a classified folder (or any folder under one). Return 404
+    # rather than 403 so its existence stays hidden.
+    if not elevated and fid is not None and _folder_hidden_for_staff(fid):
+        return jsonify({'error': 'folder not found'}), 404
+
+    # Non-elevated callers must never receive classified items.
+    folder_filter = '' if elevated else ' AND is_classified = 0'
+    file_filter = '' if elevated else ' AND f.is_classified = 0'
+
     if fid is None:
         subfolders = app_pkg.db.query(
-            "SELECT id, name, parent_id FROM file_folders WHERE parent_id IS NULL ORDER BY name"
+            "SELECT id, name, parent_id, is_classified FROM file_folders "
+            "WHERE parent_id IS NULL" + folder_filter + " ORDER BY name"
         ) or []
         files_rows = app_pkg.db.query(
             """SELECT f.id, f.original_name, f.size_bytes, f.mime_type,
-                      f.uploaded_at, f.uploaded_by,
+                      f.uploaded_at, f.uploaded_by, f.is_classified,
                       COALESCE(m.name, u.username) AS uploaded_by_name
                FROM files f
                LEFT JOIN users u ON f.uploaded_by = u.id
                LEFT JOIN members m ON u.member_id = m.id
-               WHERE f.folder_id IS NULL
+               WHERE f.folder_id IS NULL""" + file_filter + """
                ORDER BY f.original_name"""
         ) or []
         breadcrumbs = []
     else:
         subfolders = app_pkg.db.query(
-            "SELECT id, name, parent_id FROM file_folders WHERE parent_id=? ORDER BY name",
+            "SELECT id, name, parent_id, is_classified FROM file_folders "
+            "WHERE parent_id=?" + folder_filter + " ORDER BY name",
             (fid,),
         ) or []
         files_rows = app_pkg.db.query(
             """SELECT f.id, f.original_name, f.size_bytes, f.mime_type,
-                      f.uploaded_at, f.uploaded_by,
+                      f.uploaded_at, f.uploaded_by, f.is_classified,
                       COALESCE(m.name, u.username) AS uploaded_by_name
                FROM files f
                LEFT JOIN users u ON f.uploaded_by = u.id
                LEFT JOIN members m ON u.member_id = m.id
-               WHERE f.folder_id=?
+               WHERE f.folder_id=?""" + file_filter + """
                ORDER BY f.original_name""",
             (fid,),
         ) or []
@@ -197,6 +245,9 @@ def get_folder_contents(fid=None):
     for f in files_rows:
         if f.get('uploaded_at'):
             f['uploaded_at'] = f['uploaded_at'].isoformat()
+        f['is_classified'] = bool(f.get('is_classified'))
+    for sf in subfolders:
+        sf['is_classified'] = bool(sf.get('is_classified'))
 
     return jsonify({
         'folder_id': fid,
@@ -272,7 +323,15 @@ def rename_folder(fid):
     if dup:
         return jsonify({'error': 'A folder with that name already exists here'}), 409
 
-    app_pkg.db.execute("UPDATE file_folders SET name=? WHERE id=?", (name, fid))
+    # Optional classified toggle (elevated-only, enforced by the decorator).
+    if 'is_classified' in data:
+        classified = 1 if data.get('is_classified') else 0
+        app_pkg.db.execute(
+            "UPDATE file_folders SET name=?, is_classified=? WHERE id=?",
+            (name, classified, fid),
+        )
+    else:
+        app_pkg.db.execute("UPDATE file_folders SET name=? WHERE id=?", (name, fid))
     return jsonify({'ok': True, 'id': fid, 'name': name})
 
 
@@ -401,10 +460,18 @@ def upload_file():
 @login_required
 def download_file(fid):
     row = app_pkg.db.query(
-        "SELECT id, original_name, stored_name, mime_type FROM files WHERE id=?",
+        "SELECT id, original_name, stored_name, mime_type, folder_id, is_classified "
+        "FROM files WHERE id=?",
         (fid,), fetchone=True,
     )
     if not row:
+        return jsonify({'error': 'file not found'}), 404
+
+    # Staff cannot download a classified file, nor anything under a classified
+    # folder. 404 (not 403) so existence stays hidden.
+    if not _is_elevated() and (
+        row.get('is_classified') or _folder_hidden_for_staff(row.get('folder_id'))
+    ):
         return jsonify({'error': 'file not found'}), 404
 
     try:
@@ -423,6 +490,20 @@ def download_file(fid):
         download_name=_safe_download_name(row['original_name']),
         conditional=True,
     )
+
+
+@files_bp.route('/api/files/<int:fid>', methods=['PATCH'])
+@elevated_required
+def update_file(fid):
+    """Update a file's classified flag. Elevated-only (decorator enforced)."""
+    row = app_pkg.db.query("SELECT id FROM files WHERE id=?", (fid,), fetchone=True)
+    if not row:
+        return jsonify({'error': 'file not found'}), 404
+
+    data = request.json or {}
+    classified = 1 if data.get('is_classified') else 0
+    app_pkg.db.execute("UPDATE files SET is_classified=? WHERE id=?", (classified, fid))
+    return jsonify({'ok': True, 'id': fid, 'is_classified': bool(classified)})
 
 
 @files_bp.route('/api/files/<int:fid>', methods=['DELETE'])
@@ -501,11 +582,17 @@ def _select_files_by_ids(ids):
         return []
     placeholders = ','.join('?' for _ in ids)
     rows = app_pkg.db.query(
-        f"SELECT id, original_name, stored_name, size_bytes, mime_type, uploaded_by "
+        f"SELECT id, original_name, stored_name, size_bytes, mime_type, uploaded_by, "
+        f"folder_id, is_classified "
         f"FROM files WHERE id IN ({placeholders})",
         tuple(ids),
     )
     return rows or []
+
+
+def _file_hidden_for_staff(row):
+    """True if a non-elevated user must not see/access this file row."""
+    return bool(row.get('is_classified')) or _folder_hidden_for_staff(row.get('folder_id'))
 
 
 def _unique_zip_name(used, name):
@@ -567,6 +654,9 @@ def bulk_download():
     if err:
         return err
     rows = _select_files_by_ids(ids)
+    # Staff never receive classified files (or files under a classified folder).
+    if not _is_elevated():
+        rows = [r for r in rows if not _file_hidden_for_staff(r)]
     if not rows:
         return jsonify({'error': 'no files found'}), 404
 
@@ -617,6 +707,11 @@ def bulk_delete():
 
     for row in rows:
         rid = row['id']
+        # Staff cannot act on classified files — report as not found to keep
+        # existence hidden.
+        if not is_elevated and _file_hidden_for_staff(row):
+            failed.append({'id': rid, 'reason': 'not found'})
+            continue
         if not (is_elevated or row['uploaded_by'] == user_id):
             failed.append({'id': rid, 'reason': 'permission denied'})
             continue
@@ -644,12 +739,16 @@ def move_file(fid):
     Body: {folder_id: int|null}.  null = move to root.
     """
     row = app_pkg.db.query(
-        "SELECT id, uploaded_by FROM files WHERE id=?", (fid,), fetchone=True,
+        "SELECT id, uploaded_by, folder_id, is_classified FROM files WHERE id=?",
+        (fid,), fetchone=True,
     )
     if not row:
         return jsonify({'error': 'file not found'}), 404
 
     is_elevated = session.get('role') in ELEVATED_ROLES
+    # Staff cannot move a classified file (or one under a classified folder).
+    if not is_elevated and _file_hidden_for_staff(row):
+        return jsonify({'error': 'file not found'}), 404
     if not (is_elevated or row['uploaded_by'] == session.get('user_id')):
         return jsonify({'error': 'permission denied'}), 403
 
@@ -724,18 +823,24 @@ def recent_uploads():
         limit = 20
     limit = max(1, min(limit, 100))
 
+    elevated = _is_elevated()
+    classified_filter = '' if elevated else ' WHERE f.is_classified = 0'
     rows = app_pkg.db.query(
         f"""SELECT TOP {limit} f.id, f.original_name, f.size_bytes, f.mime_type,
-                   f.uploaded_at, f.uploaded_by, f.folder_id,
+                   f.uploaded_at, f.uploaded_by, f.folder_id, f.is_classified,
                    COALESCE(m.name, u.username) AS uploaded_by_name,
                    ff.name AS folder_name
             FROM files f
             LEFT JOIN users u ON f.uploaded_by = u.id
             LEFT JOIN members m ON u.member_id = m.id
-            LEFT JOIN file_folders ff ON f.folder_id = ff.id
+            LEFT JOIN file_folders ff ON f.folder_id = ff.id{classified_filter}
             ORDER BY f.uploaded_at DESC"""
     ) or []
+    # Also exclude files that sit under a classified folder (row itself not flagged).
+    if not elevated:
+        rows = [r for r in rows if not _folder_hidden_for_staff(r.get('folder_id'))]
     for r in rows:
         if r.get('uploaded_at'):
             r['uploaded_at'] = r['uploaded_at'].isoformat()
+        r['is_classified'] = bool(r.get('is_classified'))
     return jsonify(rows)

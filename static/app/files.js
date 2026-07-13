@@ -126,13 +126,14 @@ function renderTreeNodes(nodes, depth) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
             </svg>
             <span class="ml-1">${esc(n.name)}</span>
+            ${n.is_classified ? `<span class="ml-1 text-amber-500" title="${esc(t('files.classified'))}">&#128274;</span>` : ''}
             ${canManage ? `
                 <button type="button" data-del-folder="${n.id}"
                         class="float-right text-gray-300 hover:text-red-500 text-xs px-1"
                         title="Delete folder">&times;</button>
-                <button type="button" data-rename-folder="${n.id}"
+                <button type="button" data-edit-folder="${n.id}"
                         class="float-right text-gray-300 hover:text-indigo-500 text-xs px-1"
-                        title="Rename folder">&#9998;</button>
+                        title="${esc(t('files.edit'))}">&#9998;</button>
             ` : ''}
         </div>
         ${renderTreeNodes(n.children, depth + 1)}`;
@@ -243,6 +244,7 @@ function _renderFileList() {
     host.innerHTML = visible.map(f => {
         const canDelete = isElevated() || (currentUser && currentUser.id === f.uploaded_by);
         const canMove   = isElevated() || (currentUser && currentUser.id === f.uploaded_by);
+        const canManage = isElevated();
         const isImg     = _isImageMime(f.mime_type);
         const isSelected = fileSelectedIds.has(f.id);
         return `
@@ -261,9 +263,11 @@ function _renderFileList() {
                 <span class="file-row-name-text" title="${esc(f.original_name)}"
                       ${isImg ? `onclick="openFilePreview(${f.id})"` : `onclick="window.location='/api/files/${f.id}/download'"`}
                       >${esc(f.original_name)}</span>
+                ${f.is_classified ? `<span class="ml-1 text-amber-500 flex-shrink-0" title="${esc(t('files.classified'))}">&#128274;</span>` : ''}
                 <div class="file-row-actions">
                     ${isImg ? `<button type="button" onclick="openFilePreview(${f.id})">Preview</button>` : ''}
                     <a href="/api/files/${f.id}/download">Download</a>
+                    ${canManage ? `<button type="button" data-edit-file="${f.id}" title="${esc(t('files.edit'))}">${esc(t('files.edit'))}</button>` : ''}
                     ${canDelete ? `<button type="button" class="danger" data-del-file="${f.id}">Delete</button>` : ''}
                 </div>
             </div>
@@ -641,44 +645,61 @@ document.addEventListener('click', (ev) => {
     if (!isNaN(id)) deleteFolder(id);
 });
 
-// ── Rename folder ──
-async function renameFolder(fid) {
-    const current = findFolderName(fid) || '';
-    const next = prompt(`Rename folder "${current}" to:`, current);
-    if (next == null) return;                 // user cancelled
-    const trimmed = next.trim();
-    if (!trimmed) { toast('Name cannot be empty', 'error'); return; }
-    if (trimmed === current) return;          // no-op
-    let res;
-    try {
-        res = await fetch(`/api/files/folder/${fid}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: trimmed }),
-        });
-    } catch (e) {
-        toast(`Rename network error: ${e.message || e}`, 'error');
-        console.error('renameFolder network error', e);
-        return;
+// ── Edit folder (rename + classified) ──
+function findFolder(fid) {
+    if (fid == null) return null;
+    const stack = [...fileTreeCache];
+    while (stack.length) {
+        const n = stack.pop();
+        if (n.id === fid) return n;
+        if (n.children) stack.push(...n.children);
     }
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-        toast(`Rename failed: ${body.error || res.status}`, 'error');
-        console.error('renameFolder server rejected', res.status, body);
-        return;
-    }
-    toast('Folder renamed');
+    return null;
+}
+
+function openFolderEditModal(fid) {
+    const node = findFolder(fid);
+    if (!node) return;
+    const modal = document.getElementById('folder-edit-modal');
+    if (!modal) return;
+    modal.dataset.folderId = String(fid);
+    document.getElementById('folder-edit-name').value = node.name || '';
+    document.getElementById('folder-edit-classified').checked = !!node.is_classified;
+    modal.classList.remove('hidden');
+}
+
+function closeFolderEditModal() {
+    const modal = document.getElementById('folder-edit-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function confirmFolderEdit(ev) {
+    ev.preventDefault();
+    const modal = document.getElementById('folder-edit-modal');
+    const fid = parseInt(modal.dataset.folderId, 10);
+    if (isNaN(fid)) return;
+    const name = (document.getElementById('folder-edit-name').value || '').trim();
+    if (!name) { toast(t('files.name_required') || 'Name cannot be empty', 'error'); return; }
+    const is_classified = document.getElementById('folder-edit-classified').checked;
+    const res = await api(`/api/files/folder/${fid}`, {
+        method: 'PUT',
+        body: { name, is_classified },
+    });
+    if (!res) return;
+    if (res.error) { toast(res.error, 'error'); return; }
+    closeFolderEditModal();
+    toast(t('files.saved') || 'Saved');
     await loadFileTree();
 }
 
-// Event delegation for rename buttons — survives re-rendering
+// Event delegation for folder edit buttons — survives re-rendering
 document.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-rename-folder]');
+    const btn = ev.target.closest('[data-edit-folder]');
     if (!btn) return;
     ev.preventDefault();
     ev.stopPropagation();
-    const id = parseInt(btn.getAttribute('data-rename-folder'), 10);
-    if (!isNaN(id)) renameFolder(id);
+    const id = parseInt(btn.getAttribute('data-edit-folder'), 10);
+    if (!isNaN(id)) openFolderEditModal(id);
 });
 
 async function deleteFile(id) {
@@ -711,6 +732,50 @@ document.addEventListener('click', (ev) => {
     ev.preventDefault();
     const id = parseInt(btn.getAttribute('data-del-file'), 10);
     if (!isNaN(id)) deleteFile(id);
+});
+
+// ── Edit file (classified flag) ──
+function openFileEditModal(id) {
+    const match = fileListCache.find(x => x.id === id);
+    if (!match) return;
+    const modal = document.getElementById('file-edit-modal');
+    if (!modal) return;
+    modal.dataset.fileId = String(id);
+    const nameEl = document.getElementById('file-edit-name');
+    if (nameEl) nameEl.textContent = match.original_name || `#${id}`;
+    document.getElementById('file-edit-classified').checked = !!match.is_classified;
+    modal.classList.remove('hidden');
+}
+
+function closeFileEditModal() {
+    const modal = document.getElementById('file-edit-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function confirmFileEdit(ev) {
+    ev.preventDefault();
+    const modal = document.getElementById('file-edit-modal');
+    const id = parseInt(modal.dataset.fileId, 10);
+    if (isNaN(id)) return;
+    const is_classified = document.getElementById('file-edit-classified').checked;
+    const res = await api(`/api/files/${id}`, {
+        method: 'PATCH',
+        body: { is_classified },
+    });
+    if (!res) return;
+    if (res.error) { toast(res.error, 'error'); return; }
+    closeFileEditModal();
+    toast(t('files.saved') || 'Saved');
+    await loadFolderContents(fileCurrentFolderId);
+}
+
+// Event delegation for file edit buttons — survives re-rendering
+document.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('[data-edit-file]');
+    if (!btn) return;
+    ev.preventDefault();
+    const id = parseInt(btn.getAttribute('data-edit-file'), 10);
+    if (!isNaN(id)) openFileEditModal(id);
 });
 
 // ── Uploads ──

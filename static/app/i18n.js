@@ -38,10 +38,16 @@ const _i18n = {
         'files.drop_here': 'Drop to upload',
         'files.new_folder_title': 'New Folder',
         'files.folder_name': 'Folder name',
+        'files.classified': 'Classified (elevated only)',
+        'files.classified_hint': 'Classified items are hidden from Staff.',
+        'files.edit': 'Edit',
+        'files.edit_file_title': 'Edit File',
+        'files.edit_folder_title': 'Edit Folder',
 
         // Shared buttons
         'btn.cancel': 'Cancel',
         'btn.create': 'Create',
+        'btn.save': 'Save',
 
         // Selector bar
         'sel.member': 'Team Member:',
@@ -335,10 +341,16 @@ const _i18n = {
         'files.drop_here': 'วางเพื่ออัปโหลด',
         'files.new_folder_title': 'สร้างโฟลเดอร์ใหม่',
         'files.folder_name': 'ชื่อโฟลเดอร์',
+        'files.classified': 'ลับ (เฉพาะผู้มีสิทธิ์)',
+        'files.classified_hint': 'รายการลับจะถูกซ่อนจากพนักงานทั่วไป',
+        'files.edit': 'แก้ไข',
+        'files.edit_file_title': 'แก้ไขไฟล์',
+        'files.edit_folder_title': 'แก้ไขโฟลเดอร์',
 
         // Shared buttons
         'btn.cancel': 'ยกเลิก',
         'btn.create': 'สร้าง',
+        'btn.save': 'บันทึก',
 
         // Selector bar
         'sel.member': 'สมาชิกทีม:',
