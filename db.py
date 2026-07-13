@@ -12,13 +12,14 @@ def get_connection():
     conn = getattr(_thread_local, 'connection', None)
     if conn is not None:
         try:
-            conn.cursor()
+            conn.cursor().execute("SELECT 1")  # real TCP liveness probe
             return conn
         except pyodbc.Error:
             try:
                 conn.close()
             except pyodbc.Error:
                 pass
+            _thread_local.connection = None
 
     server = os.getenv('DB_SERVER', 'localhost')
     database = os.getenv('DB_NAME', 'MeterWorklog')
@@ -72,15 +73,22 @@ def init_db():
 
 
 def query(sql, params=(), fetchone=False):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(sql, _rstrip_params(params))
-    columns = [col[0] for col in cursor.description] if cursor.description else []
-    if fetchone:
-        row = cursor.fetchone()
-        return dict(zip(columns, row)) if row else None
-    rows = cursor.fetchall()
-    return [dict(zip(columns, row)) for row in rows]
+    for attempt in range(2):
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, _rstrip_params(params))
+            columns = [col[0] for col in cursor.description] if cursor.description else []
+            if fetchone:
+                row = cursor.fetchone()
+                return dict(zip(columns, row)) if row else None
+            rows = cursor.fetchall()
+            return [dict(zip(columns, row)) for row in rows]
+        except pyodbc.OperationalError:
+            if attempt == 0:
+                _thread_local.connection = None  # discard stale connection, retry once
+                continue
+            raise
 
 
 def _rstrip_params(params):
@@ -102,15 +110,22 @@ def _rstrip_params(params):
 
 
 def execute(sql, params=()):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(sql, _rstrip_params(params))
-    result = None
-    try:
-        row = cursor.fetchone()
-        if row:
-            result = row[0]
-    except pyodbc.ProgrammingError:
-        pass
-    conn.commit()
-    return result
+    for attempt in range(2):
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, _rstrip_params(params))
+            result = None
+            try:
+                row = cursor.fetchone()
+                if row:
+                    result = row[0]
+            except pyodbc.ProgrammingError:
+                pass
+            conn.commit()
+            return result
+        except pyodbc.OperationalError:
+            if attempt == 0:
+                _thread_local.connection = None  # discard stale connection, retry once
+                continue
+            raise
