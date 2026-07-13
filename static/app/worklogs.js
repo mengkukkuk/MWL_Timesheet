@@ -258,13 +258,16 @@ function openBulkEditModal() {
     setVal('bulk-note',   '');
     setVal('bulk-status', 'Done');
     const sel = document.getElementById('bulk-project');
-    //pdes p.Description
+
     if (sel) {
         sel.innerHTML = '<option value="">Select...</option>';
         pdes.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.Description; opt.textContent = p.Description;
-            sel.appendChild(opt);
+            if(p.Status !== 'Closed' && p.Status !== 'Hold') {
+                const opt = document.createElement('option');
+                opt.value = p.Description;
+                opt.textContent = p.Description;
+                sel.appendChild(opt);
+            }
         });
     }
     const modal = document.getElementById('wl-bulk-edit-modal');
@@ -612,17 +615,18 @@ function closeModal() {
     document.getElementById('modal-overlay').classList.add('hidden');
 }
 
-//Edit Project dropdown (p.[field_name])
+//Edit Project dropdown (p.[Field_name])
 function populateProjectDropdown() {
     const sel = document.getElementById('wl-project');
     const val = sel.value;
     sel.innerHTML = '<option value="">Select...</option>';
-    //data.foreach(p => {})
     pdes.forEach(p => {
-        const opt = document.createElement('option');
-        //opt.value = p.name; opt.textContent = p.name;
-        opt.value = p.Description; opt.textContent = p.Description;
-        sel.appendChild(opt);
+        if(p.Status !== 'Closed' && p.Status !== 'Hold') {
+            const opt = document.createElement('option');
+            opt.value = p.Description;
+            opt.textContent = p.Description;
+            sel.appendChild(opt);
+        }
     });
     sel.value = val;
 }
@@ -699,6 +703,9 @@ async function deleteWorklog(id) {
 
 // ── Projects ──
 async function loadProjects() {
+
+    let description;
+    let data;
 
     [data, description]  = await Promise.all([
         api(`/api/projects`),
