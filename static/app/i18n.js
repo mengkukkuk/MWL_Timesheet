@@ -43,6 +43,8 @@ const _i18n = {
         'files.edit': 'Edit',
         'files.edit_file_title': 'Edit File',
         'files.edit_folder_title': 'Edit Folder',
+        'files.expand': 'Expand',
+        'files.collapse': 'Collapse',
 
         // Shared buttons
         'btn.cancel': 'Cancel',
@@ -346,6 +348,8 @@ const _i18n = {
         'files.edit': 'แก้ไข',
         'files.edit_file_title': 'แก้ไขไฟล์',
         'files.edit_folder_title': 'แก้ไขโฟลเดอร์',
+        'files.expand': 'ขยาย',
+        'files.collapse': 'ย่อ',
 
         // Shared buttons
         'btn.cancel': 'ยกเลิก',

@@ -10,6 +10,10 @@ let fileSearchTerm = '';          // case-insensitive substring filter
 let fileSortKey = 'name';         // 'name' | 'size' | 'date' | 'uploader'
 let fileSortDir = 'asc';          // 'asc' | 'desc'
 let fileSearchDebounce = null;
+let fileTreeCollapsed = new Set();  // folder ids currently collapsed in the sidebar tree
+try {
+    fileTreeCollapsed = new Set(JSON.parse(localStorage.getItem('mwl_files_collapsed') || '[]'));
+} catch (e) { fileTreeCollapsed = new Set(); }
 
 function fmtBytes(n) {
     if (n == null) return '';
@@ -32,6 +36,7 @@ async function loadFileTree() {
     const tree = await api('/api/files/tree');
     if (!tree) return;
     fileTreeCache = tree;
+    expandAncestors(fileCurrentFolderId);
     renderFileTree();
     loadFolderContents(fileCurrentFolderId);
     loadFileStats();
@@ -118,10 +123,21 @@ function renderTreeNodes(nodes, depth) {
         const isActive = fileCurrentFolderId === n.id;
         const pad = 8 + depth * 12;
         const canManage = isElevated();
+        const hasChildren = !!(n.children && n.children.length);
+        const collapsed = hasChildren && fileTreeCollapsed.has(n.id);
+        const toggle = hasChildren ? `
+            <button type="button" onclick="event.stopPropagation(); toggleFolderCollapse(${n.id})"
+                    class="folder-tree-toggle inline-flex items-center justify-center w-4 h-4 -mt-0.5 text-gray-400 hover:text-gray-600 flex-shrink-0"
+                    title="${collapsed ? esc(t('files.expand') || 'Expand') : esc(t('files.collapse') || 'Collapse')}">
+                <svg class="w-3 h-3 transition-transform duration-150 ${collapsed ? '' : 'rotate-90'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>` : `<span class="inline-block w-4 h-4 flex-shrink-0"></span>`;
         // float-right reverses DOM order: list X first → renders rightmost; rename second → appears to its left
         return `
         <div class="folder-tree-node ${isActive ? 'active' : ''}" style="padding-left:${pad}px"
              onclick="selectFolder(${n.id})">
+            ${toggle}
             <svg class="w-4 h-4 inline-block -mt-0.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
             </svg>
@@ -136,8 +152,43 @@ function renderTreeNodes(nodes, depth) {
                         title="${esc(t('files.edit'))}">&#9998;</button>
             ` : ''}
         </div>
-        ${renderTreeNodes(n.children, depth + 1)}`;
+        ${collapsed ? '' : renderTreeNodes(n.children, depth + 1)}`;
     }).join('');
+}
+
+function toggleFolderCollapse(fid) {
+    if (fileTreeCollapsed.has(fid)) fileTreeCollapsed.delete(fid);
+    else fileTreeCollapsed.add(fid);
+    try {
+        localStorage.setItem('mwl_files_collapsed', JSON.stringify([...fileTreeCollapsed]));
+    } catch (e) { /* localStorage unavailable — collapse state just won't persist */ }
+    renderFileTree();
+}
+
+// Returns the array of ancestor folder ids leading to fid (not including fid itself), or null if not found.
+function _findFolderPath(fid, nodes, path) {
+    for (const n of (nodes || [])) {
+        if (n.id === fid) return path;
+        const found = _findFolderPath(fid, n.children, [...path, n.id]);
+        if (found) return found;
+    }
+    return null;
+}
+
+// Expands every ancestor of fid so the selected folder stays visible in the tree.
+function expandAncestors(fid) {
+    if (fid == null) return;
+    const ancestors = _findFolderPath(fid, fileTreeCache, []);
+    if (!ancestors || !ancestors.length) return;
+    let changed = false;
+    ancestors.forEach(id => {
+        if (fileTreeCollapsed.delete(id)) changed = true;
+    });
+    if (changed) {
+        try {
+            localStorage.setItem('mwl_files_collapsed', JSON.stringify([...fileTreeCollapsed]));
+        } catch (e) { /* localStorage unavailable */ }
+    }
 }
 
 function selectFolder(fid) {
@@ -146,6 +197,7 @@ function selectFolder(fid) {
     fileSearchTerm = '';
     const search = document.getElementById('file-search');
     if (search) search.value = '';
+    expandAncestors(fid);
     renderFileTree();
     updateUploadDestination();
     loadFolderContents(fid);
