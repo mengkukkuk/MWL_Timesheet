@@ -253,6 +253,20 @@ function _isImageMime(mime) {
     return typeof mime === 'string' && mime.startsWith('image/');
 }
 
+// Lightweight, dependency-free check used at row-render time to decide whether
+// to show the Preview affordance. Kept in sync with the heavier `_documentKind()`
+// in file-preview.js, which is only loaded once a preview is actually opened.
+const _PREVIEWABLE_DOC_EXTS = new Set(['pdf', 'docx', 'xlsx', 'xls', 'pptx',
+    'txt', 'log', 'md', 'markdown', 'csv', 'json', 'ini', 'conf', 'yaml', 'yml', 'xml']);
+
+function _isPreviewableDoc(mime, name) {
+    const parts = (name || '').split('.');
+    const ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
+    if (mime === 'application/pdf' || mime === 'application/vnd.ms-excel') return true;
+    if (typeof mime === 'string' && mime.startsWith('text/')) return true;
+    return _PREVIEWABLE_DOC_EXTS.has(ext);
+}
+
 function _applyFilterSort(files) {
     let out = files.slice();
     if (fileSearchTerm) {
@@ -298,6 +312,8 @@ function _renderFileList() {
         const canMove   = isElevated() || (currentUser && currentUser.id === f.uploaded_by);
         const canManage = isElevated();
         const isImg     = _isImageMime(f.mime_type);
+        const isDoc     = !isImg && _isPreviewableDoc(f.mime_type, f.original_name);
+        const canPreview = isImg || isDoc;
         const isSelected = fileSelectedIds.has(f.id);
         return `
         <div class="file-row ${isSelected ? 'selected' : ''}" data-file-id="${f.id}"
@@ -313,11 +329,11 @@ function _renderFileList() {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                        </svg>`}
                 <span class="file-row-name-text" title="${esc(f.original_name)}"
-                      ${isImg ? `onclick="openFilePreview(${f.id})"` : `onclick="window.location='/api/files/${f.id}/download'"`}
+                      ${canPreview ? `onclick="openFilePreview(${f.id})"` : `onclick="window.location='/api/files/${f.id}/download'"`}
                       >${esc(f.original_name)}</span>
                 ${f.is_classified ? `<span class="ml-1 text-amber-500 flex-shrink-0" title="${esc(t('files.classified'))}">&#128274;</span>` : ''}
                 <div class="file-row-actions">
-                    ${isImg ? `<button type="button" onclick="openFilePreview(${f.id})">Preview</button>` : ''}
+                    ${canPreview ? `<button type="button" onclick="openFilePreview(${f.id})">Preview</button>` : ''}
                     <a href="/api/files/${f.id}/download">Download</a>
                     ${canManage ? `<button type="button" data-edit-file="${f.id}" title="${esc(t('files.edit'))}">${esc(t('files.edit'))}</button>` : ''}
                     ${canDelete ? `<button type="button" class="danger" data-del-file="${f.id}">Delete</button>` : ''}
@@ -470,25 +486,69 @@ function _updateSortIndicators() {
     });
 }
 
-// ── Image preview lightbox ──
+// ── Preview lightbox (images inline; documents delegate to file-preview.js) ──
+function _filePreviewEls() {
+    return {
+        img: document.getElementById('file-preview-img'),
+        pdf: document.getElementById('file-preview-pdf'),
+        docx: document.getElementById('file-preview-docx'),
+        xlsx: document.getElementById('file-preview-xlsx'),
+        pptx: document.getElementById('file-preview-pptx'),
+        text: document.getElementById('file-preview-text'),
+        loading: document.getElementById('file-preview-loading'),
+        unsupported: document.getElementById('file-preview-unsupported'),
+    };
+}
+
+function _hideAllFilePreviewEls(els) {
+    Object.values(els).forEach(el => { if (el) el.classList.add('hidden'); });
+}
+
 function openFilePreview(id) {
     const f = fileListCache.find(x => x.id === id);
     if (!f) return;
     const modal = document.getElementById('file-preview-modal');
-    const img   = document.getElementById('file-preview-img');
     const name  = document.getElementById('file-preview-name');
     const dl    = document.getElementById('file-preview-download');
-    if (!modal || !img) return;
-    img.src = `/api/files/${id}/download?inline=1`;
-    img.classList.remove('zoomed');
-    img.onclick = () => {
-        img.classList.toggle('zoomed');
-        const body = modal.querySelector('.file-preview-body');
-        if (body) body.classList.toggle('preview-zoomed', img.classList.contains('zoomed'));
-    };
+    const body  = modal && modal.querySelector('.file-preview-body');
+    if (!modal) return;
+
+    const els = _filePreviewEls();
+    _hideAllFilePreviewEls(els);
     if (name) name.textContent = f.original_name || '';
     if (dl)   dl.href = `/api/files/${id}/download`;
     modal.classList.remove('hidden');
+
+    if (_isImageMime(f.mime_type)) {
+        if (body) body.classList.remove('doc-mode');
+        const img = els.img;
+        if (!img) return;
+        img.src = `/api/files/${id}/download?inline=1`;
+        img.classList.remove('zoomed', 'hidden');
+        img.onclick = () => {
+            img.classList.toggle('zoomed');
+            if (body) body.classList.toggle('preview-zoomed', img.classList.contains('zoomed'));
+        };
+        return;
+    }
+
+    // Non-image: lazy-load the document preview module (and, inside it, the
+    // vendor lib for this specific file type) before rendering.
+    if (body) body.classList.add('doc-mode');
+    if (els.loading) els.loading.classList.remove('hidden');
+    loadModuleOnce('file-preview').then(() => {
+        if (typeof renderDocumentPreview === 'function') {
+            renderDocumentPreview(f, els);
+        } else {
+            throw new Error('preview module failed to initialize');
+        }
+    }).catch((e) => {
+        if (els.loading) els.loading.classList.add('hidden');
+        if (els.unsupported) {
+            els.unsupported.textContent = `Preview failed: ${e.message || e}`;
+            els.unsupported.classList.remove('hidden');
+        }
+    });
 }
 
 function closeFilePreview(ev) {
@@ -497,11 +557,12 @@ function closeFilePreview(ev) {
         // but the outer overlay click *should* — that's why this handler is on the overlay
     }
     const modal = document.getElementById('file-preview-modal');
-    const img   = document.getElementById('file-preview-img');
+    const els = _filePreviewEls();
     if (modal) modal.classList.add('hidden');
-    if (img) { img.src = ''; img.classList.remove('zoomed'); }
+    if (els.img) { els.img.src = ''; els.img.classList.remove('zoomed'); }
+    if (typeof cleanupDocumentPreview === 'function') cleanupDocumentPreview(els);
     const body = modal && modal.querySelector('.file-preview-body');
-    if (body) body.classList.remove('preview-zoomed');
+    if (body) { body.classList.remove('preview-zoomed'); body.classList.remove('doc-mode'); }
 }
 
 // ── Folder stats (shown in header) ──
