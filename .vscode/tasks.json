@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "sqlproj: Build MWL_DB",
+			"type": "process",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"c:/Users/MWLTimesheet/Desktop/MWL/MWL_Timesheet/MWL_DB/MWL_DB.sqlproj"
+			],
+			"problemMatcher": "$sqlproj-problem-matcher",
+			"isBackground": true,
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"detail": "Builds the MWL_DB SQL project"
+		}
+	]
+}
