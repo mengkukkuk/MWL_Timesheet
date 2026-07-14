@@ -20,7 +20,7 @@
     <!-- Bootstrap shim runs last among defers — fires `modulesLoaded` event for legacy listeners. -->
     <script defer src="/static/app.js?v={{ static_v('app.js') }}"></script>
     <!-- Cache-busting versions for lazy-loaded modules (used by loadModuleOnce in core.js) -->
-    <script>window.STATIC_V={"settings":{{ static_v('app/settings.js') }},"files":{{ static_v('app/files.js') }},"projects-summary":{{ static_v('app/projects-summary.js') }},"draft":{{ static_v('app/draft.js') }}};</script>
+    <script>window.STATIC_V={"settings":{{ static_v('app/settings.js') }},"files":{{ static_v('app/files.js') }},"projects-summary":{{ static_v('app/projects-summary.js') }},"draft":{{ static_v('app/draft.js') }},"file-preview":{{ static_v('app/file-preview.js') }}};</script>
     <style>
 /* ── Projects Summary Dashboard ─────────────────────── */
 .ps-dash-title{font-family:'Syne',-apple-system,sans-serif;font-size:1.375rem;font-weight:800;color:#0f172a;letter-spacing:-.03em}
@@ -837,6 +837,59 @@
         </div>
     </div>
 
+    <!-- Modal for Edit File (classified flag) -->
+    <div id="file-edit-modal" class="modal-overlay hidden" onclick="closeFileEditModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="files.edit_file_title">Edit File</h3>
+                <button onclick="closeFileEditModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form onsubmit="confirmFileEdit(event)">
+                <p id="file-edit-name" class="text-sm font-medium text-gray-700 break-all"></p>
+                <label class="flex items-center gap-2 mt-3 text-sm">
+                    <input id="file-edit-classified" type="checkbox">
+                    <span data-i18n="files.classified">Classified (elevated only)</span>
+                </label>
+                <p class="text-xs text-gray-500 mt-1" data-i18n="files.classified_hint">Classified items are hidden from Staff.</p>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="closeFileEditModal()" class="btn-secondary text-sm px-3 py-1.5" data-i18n="btn.cancel">Cancel</button>
+                    <button type="submit" class="btn-primary text-sm px-3 py-1.5" data-i18n="btn.save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Edit Folder (name + classified flag) -->
+    <div id="folder-edit-modal" class="modal-overlay hidden" onclick="closeFolderEditModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="files.edit_folder_title">Edit Folder</h3>
+                <button onclick="closeFolderEditModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form onsubmit="confirmFolderEdit(event)">
+                <label class="label" data-i18n="files.folder_name">Folder name</label>
+                <input id="folder-edit-name" type="text" class="input-field w-full" maxlength="200" required>
+                <label class="flex items-center gap-2 mt-3 text-sm">
+                    <input id="folder-edit-classified" type="checkbox">
+                    <span data-i18n="files.classified">Classified (elevated only)</span>
+                </label>
+                <p class="text-xs text-gray-500 mt-1" data-i18n="files.classified_hint">Classified items are hidden from Staff.</p>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="closeFolderEditModal()" class="btn-secondary text-sm px-3 py-1.5" data-i18n="btn.cancel">Cancel</button>
+                    <button type="submit" class="btn-primary text-sm px-3 py-1.5" data-i18n="btn.save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal for Bulk Edit Worklog -->
     <div id="wl-bulk-edit-modal" class="modal-overlay hidden" onclick="closeBulkEditModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
@@ -1298,6 +1351,13 @@
             </div>
             <div class="file-preview-body">
                 <img id="file-preview-img" alt="" />
+                <iframe id="file-preview-pdf" class="hidden" title="PDF preview"></iframe>
+                <div id="file-preview-docx" class="hidden file-preview-doc"></div>
+                <div id="file-preview-xlsx" class="hidden file-preview-doc file-preview-xlsx"></div>
+                <div id="file-preview-pptx" class="hidden file-preview-doc file-preview-pptx"></div>
+                <pre id="file-preview-text" class="hidden file-preview-doc file-preview-text"></pre>
+                <p id="file-preview-loading" class="hidden file-preview-msg">Loading preview&hellip;</p>
+                <p id="file-preview-unsupported" class="hidden file-preview-msg">Preview not available for this file type.</p>
             </div>
         </div>
     </div>

@@ -10,6 +10,10 @@ let fileSearchTerm = '';          // case-insensitive substring filter
 let fileSortKey = 'name';         // 'name' | 'size' | 'date' | 'uploader'
 let fileSortDir = 'asc';          // 'asc' | 'desc'
 let fileSearchDebounce = null;
+let fileTreeCollapsed = new Set();  // folder ids currently collapsed in the sidebar tree
+try {
+    fileTreeCollapsed = new Set(JSON.parse(localStorage.getItem('mwl_files_collapsed') || '[]'));
+} catch (e) { fileTreeCollapsed = new Set(); }
 
 function fmtBytes(n) {
     if (n == null) return '';
@@ -32,6 +36,7 @@ async function loadFileTree() {
     const tree = await api('/api/files/tree');
     if (!tree) return;
     fileTreeCache = tree;
+    expandAncestors(fileCurrentFolderId);
     renderFileTree();
     loadFolderContents(fileCurrentFolderId);
     loadFileStats();
@@ -118,25 +123,72 @@ function renderTreeNodes(nodes, depth) {
         const isActive = fileCurrentFolderId === n.id;
         const pad = 8 + depth * 12;
         const canManage = isElevated();
+        const hasChildren = !!(n.children && n.children.length);
+        const collapsed = hasChildren && fileTreeCollapsed.has(n.id);
+        const toggle = hasChildren ? `
+            <button type="button" onclick="event.stopPropagation(); toggleFolderCollapse(${n.id})"
+                    class="folder-tree-toggle inline-flex items-center justify-center w-4 h-4 -mt-0.5 text-gray-400 hover:text-gray-600 flex-shrink-0"
+                    title="${collapsed ? esc(t('files.expand') || 'Expand') : esc(t('files.collapse') || 'Collapse')}">
+                <svg class="w-3 h-3 transition-transform duration-150 ${collapsed ? '' : 'rotate-90'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>` : `<span class="inline-block w-4 h-4 flex-shrink-0"></span>`;
         // float-right reverses DOM order: list X first → renders rightmost; rename second → appears to its left
         return `
         <div class="folder-tree-node ${isActive ? 'active' : ''}" style="padding-left:${pad}px"
              onclick="selectFolder(${n.id})">
+            ${toggle}
             <svg class="w-4 h-4 inline-block -mt-0.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
             </svg>
             <span class="ml-1">${esc(n.name)}</span>
+            ${n.is_classified ? `<span class="ml-1 text-amber-500" title="${esc(t('files.classified'))}">&#128274;</span>` : ''}
             ${canManage ? `
                 <button type="button" data-del-folder="${n.id}"
                         class="float-right text-gray-300 hover:text-red-500 text-xs px-1"
                         title="Delete folder">&times;</button>
-                <button type="button" data-rename-folder="${n.id}"
+                <button type="button" data-edit-folder="${n.id}"
                         class="float-right text-gray-300 hover:text-indigo-500 text-xs px-1"
-                        title="Rename folder">&#9998;</button>
+                        title="${esc(t('files.edit'))}">&#9998;</button>
             ` : ''}
         </div>
-        ${renderTreeNodes(n.children, depth + 1)}`;
+        ${collapsed ? '' : renderTreeNodes(n.children, depth + 1)}`;
     }).join('');
+}
+
+function toggleFolderCollapse(fid) {
+    if (fileTreeCollapsed.has(fid)) fileTreeCollapsed.delete(fid);
+    else fileTreeCollapsed.add(fid);
+    try {
+        localStorage.setItem('mwl_files_collapsed', JSON.stringify([...fileTreeCollapsed]));
+    } catch (e) { /* localStorage unavailable — collapse state just won't persist */ }
+    renderFileTree();
+}
+
+// Returns the array of ancestor folder ids leading to fid (not including fid itself), or null if not found.
+function _findFolderPath(fid, nodes, path) {
+    for (const n of (nodes || [])) {
+        if (n.id === fid) return path;
+        const found = _findFolderPath(fid, n.children, [...path, n.id]);
+        if (found) return found;
+    }
+    return null;
+}
+
+// Expands every ancestor of fid so the selected folder stays visible in the tree.
+function expandAncestors(fid) {
+    if (fid == null) return;
+    const ancestors = _findFolderPath(fid, fileTreeCache, []);
+    if (!ancestors || !ancestors.length) return;
+    let changed = false;
+    ancestors.forEach(id => {
+        if (fileTreeCollapsed.delete(id)) changed = true;
+    });
+    if (changed) {
+        try {
+            localStorage.setItem('mwl_files_collapsed', JSON.stringify([...fileTreeCollapsed]));
+        } catch (e) { /* localStorage unavailable */ }
+    }
 }
 
 function selectFolder(fid) {
@@ -145,6 +197,7 @@ function selectFolder(fid) {
     fileSearchTerm = '';
     const search = document.getElementById('file-search');
     if (search) search.value = '';
+    expandAncestors(fid);
     renderFileTree();
     updateUploadDestination();
     loadFolderContents(fid);
@@ -200,6 +253,20 @@ function _isImageMime(mime) {
     return typeof mime === 'string' && mime.startsWith('image/');
 }
 
+// Lightweight, dependency-free check used at row-render time to decide whether
+// to show the Preview affordance. Kept in sync with the heavier `_documentKind()`
+// in file-preview.js, which is only loaded once a preview is actually opened.
+const _PREVIEWABLE_DOC_EXTS = new Set(['pdf', 'docx', 'xlsx', 'xls', 'pptx',
+    'txt', 'log', 'md', 'markdown', 'csv', 'json', 'ini', 'conf', 'yaml', 'yml', 'xml']);
+
+function _isPreviewableDoc(mime, name) {
+    const parts = (name || '').split('.');
+    const ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
+    if (mime === 'application/pdf' || mime === 'application/vnd.ms-excel') return true;
+    if (typeof mime === 'string' && mime.startsWith('text/')) return true;
+    return _PREVIEWABLE_DOC_EXTS.has(ext);
+}
+
 function _applyFilterSort(files) {
     let out = files.slice();
     if (fileSearchTerm) {
@@ -243,7 +310,10 @@ function _renderFileList() {
     host.innerHTML = visible.map(f => {
         const canDelete = isElevated() || (currentUser && currentUser.id === f.uploaded_by);
         const canMove   = isElevated() || (currentUser && currentUser.id === f.uploaded_by);
+        const canManage = isElevated();
         const isImg     = _isImageMime(f.mime_type);
+        const isDoc     = !isImg && _isPreviewableDoc(f.mime_type, f.original_name);
+        const canPreview = isImg || isDoc;
         const isSelected = fileSelectedIds.has(f.id);
         return `
         <div class="file-row ${isSelected ? 'selected' : ''}" data-file-id="${f.id}"
@@ -259,11 +329,13 @@ function _renderFileList() {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                        </svg>`}
                 <span class="file-row-name-text" title="${esc(f.original_name)}"
-                      ${isImg ? `onclick="openFilePreview(${f.id})"` : `onclick="window.location='/api/files/${f.id}/download'"`}
+                      ${canPreview ? `onclick="openFilePreview(${f.id})"` : `onclick="window.location='/api/files/${f.id}/download'"`}
                       >${esc(f.original_name)}</span>
+                ${f.is_classified ? `<span class="ml-1 text-amber-500 flex-shrink-0" title="${esc(t('files.classified'))}">&#128274;</span>` : ''}
                 <div class="file-row-actions">
-                    ${isImg ? `<button type="button" onclick="openFilePreview(${f.id})">Preview</button>` : ''}
+                    ${canPreview ? `<button type="button" onclick="openFilePreview(${f.id})">Preview</button>` : ''}
                     <a href="/api/files/${f.id}/download">Download</a>
+                    ${canManage ? `<button type="button" data-edit-file="${f.id}" title="${esc(t('files.edit'))}">${esc(t('files.edit'))}</button>` : ''}
                     ${canDelete ? `<button type="button" class="danger" data-del-file="${f.id}">Delete</button>` : ''}
                 </div>
             </div>
@@ -414,25 +486,69 @@ function _updateSortIndicators() {
     });
 }
 
-// ── Image preview lightbox ──
+// ── Preview lightbox (images inline; documents delegate to file-preview.js) ──
+function _filePreviewEls() {
+    return {
+        img: document.getElementById('file-preview-img'),
+        pdf: document.getElementById('file-preview-pdf'),
+        docx: document.getElementById('file-preview-docx'),
+        xlsx: document.getElementById('file-preview-xlsx'),
+        pptx: document.getElementById('file-preview-pptx'),
+        text: document.getElementById('file-preview-text'),
+        loading: document.getElementById('file-preview-loading'),
+        unsupported: document.getElementById('file-preview-unsupported'),
+    };
+}
+
+function _hideAllFilePreviewEls(els) {
+    Object.values(els).forEach(el => { if (el) el.classList.add('hidden'); });
+}
+
 function openFilePreview(id) {
     const f = fileListCache.find(x => x.id === id);
     if (!f) return;
     const modal = document.getElementById('file-preview-modal');
-    const img   = document.getElementById('file-preview-img');
     const name  = document.getElementById('file-preview-name');
     const dl    = document.getElementById('file-preview-download');
-    if (!modal || !img) return;
-    img.src = `/api/files/${id}/download?inline=1`;
-    img.classList.remove('zoomed');
-    img.onclick = () => {
-        img.classList.toggle('zoomed');
-        const body = modal.querySelector('.file-preview-body');
-        if (body) body.classList.toggle('preview-zoomed', img.classList.contains('zoomed'));
-    };
+    const body  = modal && modal.querySelector('.file-preview-body');
+    if (!modal) return;
+
+    const els = _filePreviewEls();
+    _hideAllFilePreviewEls(els);
     if (name) name.textContent = f.original_name || '';
     if (dl)   dl.href = `/api/files/${id}/download`;
     modal.classList.remove('hidden');
+
+    if (_isImageMime(f.mime_type)) {
+        if (body) body.classList.remove('doc-mode');
+        const img = els.img;
+        if (!img) return;
+        img.src = `/api/files/${id}/download?inline=1`;
+        img.classList.remove('zoomed', 'hidden');
+        img.onclick = () => {
+            img.classList.toggle('zoomed');
+            if (body) body.classList.toggle('preview-zoomed', img.classList.contains('zoomed'));
+        };
+        return;
+    }
+
+    // Non-image: lazy-load the document preview module (and, inside it, the
+    // vendor lib for this specific file type) before rendering.
+    if (body) body.classList.add('doc-mode');
+    if (els.loading) els.loading.classList.remove('hidden');
+    loadModuleOnce('file-preview').then(() => {
+        if (typeof renderDocumentPreview === 'function') {
+            renderDocumentPreview(f, els);
+        } else {
+            throw new Error('preview module failed to initialize');
+        }
+    }).catch((e) => {
+        if (els.loading) els.loading.classList.add('hidden');
+        if (els.unsupported) {
+            els.unsupported.textContent = `Preview failed: ${e.message || e}`;
+            els.unsupported.classList.remove('hidden');
+        }
+    });
 }
 
 function closeFilePreview(ev) {
@@ -441,11 +557,12 @@ function closeFilePreview(ev) {
         // but the outer overlay click *should* — that's why this handler is on the overlay
     }
     const modal = document.getElementById('file-preview-modal');
-    const img   = document.getElementById('file-preview-img');
+    const els = _filePreviewEls();
     if (modal) modal.classList.add('hidden');
-    if (img) { img.src = ''; img.classList.remove('zoomed'); }
+    if (els.img) { els.img.src = ''; els.img.classList.remove('zoomed'); }
+    if (typeof cleanupDocumentPreview === 'function') cleanupDocumentPreview(els);
     const body = modal && modal.querySelector('.file-preview-body');
-    if (body) body.classList.remove('preview-zoomed');
+    if (body) { body.classList.remove('preview-zoomed'); body.classList.remove('doc-mode'); }
 }
 
 // ── Folder stats (shown in header) ──
@@ -641,44 +758,61 @@ document.addEventListener('click', (ev) => {
     if (!isNaN(id)) deleteFolder(id);
 });
 
-// ── Rename folder ──
-async function renameFolder(fid) {
-    const current = findFolderName(fid) || '';
-    const next = prompt(`Rename folder "${current}" to:`, current);
-    if (next == null) return;                 // user cancelled
-    const trimmed = next.trim();
-    if (!trimmed) { toast('Name cannot be empty', 'error'); return; }
-    if (trimmed === current) return;          // no-op
-    let res;
-    try {
-        res = await fetch(`/api/files/folder/${fid}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: trimmed }),
-        });
-    } catch (e) {
-        toast(`Rename network error: ${e.message || e}`, 'error');
-        console.error('renameFolder network error', e);
-        return;
+// ── Edit folder (rename + classified) ──
+function findFolder(fid) {
+    if (fid == null) return null;
+    const stack = [...fileTreeCache];
+    while (stack.length) {
+        const n = stack.pop();
+        if (n.id === fid) return n;
+        if (n.children) stack.push(...n.children);
     }
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-        toast(`Rename failed: ${body.error || res.status}`, 'error');
-        console.error('renameFolder server rejected', res.status, body);
-        return;
-    }
-    toast('Folder renamed');
+    return null;
+}
+
+function openFolderEditModal(fid) {
+    const node = findFolder(fid);
+    if (!node) return;
+    const modal = document.getElementById('folder-edit-modal');
+    if (!modal) return;
+    modal.dataset.folderId = String(fid);
+    document.getElementById('folder-edit-name').value = node.name || '';
+    document.getElementById('folder-edit-classified').checked = !!node.is_classified;
+    modal.classList.remove('hidden');
+}
+
+function closeFolderEditModal() {
+    const modal = document.getElementById('folder-edit-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function confirmFolderEdit(ev) {
+    ev.preventDefault();
+    const modal = document.getElementById('folder-edit-modal');
+    const fid = parseInt(modal.dataset.folderId, 10);
+    if (isNaN(fid)) return;
+    const name = (document.getElementById('folder-edit-name').value || '').trim();
+    if (!name) { toast(t('files.name_required') || 'Name cannot be empty', 'error'); return; }
+    const is_classified = document.getElementById('folder-edit-classified').checked;
+    const res = await api(`/api/files/folder/${fid}`, {
+        method: 'PUT',
+        body: { name, is_classified },
+    });
+    if (!res) return;
+    if (res.error) { toast(res.error, 'error'); return; }
+    closeFolderEditModal();
+    toast(t('files.saved') || 'Saved');
     await loadFileTree();
 }
 
-// Event delegation for rename buttons — survives re-rendering
+// Event delegation for folder edit buttons — survives re-rendering
 document.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-rename-folder]');
+    const btn = ev.target.closest('[data-edit-folder]');
     if (!btn) return;
     ev.preventDefault();
     ev.stopPropagation();
-    const id = parseInt(btn.getAttribute('data-rename-folder'), 10);
-    if (!isNaN(id)) renameFolder(id);
+    const id = parseInt(btn.getAttribute('data-edit-folder'), 10);
+    if (!isNaN(id)) openFolderEditModal(id);
 });
 
 async function deleteFile(id) {
@@ -711,6 +845,50 @@ document.addEventListener('click', (ev) => {
     ev.preventDefault();
     const id = parseInt(btn.getAttribute('data-del-file'), 10);
     if (!isNaN(id)) deleteFile(id);
+});
+
+// ── Edit file (classified flag) ──
+function openFileEditModal(id) {
+    const match = fileListCache.find(x => x.id === id);
+    if (!match) return;
+    const modal = document.getElementById('file-edit-modal');
+    if (!modal) return;
+    modal.dataset.fileId = String(id);
+    const nameEl = document.getElementById('file-edit-name');
+    if (nameEl) nameEl.textContent = match.original_name || `#${id}`;
+    document.getElementById('file-edit-classified').checked = !!match.is_classified;
+    modal.classList.remove('hidden');
+}
+
+function closeFileEditModal() {
+    const modal = document.getElementById('file-edit-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function confirmFileEdit(ev) {
+    ev.preventDefault();
+    const modal = document.getElementById('file-edit-modal');
+    const id = parseInt(modal.dataset.fileId, 10);
+    if (isNaN(id)) return;
+    const is_classified = document.getElementById('file-edit-classified').checked;
+    const res = await api(`/api/files/${id}`, {
+        method: 'PATCH',
+        body: { is_classified },
+    });
+    if (!res) return;
+    if (res.error) { toast(res.error, 'error'); return; }
+    closeFileEditModal();
+    toast(t('files.saved') || 'Saved');
+    await loadFolderContents(fileCurrentFolderId);
+}
+
+// Event delegation for file edit buttons — survives re-rendering
+document.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('[data-edit-file]');
+    if (!btn) return;
+    ev.preventDefault();
+    const id = parseInt(btn.getAttribute('data-edit-file'), 10);
+    if (!isNaN(id)) openFileEditModal(id);
 });
 
 // ── Uploads ──
