@@ -72,12 +72,13 @@ function _el(id) { return document.getElementById(id); }
 function _psUpdateKPIs(projects) {
     const totalProjects = projects.length;
     const totalHours    = projects.reduce((s, p) => s + p.total_hours, 0);
+    const totalHours_md = totalHours/8
     const unique        = new Set();
     projects.forEach(p => p.employees.forEach(e => unique.add(e.employee_id)));
     const avgHours = totalProjects ? totalHours / totalProjects : 0;
 
     if (_el('ps-kpi-projects'))  _el('ps-kpi-projects').textContent  = totalProjects;
-    if (_el('ps-kpi-hours'))     _el('ps-kpi-hours').textContent     = totalHours.toFixed(1);
+    if (_el('ps-kpi-hours'))     _el('ps-kpi-hours').textContent     = totalHours_md.toFixed(1);
     if (_el('ps-kpi-employees')) _el('ps-kpi-employees').textContent = unique.size;
     if (_el('ps-kpi-avg'))       _el('ps-kpi-avg').textContent       = avgHours.toFixed(1);
 }
