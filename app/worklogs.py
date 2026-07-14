@@ -23,7 +23,7 @@ from .auth import login_required
 from .constants import ELEVATED_ROLES
 
 worklogs_bp = Blueprint('worklogs', __name__)
-VALID_STATUSES = {'Done', 'In Progress', 'Pending', 'Man day'}
+VALID_STATUSES = {'Done', 'In Progress', 'Pending', 'Man day', 'Leave'}
 
 @worklogs_bp.route('/api/worklogs', methods=['GET'])
 @login_required
