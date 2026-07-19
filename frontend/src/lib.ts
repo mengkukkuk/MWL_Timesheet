@@ -3,6 +3,8 @@
 // static/app/i18n.js (loaded by the Flask template before this bundle), so we
 // do NOT duplicate the TH/EN dictionaries.
 
+import { useEffect, useState } from 'react'
+
 // ── i18n bridge ───────────────────────────────────────────────────────────
 type TFn = (key: string, ...args: unknown[]) => string
 declare global {
@@ -10,7 +12,20 @@ declare global {
     t?: TFn
     toggleLang?: () => void
     applyTranslations?: () => void
+    toast?: (msg: string, type?: 'success' | 'error') => void
   }
+}
+
+// ── toast bridge (reuses core.js's global toast() host) ─────────────────────
+export function toast(msg: string, type: 'success' | 'error' = 'success'): void {
+  if (typeof window.toast === 'function') window.toast(msg, type)
+}
+
+// Reads the month names array from the existing i18n table (`months.full`).
+export function monthName(month: number): string {
+  const arr = typeof window.t === 'function' ? (window.t('months.full') as unknown) : null
+  if (Array.isArray(arr) && typeof arr[month] === 'string') return arr[month] as string
+  return String(month)
 }
 
 export function t(key: string, ...args: unknown[]): string {
@@ -96,6 +111,28 @@ export function isElevated(role: string | undefined): boolean {
   return !!role && ELEVATED_ROLES.includes(role)
 }
 
+// Independent /api/me fetch for React islands — does NOT read core.js's
+// `currentUser` global, since that is populated asynchronously on
+// DOMContentLoaded (after this module's top-level code has already run).
+export function useCurrentUser(): MeResp | null {
+  const [user, setUser] = useState<MeResp | null>(null)
+  useEffect(() => {
+    let alive = true
+    api<MeResp>('/api/me').then((r) => {
+      if (alive && r.ok) setUser(r.data)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  return user
+}
+
+export function canManageMember(user: MeResp | null, memberId: string): boolean {
+  if (!user) return false
+  return isElevated(user.role) || String(user.member_id) === String(memberId)
+}
+
 export interface Member {
   id: string // EmployeeID
   name: string
@@ -144,6 +181,31 @@ export interface Skill {
   id: number
   name: string
   level: number
+}
+export type SkillsByMember = Record<string, Skill[]>
+
+// Raw /api/projects row — main_members/support_members are JSON-array
+// strings of EmployeeIDs (or, for legacy rows, "#"-separated names).
+export interface ProjectRow {
+  id: number
+  name: string
+  main_members?: string | null
+  support_members?: string | null
+}
+
+export type MissingMap = Record<string, number>
+
+export function parseProjectMemberList(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  const s = raw.trim()
+  if (s.startsWith('[')) {
+    try {
+      return (JSON.parse(s) as unknown[]).map(String).filter(Boolean)
+    } catch {
+      return []
+    }
+  }
+  return s.split('#').map((n) => n.trim()).filter(Boolean)
 }
 
 export interface EmployeeLookupResp {
