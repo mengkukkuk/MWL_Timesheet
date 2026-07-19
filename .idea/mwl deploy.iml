@@ -11,7 +11,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/storage" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.14 (MWL_Timesheet) (2)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.14 (MWL_Timesheet) (3)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Python 3.14 (MWL_Timesheet) interpreter library" level="application" />
   </component>

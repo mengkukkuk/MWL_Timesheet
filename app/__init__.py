@@ -63,6 +63,66 @@ def _static_version(filename):
 app.jinja_env.globals['static_v'] = _static_version
 
 
+# ── Vite manifest bridge ──────────────────────────────────────────────────────
+# The React islands (login + dashboard) are built by Vite into static/react/
+# with hashed filenames and a manifest. vite_asset('login'|'dashboard') reads
+# that manifest and returns {'css': [urls], 'js': [urls]} for the entry, so the
+# Jinja templates can inject the correct hashed tags. The parsed manifest is
+# cached in module scope; set VITE_DEV=1 to force a re-read on every call while
+# iterating locally. This is the only Vite-related backend change — no route or
+# API logic is touched.
+_VITE_MANIFEST_PATH = os.path.join(BASE_DIR, 'static', 'react', '.vite', 'manifest.json')
+_VITE_BASE = '/static/react/'
+_vite_manifest_cache = None
+
+
+def _load_vite_manifest():
+    global _vite_manifest_cache
+    if _vite_manifest_cache is not None and not os.getenv('VITE_DEV'):
+        return _vite_manifest_cache
+    import json
+    try:
+        with open(_VITE_MANIFEST_PATH, encoding='utf-8') as fh:
+            _vite_manifest_cache = json.load(fh)
+    except (OSError, ValueError):
+        _vite_manifest_cache = {}
+    return _vite_manifest_cache
+
+
+def _vite_asset(entry):
+    """Resolve a Vite entry name ('login' | 'dashboard') to its hashed asset
+    URLs. Returns {'js': [...], 'css': [...]} with the entry chunk, its imported
+    (shared) chunks, and all associated CSS, de-duplicated and in load order."""
+    manifest = _load_vite_manifest()
+    key = f'{entry}.html'
+    node = manifest.get(key)
+    if not node:
+        return {'js': [], 'css': []}
+    js, css, seen = [], [], set()
+
+    def add_chunk(chunk_key):
+        if chunk_key in seen:
+            return
+        seen.add(chunk_key)
+        chunk = manifest.get(chunk_key)
+        if not chunk:
+            return
+        for imported in chunk.get('imports', []):
+            add_chunk(imported)
+        for css_file in chunk.get('css', []):
+            url = _VITE_BASE + css_file
+            if url not in css:
+                css.append(url)
+        if chunk.get('file'):
+            js.append(_VITE_BASE + chunk['file'])
+
+    add_chunk(key)
+    return {'js': js, 'css': css}
+
+
+app.jinja_env.globals['vite_asset'] = _vite_asset
+
+
 @app.after_request
 def _add_static_cache_headers(response):
     """Cache-Control for static assets and read-mostly API endpoints.

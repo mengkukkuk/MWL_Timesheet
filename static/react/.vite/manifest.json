@@ -1,0 +1,31 @@
+{
+  "_lib-!~{003}~.js": {
+    "file": "assets/lib-CQGJ7wCF.css",
+    "src": "_lib-!~{003}~.js"
+  },
+  "_lib-DBN1gx9g.js": {
+    "file": "assets/lib-DBN1gx9g.js",
+    "name": "lib",
+    "css": [
+      "assets/lib-CQGJ7wCF.css"
+    ]
+  },
+  "dashboard.html": {
+    "file": "assets/dashboard-DYBNy7a-.js",
+    "name": "dashboard",
+    "src": "dashboard.html",
+    "isEntry": true,
+    "imports": [
+      "_lib-DBN1gx9g.js"
+    ]
+  },
+  "login.html": {
+    "file": "assets/login-BxDnj3Tr.js",
+    "name": "login",
+    "src": "login.html",
+    "isEntry": true,
+    "imports": [
+      "_lib-DBN1gx9g.js"
+    ]
+  }
+}

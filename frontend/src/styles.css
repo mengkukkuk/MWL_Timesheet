@@ -1,0 +1,545 @@
+/* MWL React islands — design tokens + component styles.
+ * Imported by both entry mounts (login + dashboard). No Tailwind here; the
+ * vanilla pages keep the Tailwind CDN. All class names are `mwl-` prefixed to
+ * avoid collision with the existing global stylesheet. Fonts (Syne / Kanit /
+ * DM Mono) are already loaded by the Flask template, so no new network cost. */
+
+:root {
+  /* ── color ── */
+  --ink: #0b1020;
+  --ink-soft: #141a2e;
+  --indigo: #4f46e5;
+  --indigo-600: #4338ca;
+  --indigo-glow: #818cf8;
+  --violet: #a78bfa;
+  --surface: #f7f8fb;
+  --card: #ffffff;
+  --line: #e6e8ef;
+  --success: #059669;
+  --amber: #d97706;
+  --rose: #e11d48;
+  /* ink text on light surfaces */
+  --ink-90: rgba(11, 16, 32, 0.9);
+  --ink-70: rgba(11, 16, 32, 0.7);
+  --ink-50: rgba(11, 16, 32, 0.5);
+  --ink-30: rgba(11, 16, 32, 0.3);
+  /* light text on ink panels */
+  --paper-90: rgba(247, 248, 251, 0.92);
+  --paper-70: rgba(247, 248, 251, 0.68);
+  --paper-50: rgba(247, 248, 251, 0.46);
+  --paper-30: rgba(247, 248, 251, 0.26);
+  /* ── type ── */
+  --font-display: 'Syne', system-ui, sans-serif;
+  --font-body: 'Kanit', system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+  /* ── radius ── */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+  --shadow-card: 0 1px 2px rgba(11, 16, 32, 0.04), 0 8px 24px rgba(11, 16, 32, 0.06);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LOGIN
+   ───────────────────────────────────────────────────────────────────────── */
+.mwl-login {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--ink-90);
+  background: var(--surface);
+}
+
+/* Left brand panel — deep ink with the signature workday timeline */
+.mwl-brand {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(2rem, 4vw, 4rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--paper-90);
+  background:
+    radial-gradient(120% 90% at 15% 10%, #1b2344 0%, transparent 60%),
+    radial-gradient(120% 120% at 90% 100%, #241a4a 0%, transparent 55%),
+    var(--ink);
+}
+
+.mwl-brand__logo {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 1.05rem;
+}
+.mwl-brand__logo-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px;
+}
+
+.mwl-brand__headline {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.1rem, 3.6vw, 3.3rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.9rem;
+}
+.mwl-brand__headline em {
+  font-style: normal;
+  background: linear-gradient(92deg, var(--indigo-glow), var(--violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.mwl-brand__sub {
+  max-width: 34ch;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--paper-70);
+  margin: 0;
+}
+
+/* Signature: ambient workday timeline (08:30 · 12:00 · 13:00 · 17:30) */
+.mwl-timeline {
+  position: relative;
+  margin: 2.4rem 0 0.5rem;
+  padding-left: 1.4rem;
+}
+.mwl-timeline__rail {
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 2.6rem;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    rgba(129, 140, 248, 0.05),
+    rgba(129, 140, 248, 0.35),
+    rgba(129, 140, 248, 0.05)
+  );
+  border-radius: 2px;
+}
+.mwl-timeline__sweep {
+  position: absolute;
+  left: -3px;
+  width: 8px;
+  height: 84px;
+  border-radius: 8px;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(129, 140, 248, 0.55) 0%,
+    transparent 70%
+  );
+  filter: blur(2px);
+  animation: mwl-sweep 6.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes mwl-sweep {
+  0% { top: 0; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { top: calc(100% - 2.6rem); opacity: 0; }
+}
+.mwl-tick {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+.mwl-tick::before {
+  content: '';
+  position: absolute;
+  left: -1.4rem;
+  top: 0.95rem;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--indigo-glow);
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+}
+.mwl-tick__time {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 1.05rem;
+  color: var(--paper-90);
+  min-width: 3.6em;
+}
+.mwl-tick__label {
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--paper-50);
+}
+.mwl-timeline__total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-left: 0.05rem;
+}
+.mwl-timeline__total-num {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 2rem;
+  color: #fff;
+}
+.mwl-timeline__total-label {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-50);
+}
+
+/* Right auth panel */
+.mwl-auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+}
+.mwl-auth__card {
+  width: 100%;
+  max-width: 400px;
+}
+.mwl-auth__head {
+  margin-bottom: 1.6rem;
+}
+.mwl-auth__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.7rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.3rem;
+  color: var(--ink);
+}
+.mwl-auth__hint {
+  font-size: 0.94rem;
+  color: var(--ink-50);
+  margin: 0;
+}
+
+.mwl-field {
+  margin-bottom: 1rem;
+}
+.mwl-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-70);
+  margin-bottom: 0.35rem;
+}
+.mwl-input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font-family: var(--font-body);
+  font-size: 0.97rem;
+  color: var(--ink-90);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.mwl-input:focus {
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+}
+.mwl-input--mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.mwl-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--ink-70);
+  margin-bottom: 1.1rem;
+  cursor: pointer;
+}
+.mwl-check input {
+  accent-color: var(--indigo);
+  width: 15px;
+  height: 15px;
+}
+
+.mwl-btn {
+  width: 100%;
+  padding: 0.78rem 1rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.98rem;
+  color: #fff;
+  background: linear-gradient(180deg, var(--indigo), var(--indigo-600));
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.15s, opacity 0.15s;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);
+}
+.mwl-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.34);
+}
+.mwl-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.mwl-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mwl-linkrow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.1rem;
+  font-size: 0.88rem;
+}
+.mwl-link {
+  color: var(--indigo);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+}
+.mwl-link:hover {
+  text-decoration: underline;
+}
+
+.mwl-msg {
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--r-md);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  margin-bottom: 1rem;
+}
+.mwl-msg--err {
+  background: rgba(225, 29, 72, 0.08);
+  color: var(--rose);
+  border: 1px solid rgba(225, 29, 72, 0.2);
+}
+.mwl-msg--ok {
+  background: rgba(5, 150, 105, 0.08);
+  color: var(--success);
+  border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+.mwl-preview {
+  margin-top: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-size: 0.9rem;
+}
+.mwl-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.mwl-status--ok { color: var(--success); }
+.mwl-status--warn { color: var(--amber); }
+.mwl-status--err { color: var(--rose); }
+
+.mwl-langtoggle {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.4rem;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: var(--paper-70);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+}
+.mwl-langtoggle:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   DASHBOARD ISLAND
+   ───────────────────────────────────────────────────────────────────────── */
+.mwl-dash {
+  font-family: var(--font-body);
+  color: var(--ink-90);
+}
+.mwl-eyebrow {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--indigo);
+  margin: 0 0 0.6rem;
+}
+
+/* Staff identity card */
+.mwl-staff {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 1.3rem;
+  padding: 1.4rem 1.6rem;
+  border-radius: var(--r-xl);
+  color: var(--paper-90);
+  background:
+    radial-gradient(120% 140% at 0% 0%, #1b2344 0%, transparent 55%),
+    radial-gradient(120% 140% at 100% 100%, #241a4a 0%, transparent 55%),
+    var(--ink);
+  box-shadow: var(--shadow-card);
+}
+.mwl-staff__avatar {
+  width: 68px;
+  height: 68px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  flex-shrink: 0;
+}
+.mwl-staff__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.4rem;
+}
+.mwl-staff__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1.1rem;
+  font-size: 0.9rem;
+  color: var(--paper-70);
+}
+.mwl-staff__meta b {
+  font-weight: 500;
+  color: var(--paper-90);
+}
+.mwl-staff__id {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--indigo-glow);
+}
+.mwl-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--indigo-glow), var(--violet));
+  border-radius: 999px;
+  padding: 0.18rem 0.6rem;
+}
+
+/* Stat cards */
+.mwl-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 1.2rem;
+}
+.mwl-stat {
+  padding: 1.1rem 1.2rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.mwl-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(11, 16, 32, 0.05), 0 14px 32px rgba(11, 16, 32, 0.09);
+}
+.mwl-stat__label {
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-50);
+  margin-bottom: 0.5rem;
+}
+.mwl-stat__value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1.9rem;
+  line-height: 1;
+  color: var(--ink);
+}
+.mwl-stat__value--indigo { color: var(--indigo); }
+.mwl-stat__value--green { color: var(--success); }
+.mwl-stat__value--amber { color: var(--amber); }
+.mwl-stat__unit {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--ink-50);
+  margin-left: 0.3rem;
+}
+
+/* Entrance micro-motion */
+.mwl-fadein {
+  animation: mwl-fadein 0.4s ease both;
+}
+@keyframes mwl-fadein {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   RESPONSIVE + REDUCED MOTION
+   ───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .mwl-login {
+    grid-template-columns: 1fr;
+  }
+  .mwl-brand {
+    padding: 1.5rem;
+  }
+  .mwl-brand__headline,
+  .mwl-brand__sub,
+  .mwl-timeline {
+    display: none;
+  }
+  .mwl-staff {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mwl-timeline__sweep {
+    animation: none;
+    top: 30%;
+    opacity: 0.6;
+  }
+  .mwl-fadein,
+  .mwl-stat,
+  .mwl-btn {
+    animation: none;
+    transition: none;
+  }
+}

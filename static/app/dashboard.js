@@ -8,14 +8,20 @@ async function loadDashboard() {
         return;
     }
 
-    document.getElementById('dash-total-hours').textContent = data.total_hours;
-    document.getElementById('dash-total-done').textContent = data.total_done;
-    document.getElementById('dash-total-ip').textContent = data.total_in_progress;
-    document.getElementById('dash-lvl').textContent = data.member.level;
-    document.getElementById('dash-name').textContent = data.member.name;
-    document.getElementById('dash-dept').textContent = data.member.department;
-    document.getElementById('dash-empid').textContent = "ID : " + currentMemberId;
-    _renderDashAvatar(currentMemberId, data.member.name, data.member.avatar_url);
+    // Staff card + summary stats are now owned by the React dashboard island
+    // (#dashboard-root). These nodes may be absent; write only if present so the
+    // vanilla skills/monthly rendering below still runs.
+    const _setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    _setText('dash-total-hours', data.total_hours);
+    _setText('dash-total-done', data.total_done);
+    _setText('dash-total-ip', data.total_in_progress);
+    _setText('dash-lvl', data.member.level);
+    _setText('dash-name', data.member.name);
+    _setText('dash-dept', data.member.department);
+    _setText('dash-empid', "ID : " + currentMemberId);
+    if (document.getElementById('dash-avatar-wrap')) {
+        _renderDashAvatar(currentMemberId, data.member.name, data.member.avatar_url);
+    }
 
     // Render skills box
     const skillsGrid = document.getElementById('dashboard-member-grid');

@@ -8,6 +8,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+    <!-- React dashboard island (Vite bundle): CSS in head, JS module before </body>. -->
+    {% set dash_assets = vite_asset('dashboard') %}
+    {% for href in dash_assets.css %}
+    <link rel="stylesheet" href="{{ href }}">
+    {% endfor %}
     <!-- Chart.js is lazy-loaded on demand by dashboard/projects-summary modules to reduce initial payload. -->
     <!-- Eager frontend modules: load in parallel via `defer` (executes in document order, downloads concurrently). -->
     <script defer src="/static/app/i18n.js?v={{ static_v('app/i18n.js') }}"></script>
@@ -186,39 +191,11 @@
                     </button>
                 </div>
 
-                <!-- Summary Cards -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="card bg-white">
-                        <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.total_hours">Total Hours</p>
-                        <p id="dash-total-hours" class="text-2xl font-bold text-indigo-600 mt-1">0</p>
-                    </div>
-                    <div class="card bg-white">
-                        <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.tasks_done">Tasks Done</p>
-                        <p id="dash-total-done" class="text-2xl font-bold text-green-600 mt-1">0</p>
-                    </div>
-                    <div class="card bg-white">
-                        <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.in_progress_card">In Progress</p>
-                        <p id="dash-total-ip" class="text-2xl font-bold text-yellow-600 mt-1">0</p>
-                    </div>
-                </div>
+                <!-- Enriched staff card + stat cards (React island, Vite bundle). -->
+                <div id="dashboard-root"></div>
 
-                <!-- Member Info -->
-                <div class="card bg-white mb-6">
-                    <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
-                        <div class="flex items-center gap-4 shrink-0">
-                            <div id="dash-avatar-wrap" class="avatar-wrap avatar-md bg-indigo-100">
-                                <span id="dash-avatar" class="avatar-letter text-indigo-600">?</span>
-                            </div>
-                            <div>
-                                <p id="dash-lvl" class="font-bold text-blue-800"></p>
-                                <p id="dash-name" class="font-semibold text-gray-800"></p>
-                                <p id="dash-dept" class="text-sm text-gray-500"></p>
-                                <p id="dash-empid" class="text-sm text-gray-500"></p>
-                            </div>
-                        </div>
-                        <div class="w-full flex-1" id="dashboard-member-grid"></div>
-                    </div>
-                </div>
+                <!-- Skills box — still rendered by vanilla dashboard.js into #dashboard-member-grid. -->
+                <div class="mb-6" id="dashboard-member-grid"></div>
 
                 <!-- Project Roles -->
                 <div id="project-roles-section" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -1441,5 +1418,9 @@
     <div id="toast" class="toast hidden"></div>
 
     <!-- Frontend modules are loaded via `<script defer>` in the <head>, in dependency order. -->
+    <!-- React dashboard island bundle (mounts into #dashboard-root; reads #member-select/#year-select). -->
+    {% for src in dash_assets.js %}
+    <script type="module" src="{{ src }}"></script>
+    {% endfor %}
 </body>
 </html>

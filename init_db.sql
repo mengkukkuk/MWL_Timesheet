@@ -2,7 +2,7 @@
    DATABASE INIT
 ========================= */
 IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'MeterWorklog')
-    CREATE DATABASE MeterWorklog;
+CREATE DATABASE MeterWorklog;
 GO
 
 USE MeterWorklog;
@@ -118,22 +118,22 @@ CREATE TABLE worklogs (
                                   END
                               ) PERSISTED,
 
-                          -- regular_hours: portion of work inside 08:30-17:30 minus lunch overlap.
-                          -- Pure function of start/end time (no holiday lookup needed).
+    -- regular_hours: portion of work inside 08:30-17:30 minus lunch overlap.
+    -- Pure function of start/end time (no holiday lookup needed).
                           regular_hours AS (
                               CASE
                                   WHEN start_time IS NOT NULL AND end_time IS NOT NULL
-                                       AND end_time   > TIMEFROMPARTS(8,30,0,0,0)
-                                       AND start_time < TIMEFROMPARTS(17,30,0,0,0)
+                                      AND end_time   > TIMEFROMPARTS(8,30,0,0,0)
+                                      AND start_time < TIMEFROMPARTS(17,30,0,0,0)
                                       THEN CAST((
                                                     DATEDIFF(
-                                                        MINUTE,
-                                                        CASE WHEN start_time > TIMEFROMPARTS(8,30,0,0,0)
-                                                                 THEN start_time ELSE TIMEFROMPARTS(8,30,0,0,0) END,
-                                                        CASE WHEN end_time   < TIMEFROMPARTS(17,30,0,0,0)
-                                                                 THEN end_time   ELSE TIMEFROMPARTS(17,30,0,0,0) END
+                                                            MINUTE,
+                                                            CASE WHEN start_time > TIMEFROMPARTS(8,30,0,0,0)
+                                                                     THEN start_time ELSE TIMEFROMPARTS(8,30,0,0,0) END,
+                                                            CASE WHEN end_time   < TIMEFROMPARTS(17,30,0,0,0)
+                                                                     THEN end_time   ELSE TIMEFROMPARTS(17,30,0,0,0) END
                                                     )
-                                                    -
+                                                        -
                                                     CASE
                                                         WHEN start_time < TIMEFROMPARTS(13,0,0,0,0)
                                                             AND end_time   > TIMEFROMPARTS(12,0,0,0,0)
@@ -172,10 +172,10 @@ GO
 ========================= */
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'holiday')
 CREATE TABLE dbo.holiday (
-    id          INT IDENTITY(1,1) PRIMARY KEY,
-    [date]      DATE NOT NULL UNIQUE,
-    description NVARCHAR(500) NULL,
-    created_at  DATETIME2 DEFAULT GETDATE()
+                             id          INT IDENTITY(1,1) PRIMARY KEY,
+                             [date]      DATE NOT NULL UNIQUE,
+                             description NVARCHAR(500) NULL,
+                             created_at  DATETIME2 DEFAULT GETDATE()
 );
 GO
 
@@ -198,7 +198,7 @@ CREATE TABLE users (
                        created_at DATETIME2 DEFAULT GETDATE()
 );
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'EmployeeID')
-    ALTER TABLE users ADD EmployeeID NVARCHAR(5) NULL;
+ALTER TABLE users ADD EmployeeID NVARCHAR(5) NULL;
 GO
 
 /* =========================
@@ -246,12 +246,12 @@ CREATE TABLE member_skills (
 );
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_member_skills_member')
-    CREATE NONCLUSTERED INDEX IX_member_skills_member ON member_skills(member_id);
+CREATE NONCLUSTERED INDEX IX_member_skills_member ON member_skills(member_id);
 
 -- EmployeeID is the post-migration skill owner key. Keep legacy member_id
 -- nullable so new Employee-backed users are not forced through members.id.
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('member_skills') AND name = 'EmployeeID')
-    ALTER TABLE member_skills ADD EmployeeID NVARCHAR(5) NULL;
+ALTER TABLE member_skills ADD EmployeeID NVARCHAR(5) NULL;
 
 GO
 
@@ -299,7 +299,7 @@ IF EXISTS (
     END
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_member_skills_employee')
-    CREATE NONCLUSTERED INDEX IX_member_skills_employee ON member_skills(EmployeeID);
+CREATE NONCLUSTERED INDEX IX_member_skills_employee ON member_skills(EmployeeID);
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'UX_member_skills_employee_name')
     AND NOT EXISTS (
@@ -382,12 +382,21 @@ IF NOT EXISTS (SELECT 1 FROM file_folders WHERE parent_id IS NULL AND name = 'Sh
 
 GO
 
+-- Per-item "classified" flag: classified folders/files are visible only to
+-- elevated roles (Super_Ultimate_ADMIN, Admin, Leader). Staff cannot see them.
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('file_folders') AND name = 'is_classified')
+ALTER TABLE file_folders ADD is_classified BIT NOT NULL CONSTRAINT DF_file_folders_classified DEFAULT 0;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('files') AND name = 'is_classified')
+ALTER TABLE files ADD is_classified BIT NOT NULL CONSTRAINT DF_files_classified DEFAULT 0;
+GO
+
 -- Add IsEditRow row-lock flag to worklogs (mirrors dbo.Allowance pattern)
 IF NOT EXISTS (
     SELECT 1 FROM sys.columns
     WHERE object_id = OBJECT_ID('dbo.worklogs') AND name = 'IsEditRow'
 )
-    ALTER TABLE worklogs ADD IsEditRow BIT NOT NULL DEFAULT 1;
+ALTER TABLE worklogs ADD IsEditRow BIT NOT NULL DEFAULT 1;
 GO
 
 -- ── P0 performance indexes (added 2026-05-12) ────────────────────────────────
@@ -395,7 +404,7 @@ GO
 
 -- Speeds /api/projects-summary aggregation (filtered for non-null projects)
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_worklogs_project')
-    CREATE NONCLUSTERED INDEX IX_worklogs_project
+CREATE NONCLUSTERED INDEX IX_worklogs_project
     ON worklogs(project)
     WHERE project IS NOT NULL;
 
@@ -403,21 +412,21 @@ GO
 
 -- Speeds /api/users pending list and approval flow
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_users_status')
-    CREATE NONCLUSTERED INDEX IX_users_status
+CREATE NONCLUSTERED INDEX IX_users_status
     ON users(status);
 
 GO
 
 -- Speeds folder breadcrumb recursion and dedup checks
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_file_folders_parent_name')
-    CREATE NONCLUSTERED INDEX IX_file_folders_parent_name
+CREATE NONCLUSTERED INDEX IX_file_folders_parent_name
     ON file_folders(parent_id, name);
 
 GO
 
 -- Speeds /api/worklogs date-range scans without EmployeeID filter (admin views)
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_worklogs_log_date')
-    CREATE NONCLUSTERED INDEX IX_worklogs_log_date
+CREATE NONCLUSTERED INDEX IX_worklogs_log_date
     ON worklogs(log_date)
     INCLUDE (EmployeeID, project, status);
 
@@ -439,7 +448,7 @@ GO
    parameter before SQL binding, so this backfill only matters for rows
    written before that fix landed.
 ========================= */
-USE MWLTimesheet
+USE MeterWorklog
 UPDATE dbo.Employee
 SET EmployeeID = RTRIM(EmployeeID)
 WHERE DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
@@ -479,89 +488,89 @@ Update projects
 SET name = RTRIM(name)
 WHERE name IS NOT NULL
   AND DATALENGTH(name) <> DATALENGTH(RTRIM(name));
-go      
+go
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- OT tier columns and regular_hours computed column (added 2026-05).
 -- Idempotent — safe to re-run via init_db().
 -- ════════════════════════════════════════════════════════════════════════════
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'OT1')
-    ALTER TABLE worklogs ADD OT1 DECIMAL(5,2) NULL;
+ALTER TABLE worklogs ADD OT1 DECIMAL(5,2) NULL;
 GO
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'OT1_5')
-    ALTER TABLE worklogs ADD OT1_5 DECIMAL(5,2) NULL;
+ALTER TABLE worklogs ADD OT1_5 DECIMAL(5,2) NULL;
 GO
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'OT3')
-    ALTER TABLE worklogs ADD OT3 DECIMAL(5,2) NULL;
+ALTER TABLE worklogs ADD OT3 DECIMAL(5,2) NULL;
 GO
 -- is_allowance flag: when 1, OT1/OT1_5/OT3 are NOT calculated (forced to 0).
 -- Used for "allowance" worklog entries that should not earn overtime pay.
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'is_allowance')
-    ALTER TABLE worklogs ADD is_allowance BIT NOT NULL CONSTRAINT DF_worklogs_is_allowance DEFAULT 0;
+ALTER TABLE worklogs ADD is_allowance BIT NOT NULL CONSTRAINT DF_worklogs_is_allowance DEFAULT 0;
 GO
 
 -- allowance_overtime: per-day OT bucket for JG06-JG08 employees. Populated by
 -- app/worklogs.py::_rebalance_day_allowance_ot on the row with MAX(id) for
 -- each (EmployeeID, log_date); all other rows of that day carry 0.
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'allowance_overtime')
-    ALTER TABLE worklogs ADD allowance_overtime DECIMAL(5,2) NULL;
+ALTER TABLE worklogs ADD allowance_overtime DECIMAL(5,2) NULL;
 GO
 
 -- ProjectDepartment / Description: free-text fields mirrored from
 -- dbo.ProjectAndBudget at the time of the worklog entry.
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'ProjectDepartment')
-    ALTER TABLE worklogs ADD ProjectDepartment NVARCHAR(100) NULL;
+ALTER TABLE worklogs ADD ProjectDepartment NVARCHAR(100) NULL;
 GO
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'Description')
-    ALTER TABLE worklogs ADD Description NVARCHAR(500) NULL;
+ALTER TABLE worklogs ADD Description NVARCHAR(500) NULL;
 GO
 
 -- Use EXEC() so the IF NOT EXISTS wrapper does not interfere with
 -- T-SQL parsing of the "AS (...) PERSISTED" computed-column expression.
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('worklogs') AND name = 'regular_hours')
-    ALTER TABLE worklogs ADD regular_hours AS (
-        CASE
-            WHEN start_time IS NOT NULL AND end_time IS NOT NULL
-                 AND end_time   > TIMEFROMPARTS(8,30,0,0,0)
-                 AND start_time < TIMEFROMPARTS(17,30,0,0,0)
-                THEN CAST((
-                    DATEDIFF(
-                        MINUTE,
-                        CASE WHEN start_time > TIMEFROMPARTS(8,30,0,0,0)
-                                 THEN start_time ELSE TIMEFROMPARTS(8,30,0,0,0) END,
-                        CASE WHEN end_time   < TIMEFROMPARTS(17,30,0,0,0)
-                                 THEN end_time   ELSE TIMEFROMPARTS(17,30,0,0,0) END
-                    )
-                    -
-                    CASE
-                        WHEN start_time < TIMEFROMPARTS(13,0,0,0,0)
-                             AND end_time > TIMEFROMPARTS(12,0,0,0,0)
-                            THEN DATEDIFF(
-                                MINUTE,
-                                CASE WHEN start_time > TIMEFROMPARTS(12,0,0,0,0)
-                                         THEN start_time ELSE TIMEFROMPARTS(12,0,0,0,0) END,
-                                CASE WHEN end_time < TIMEFROMPARTS(13,0,0,0,0)
-                                         THEN end_time ELSE TIMEFROMPARTS(13,0,0,0,0) END
-                            )
-                        ELSE 0
-                    END
-                ) / 60.0 AS DECIMAL(5,2))
-            ELSE CAST(0 AS DECIMAL(5,2))
+ALTER TABLE worklogs ADD regular_hours AS (
+    CASE
+        WHEN start_time IS NOT NULL AND end_time IS NOT NULL
+            AND end_time   > TIMEFROMPARTS(8,30,0,0,0)
+            AND start_time < TIMEFROMPARTS(17,30,0,0,0)
+            THEN CAST((
+                          DATEDIFF(
+                                  MINUTE,
+                                  CASE WHEN start_time > TIMEFROMPARTS(8,30,0,0,0)
+                                           THEN start_time ELSE TIMEFROMPARTS(8,30,0,0,0) END,
+                                  CASE WHEN end_time   < TIMEFROMPARTS(17,30,0,0,0)
+                                           THEN end_time   ELSE TIMEFROMPARTS(17,30,0,0,0) END
+                          )
+                              -
+                          CASE
+                              WHEN start_time < TIMEFROMPARTS(13,0,0,0,0)
+                                  AND end_time > TIMEFROMPARTS(12,0,0,0,0)
+                                  THEN DATEDIFF(
+                                      MINUTE,
+                                      CASE WHEN start_time > TIMEFROMPARTS(12,0,0,0,0)
+                                               THEN start_time ELSE TIMEFROMPARTS(12,0,0,0,0) END,
+                                      CASE WHEN end_time < TIMEFROMPARTS(13,0,0,0,0)
+                                               THEN end_time ELSE TIMEFROMPARTS(13,0,0,0,0) END
+                                       )
+                              ELSE 0
+                              END
+                          ) / 60.0 AS DECIMAL(5,2))
+        ELSE CAST(0 AS DECIMAL(5,2))
         END
     ) PERSISTED;
 GO
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'holiday' AND SCHEMA_NAME(schema_id) = 'dbo')
 CREATE TABLE dbo.holiday (
-    id          INT IDENTITY(1,1) PRIMARY KEY,
-    [date]      DATE NOT NULL UNIQUE,
-    description NVARCHAR(500) NULL,
-    created_at  DATETIME2 DEFAULT GETDATE()
+                             id          INT IDENTITY(1,1) PRIMARY KEY,
+                             [date]      DATE NOT NULL UNIQUE,
+                             description NVARCHAR(500) NULL,
+                             created_at  DATETIME2 DEFAULT GETDATE()
 );
 GO
 
 -- Allowance table --
-USE MWLTimesheet
+USE MeterWorklog
 IF NOT EXISTS (
     SELECT 1
     FROM sys.tables
