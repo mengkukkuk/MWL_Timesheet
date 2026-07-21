@@ -191,53 +191,11 @@
                     </button>
                 </div>
 
-                <!-- Enriched staff card + stat cards (React island, Vite bundle). -->
+                <!-- Individual dashboard is now a React island (Vite bundle): staff
+                     card, stat cards, project roles, skills box and the monthly
+                     ledger all render into #dashboard-root via DashboardIsland.tsx.
+                     Add/edit still hand off to the vanilla modals below. -->
                 <div id="dashboard-root"></div>
-
-                <!-- Skills box — still rendered by vanilla dashboard.js into #dashboard-member-grid. -->
-                <div class="mb-6" id="dashboard-member-grid"></div>
-
-                <!-- Project Roles -->
-                <div id="project-roles-section" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                    <!-- Main Project -->
-                    <div class="card bg-white">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="bg-indigo-600 text-white text-xs font-semibold px-3 py-1.5 rounded" data-i18n="dash.main_project">Main Project</span>
-                            <button id="btn-add-main" onclick="openAddProjectModal('main')"
-                                    class="w-6 h-6 bg-gray-600 hover:bg-gray-700 text-white rounded flex items-center justify-center text-base font-bold leading-none transition-colors">+</button>
-                        </div>
-                        <div id="main-project-tags" class="flex flex-wrap gap-2 min-h-[28px]"></div>
-                    </div>
-                    <!-- Support -->
-                    <div class="card bg-white">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded" data-i18n="dash.support">Support</span>
-                            <button id="btn-add-support" onclick="openAddProjectModal('support')"
-                                    class="w-6 h-6 bg-gray-600 hover:bg-gray-700 text-white rounded flex items-center justify-center text-base font-bold leading-none transition-colors">+</button>
-                        </div>
-                        <div id="support-project-tags" class="flex flex-wrap gap-2 min-h-[28px]"></div>
-                    </div>
-                </div>
-
-                <!-- Monthly Breakdown Table -->
-                <div class="card bg-white">
-                    <h3 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide" data-i18n="dash.monthly_breakdown">Monthly Breakdown</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="border-b border-gray-200">
-                                    <th class="text-left py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_month">Month</th>
-                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_hours">Hours</th>
-                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_done">Done</th>
-                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_missing">Missing entry</th>
-                                    <th class="text-right py-2 px-3 text-gray-500 font-medium" data-i18n="dash.col_man_day">Man day</th>
-                                    <th class="py-2 px-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="dash-months"></tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
         </div>
 

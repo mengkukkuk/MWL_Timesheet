@@ -508,6 +508,476 @@
   to { opacity: 1; transform: none; }
 }
 
+/* ── Project roles (Main / Support) ── */
+.mwl-proles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.2rem;
+}
+.mwl-proles__col {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 1rem 1.1rem;
+}
+.mwl-proles__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+.mwl-proles__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-height: 28px;
+}
+.mwl-proles__empty {
+  color: var(--ink-30);
+  font-size: 0.9rem;
+}
+.mwl-ptag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+}
+.mwl-ptag--main {
+  background: linear-gradient(180deg, var(--indigo), var(--indigo-600));
+}
+.mwl-ptag--support {
+  background: var(--success);
+}
+.mwl-ptag--label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+.mwl-ptag__x {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0;
+}
+.mwl-ptag__x:hover {
+  color: #fff;
+}
+.mwl-addbtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+.mwl-addbtn:hover {
+  background: var(--ink-soft);
+}
+
+/* ── Skills box (light card on dashboard; dark panel inside team cards) ── */
+.mwl-skills {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 0.9rem 1rem;
+  margin-top: 1.2rem;
+}
+.mwl-skills__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.mwl-skills__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-70);
+}
+.mwl-skills__actions {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+.mwl-iconbtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-50);
+  font-size: 0.8rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+}
+.mwl-iconbtn:hover {
+  color: var(--indigo);
+  background: rgba(79, 70, 229, 0.08);
+}
+.mwl-skills__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.mwl-skills__list--matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.4rem 1.2rem;
+}
+.mwl-skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+.mwl-skill-name {
+  font-size: 0.85rem;
+  color: var(--ink-90);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mwl-skill-empty {
+  font-size: 0.85rem;
+  color: var(--ink-30);
+  font-style: italic;
+}
+.mwl-skill-more {
+  font-size: 0.75rem;
+  color: var(--ink-50);
+}
+.mwl-skillbar {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.mwl-seg {
+  width: 14px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--line);
+}
+.mwl-seg--on {
+  background: linear-gradient(180deg, var(--indigo-glow), var(--indigo));
+}
+
+/* Dark-context overrides when the skills box lives inside a team card */
+.mwl-tcard .mwl-skills {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  padding: 0.7rem 0.8rem;
+  margin-top: 0;
+}
+.mwl-tcard .mwl-skills__title {
+  color: var(--paper-70);
+}
+.mwl-tcard .mwl-skill-name {
+  color: var(--paper-90);
+}
+.mwl-tcard .mwl-skill-empty,
+.mwl-tcard .mwl-skill-more {
+  color: var(--paper-50);
+}
+.mwl-tcard .mwl-iconbtn {
+  color: var(--paper-50);
+}
+.mwl-tcard .mwl-iconbtn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.mwl-tcard .mwl-seg {
+  background: rgba(255, 255, 255, 0.14);
+}
+.mwl-tcard .mwl-seg--on {
+  background: linear-gradient(180deg, var(--indigo-glow), var(--violet));
+}
+
+/* ── Monthly ledger (signature element) ── */
+.mwl-ledger-wrap {
+  margin-top: 1.4rem;
+  overflow-x: auto;
+}
+.mwl-ledger {
+  min-width: 520px;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.mwl-ledger__head,
+.mwl-ledger__row {
+  display: grid;
+  grid-template-columns: 1.4fr 1.3fr 0.8fr 0.9fr 0.9fr 0.4fr;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.1rem;
+}
+.mwl-ledger__head {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-50);
+  border-bottom: 1px solid var(--line);
+}
+.mwl-ledger__num {
+  justify-self: end;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.mwl-ledger__row {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background 0.12s;
+}
+.mwl-ledger__row:last-child {
+  border-bottom: none;
+}
+.mwl-ledger__row:hover {
+  background: var(--surface);
+}
+.mwl-ledger__row:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: -2px;
+}
+.mwl-ledger__month {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--ink-90);
+}
+.mwl-ledger__hours {
+  justify-self: stretch;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-family: var(--font-mono);
+}
+.mwl-ledger__bar {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 62%;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.07), rgba(129, 140, 248, 0.24));
+  border-radius: 4px;
+  z-index: 0;
+}
+.mwl-ledger__hoursval {
+  position: relative;
+  z-index: 1;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+.mwl-ledger__zero {
+  color: var(--ink-30);
+  font-size: 0.85rem;
+}
+.mwl-ledger__chev {
+  justify-self: end;
+  color: var(--ink-30);
+  font-size: 1.15rem;
+  transition: transform 0.12s, color 0.12s;
+}
+.mwl-ledger__row:hover .mwl-ledger__chev {
+  color: var(--indigo);
+  transform: translateX(2px);
+}
+.mwl-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}
+.mwl-pill--done {
+  color: var(--success);
+  background: rgba(5, 150, 105, 0.1);
+}
+.mwl-pill--missing {
+  color: var(--rose);
+  background: rgba(225, 29, 72, 0.1);
+}
+.mwl-pill--manday {
+  color: var(--indigo);
+  background: rgba(79, 70, 229, 0.1);
+}
+
+/* ── Team overview grid ── */
+.mwl-team {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem;
+}
+.mwl-tcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: var(--r-xl);
+  color: var(--paper-90);
+  cursor: pointer;
+  background:
+    radial-gradient(120% 140% at 0% 0%, #1b2344 0%, transparent 55%),
+    radial-gradient(120% 140% at 100% 100%, #241a4a 0%, transparent 55%),
+    var(--ink);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.14s, box-shadow 0.14s;
+}
+.mwl-tcard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 4px rgba(11, 16, 32, 0.05), 0 16px 34px rgba(11, 16, 32, 0.16);
+}
+.mwl-tcard:focus-visible {
+  outline: 2px solid var(--indigo-glow);
+  outline-offset: 2px;
+}
+.mwl-tcard--muted {
+  background: #434a5e;
+  color: var(--paper-70);
+}
+.mwl-tcard__top {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.mwl-tcard__avatar {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+}
+.mwl-tcard__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mwl-tcard__avatar--edit {
+  cursor: pointer;
+}
+.mwl-tcard__letter {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--paper-90);
+}
+.mwl-tcard__avatar-x {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: var(--rose);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+.mwl-tcard__id {
+  min-width: 0;
+}
+.mwl-tcard__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mwl-tcard__sub {
+  font-size: 0.76rem;
+  color: var(--paper-70);
+}
+.mwl-tcard__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: var(--r-md);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.78rem;
+}
+.mwl-tcard__roleline {
+  display: flex;
+  gap: 0.4rem;
+}
+.mwl-tcard__rolelabel {
+  color: var(--paper-50);
+  flex-shrink: 0;
+}
+.mwl-tcard__roleval {
+  color: var(--paper-90);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mwl-tcard__missing {
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fecaca;
+  background: rgba(225, 29, 72, 0.22);
+  border: 1px solid rgba(225, 29, 72, 0.35);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+
+/* Quiet the dashboard motion for reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+  .mwl-ledger__row,
+  .mwl-ledger__chev,
+  .mwl-tcard {
+    transition: none;
+  }
+  .mwl-tcard:hover {
+    transform: none;
+  }
+  .mwl-ledger__row:hover .mwl-ledger__chev {
+    transform: none;
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    RESPONSIVE + REDUCED MOTION
    ───────────────────────────────────────────────────────────────────────── */

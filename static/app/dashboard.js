@@ -1,103 +1,20 @@
+// The individual dashboard — staff card, stat cards, project roles, skills box
+// and the monthly ledger — is now rendered by the React island (#dashboard-root,
+// DashboardIsland.tsx). This shim just notifies that island to (re)load for the
+// current #member-select / #year-select. Kept as a function so the existing
+// core.js context flow (onContextChange) needs no change.
 async function loadDashboard() {
-    if (!currentMemberId) return;
-    console.time('loadDashboard');
-    const year = document.getElementById('year-select').value;
-    const data = await api(`/api/dashboard?member_id=${currentMemberId}&year=${year}`);
-    if (!data) {
-        console.timeEnd('loadDashboard');
-        return;
-    }
-
-    // Staff card + summary stats are now owned by the React dashboard island
-    // (#dashboard-root). These nodes may be absent; write only if present so the
-    // vanilla skills/monthly rendering below still runs.
-    const _setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    _setText('dash-total-hours', data.total_hours);
-    _setText('dash-total-done', data.total_done);
-    _setText('dash-total-ip', data.total_in_progress);
-    _setText('dash-lvl', data.member.level);
-    _setText('dash-name', data.member.name);
-    _setText('dash-dept', data.member.department);
-    _setText('dash-empid', "ID : " + currentMemberId);
-    if (document.getElementById('dash-avatar-wrap')) {
-        _renderDashAvatar(currentMemberId, data.member.name, data.member.avatar_url);
-    }
-
-    // Render skills box
-    const skillsGrid = document.getElementById('dashboard-member-grid');
-    if (skillsGrid) {
-        if (!_skillsByMember[currentMemberId]) {
-            try {
-                const s = await api(`/api/members/${currentMemberId}/skills`);
-                _skillsByMember[currentMemberId] = s || [];
-            } catch (e) { _skillsByMember[currentMemberId] = []; }
-        }
-        const canEdit = isElevated() || String(currentMemberId) === String(currentUser.member_id);
-        skillsGrid.innerHTML = `
-            <div class="rounded-2xl p-5 text-white shadow-sm w-full" style="background:#4f46e5">
-                ${_renderMemberSkillsBox(currentMemberId, canEdit, 16)}
-            </div>
-        `;
-    }
-
-    //Render monthly breakdown
-    const tbody = document.getElementById('dash-months');
-    tbody.innerHTML = '';
-    data.months.forEach(m => {
-        const tr = document.createElement('tr');
-        tr.className = 'month-row border-b border-gray-100';
-        tr.onclick = () => {
-            document.getElementById('month-select').value = m.month;
-            showTab('worklog');
-        };
-        tr.innerHTML = `
-            <td class="py-2 px-3 font-medium">${t('months.full')[m.month] || m.name}</td>
-            <td class="py-2 px-3 text-right">${m.total_hours}</td>
-            <td class="py-2 px-3 text-right"><span class="badge badge-done">${m.done}</span></td>
-            <td class="py-2 px-3 text-right">${(m.missing && m.missing > 0)
-                ? `<span class="inline-flex items-center text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5">${m.missing}</span>`
-                : `<span class="text-gray-400 text-xs">0</span>`}</td>
-            <td class="py-2 px-3 text-right"><span class="badge badge-manday">${m.man_day}</span></td>
-            <td class="py-2 px-3 text-right text-gray-400">
-                <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-
-    loadProjectRoles();
-    console.timeEnd('loadDashboard');
+    window.dispatchEvent(new Event('mwl:dashboard'));
 }
 
 // ── Project Roles ──
 let _addProjectRoleType = null;
 
+// Project-role tags are now rendered by the React dashboard island. This shim
+// is the refresh hook the (still-vanilla) Add-Project modal calls after a
+// successful assign/unassign — it just notifies the island to reload.
 async function loadProjectRoles() {
-    if (!currentMemberId) return;
-    const canManage = isElevated() || String(currentMemberId) === String(currentUser.member_id);
-
-    // Show/hide + buttons based on permission
-    document.getElementById('btn-add-main').classList.toggle('hidden', !canManage);
-    document.getElementById('btn-add-support').classList.toggle('hidden', !canManage);
-
-    const data = await api(`/api/members/${currentMemberId}/project-roles`);
-    if (!data) return;
-
-    const renderTags = (containerId, items, type, bgStyle) => {
-        const el = document.getElementById(containerId);
-        el.innerHTML = items.length
-            ? items.map(p => `
-                <span class="inline-flex items-center gap-1 text-white text-xs font-medium px-2.5 py-1 rounded" style="background:${bgStyle}">
-                    ${esc(p.name)}
-                    ${canManage ? `<button onclick="removeProjectRole(${p.id},'${type}')" class="ml-1 opacity-70 hover:opacity-100 leading-none" title="Remove">×</button>` : ''}
-                </span>`).join('')
-            : '';
-    };
-
-    renderTags('main-project-tags',    data.main,    'main',    '#4f46e5');
-    renderTags('support-project-tags', data.support, 'support', '#059669');
+    window.dispatchEvent(new Event('mwl:dashboard'));
 }
 
 function openAddProjectModal(type) {
@@ -218,110 +135,12 @@ function _renderMemberSkillsBox(memberId, canEdit, limit = SKILL_PREVIEW_COUNT) 
     `;
 }
 
+// The Team Overview grid is now a React island (#overall-member-grid,
+// TeamOverviewIsland.tsx) that self-fetches members/projects/skills/missing.
+// This shim notifies it to (re)load; it is still called by core.js's
+// onContextChange / onOverallMonthChange when the overall view is active.
 async function loadOverallDashboard() {
-    // Resolve year + month for the missing-entry per-card badge
-    const yrEl = document.getElementById('year-select');
-    const moEl = document.getElementById('overall-month-select');
-    const yr = (yrEl && yrEl.value) ? parseInt(yrEl.value) : new Date().getFullYear();
-    const mo = (moEl && moEl.value) ? parseInt(moEl.value) : (new Date().getMonth() + 1);
-
-    // Fetch skills and missing-entry map in parallel
-    let _missingMap = {};
-    try {
-        const [skills, missing] = await Promise.all([
-            api('/api/skills'),
-            api(`/api/dashboard/missing?year=${yr}&month=${mo}`),
-        ]);
-        _skillsByMember = skills && typeof skills === 'object' ? skills : {};
-        _missingMap = (missing && typeof missing === 'object' && !Array.isArray(missing)) ? missing : {};
-    } catch (e) {
-        _skillsByMember = {};
-        _missingMap = {};
-    }
-
-    // Build member→projects map from the already-loaded projects array (no extra API calls)
-    const memberProjects = {};
-    members.forEach(m => { memberProjects[m.id] = { main: [], support: [] }; });
-
-    projects.forEach(p => {
-        const parseProjectMembers = (str) => {
-            if (!str) return [];
-            const s = str.trim();
-            if (s.startsWith('[')) { try { return JSON.parse(s).filter(n => n); } catch (e) {} }
-            return s.split('#').map(n => n.trim()).filter(n => n);
-        };
-        const hasMember = (items, member) => items.some(item => {
-            const numericId = Number(item);
-            if (Number.isFinite(numericId) && numericId === Number(member.id)) return true;
-            return String(item).trim() === member.name;
-        });
-        const mainMembers = parseProjectMembers(p.main_members);
-        const suppMembers = parseProjectMembers(p.support_members);
-        members.forEach(m => {
-            if (hasMember(mainMembers, m)) memberProjects[m.id].main.push(p.name);
-            if (hasMember(suppMembers, m)) memberProjects[m.id].support.push(p.name);
-        });
-    });
-
-    const countEl = document.getElementById('overall-member-count');
-    if (countEl) countEl.textContent = t('dash.members_count', members.length);
-
-    const grid = document.getElementById('overall-member-grid');
-    grid.innerHTML = '';
-
-    members.forEach(m => {
-        const roles = memberProjects[m.id];
-        const hasProjects = roles.main.length > 0 || roles.support.length > 0;
-
-        const card = document.createElement('div');
-        card.className = 'rounded-2xl p-5 text-white text-center cursor-pointer transition-all duration-150 hover:scale-105 hover:shadow-lg select-none';
-        card.style.background = hasProjects ? '#4f46e5' : '#9ca3af';
-
-        const mainText = roles.main.length ? esc(roles.main.join(', ')) : '<span class="opacity-50">—</span>';
-        const suppText = roles.support.length ? esc(roles.support.join(', ')) : '<span class="opacity-50">—</span>';
-
-        const canEditThis = isElevated() || (currentUser && String(currentUser.member_id) === String(m.id));
-        const canEditAvatar = canEditAvatarFor(m.id);
-        const skillsHTML = _renderMemberSkillsBox(m.id, canEditThis);
-        const avatarHTML = _renderGridAvatar(m, canEditAvatar);
-
-        // Per-card "Missing N days" badge (hidden if 0 or no row in map)
-        const eidKey = String(m.staff_id || '');
-        const missCount = (_missingMap && _missingMap[eidKey]) ? Number(_missingMap[eidKey]) : 0;
-        const missingLabel = (typeof t === 'function')
-            ? t('dash.missing_n_days', missCount)
-            : `Missing ${missCount} day${missCount !== 1 ? 's' : ''}`;
-        const missingHTML = missCount > 0 ? `
-            <div class="mt-2 flex justify-center">
-                <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5">
-                    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    ${esc(missingLabel)}
-                </span>
-            </div>` : '';
-
-        card.innerHTML = `
-            ${avatarHTML}
-            <div class="font-semibold text-sm leading-tight mb-1">${esc(m.name)}</div>
-            <div class="text-xs opacity-80 mb-0.5">ID : ${esc(m.staff_id || '—')}</div>
-            <div class="text-xs opacity-80 mb-3">Position : ${esc(m.position || '—')}</div>
-            <div class="text-left rounded-xl p-2.5 text-xs space-y-1" style="background:rgba(0,0,0,0.15)">
-                <div class="flex gap-1"><span class="opacity-70 shrink-0">Main :</span><span class="font-medium truncate">${mainText}</span></div>
-                <div class="flex gap-1"><span class="opacity-70 shrink-0">Support :</span><span class="font-medium truncate">${suppText}</span></div>
-            </div>
-            ${skillsHTML}
-            ${missingHTML}
-        `;
-
-        card.onclick = () => {
-            document.getElementById('member-select').value = m.id;
-            currentMemberId = m.id;
-            onContextChange();
-        };
-
-        grid.appendChild(card);
-    });
+    window.dispatchEvent(new Event('mwl:dashboard'));
 }
 
 function toggleSkillSort() {
@@ -336,12 +155,22 @@ function toggleSkillSort() {
 let _skillsEditMemberId = null;
 let _skillsEditDraft = [];   // [{id?, name, level, _new?, _deleted?, _dirty?}]
 
-function openSkillsManager(memberId) {
+async function openSkillsManager(memberId) {
     _skillsEditMemberId = memberId;
-    _skillsEditDraft = (_skillsByMember[memberId] || []).map(s => ({
+    // The React dashboard now owns loading, so the _skillsByMember cache is no
+    // longer kept fresh by loadOverallDashboard. Fetch this member's skills
+    // on demand so the editor always seeds from current data (also after a save).
+    let skills;
+    try {
+        skills = await api(`/api/members/${memberId}/skills`) || [];
+    } catch (e) {
+        skills = [];
+    }
+    _skillsByMember[memberId] = skills;
+    _skillsEditDraft = skills.map(s => ({
         id: s.id, name: s.name, level: s.level,
     }));
-    const member = members.find(m => m.id === memberId);
+    const member = members.find(m => String(m.id) === String(memberId));
     const titleEl = document.getElementById('skills-modal-title');
     if (titleEl) titleEl.textContent = `Skills — ${member ? member.name : ''}`;
     renderSkillsEditor();

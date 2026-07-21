@@ -10,7 +10,13 @@
 // set in DM Mono. Clicking a month row hands control back to the vanilla shell
 // (#month-select + showTab('worklog')) so the rest of the app is unchanged.
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '../lib'
+import type { ProjectRolesResp, Skill } from '../lib'
+import { api, canManageMember, useCurrentUser } from '../lib'
+import { MonthlyLedger } from './MonthlyLedger'
+import { ProjectRoles } from './ProjectRoles'
+import { SkillsBox } from './SkillsBox'
+
+const EMPTY_ROLES: ProjectRolesResp = { main: [], support: [] }
 
 interface DashMember {
   name: string
@@ -64,7 +70,10 @@ function currentMemberId(): string {
 }
 
 export function DashboardIsland() {
+  const user = useCurrentUser()
   const [data, setData] = useState<DashboardData | null>(null)
+  const [skills, setSkills] = useState<Skill[]>([])
+  const [roles, setRoles] = useState<ProjectRolesResp>(EMPTY_ROLES)
   const [loading, setLoading] = useState(false)
   const [memberId, setMemberId] = useState<string>(currentMemberId())
   const [, bumpLang] = useState(0)
@@ -78,13 +87,17 @@ export function DashboardIsland() {
     }
     const year = readSelect('year-select') || String(new Date().getFullYear())
     setLoading(true)
-    const [dash, employees] = await Promise.all([
+    const [dash, employees, sk, pr] = await Promise.all([
       api<DashboardData>(
         `/api/dashboard?member_id=${encodeURIComponent(id)}&year=${encodeURIComponent(year)}`,
       ),
       api<Array<{ id: string; jg?: string }>>('/api/employees'),
+      api<Skill[]>(`/api/members/${encodeURIComponent(id)}/skills`),
+      api<ProjectRolesResp>(`/api/members/${encodeURIComponent(id)}/project-roles`),
     ])
     setLoading(false)
+    setSkills(sk.data ?? [])
+    setRoles(pr.data ?? EMPTY_ROLES)
     if (!dash.ok || !dash.data) {
       setData(null)
       return
@@ -132,10 +145,15 @@ export function DashboardIsland() {
     )
   }
 
+  const canManage = canManageMember(user, memberId)
+
   return (
     <div className={`mwl-dash ${loading ? '' : 'mwl-fadein'}`}>
       <StaffIdentityCard member={data.member} memberId={memberId} />
       <StatCards data={data} />
+      <ProjectRoles memberId={memberId} roles={roles} canManage={canManage} />
+      <SkillsBox memberId={memberId} skills={skills} canManage={canManage} limit={16} />
+      <MonthlyLedger months={data.months} />
     </div>
   )
 }
