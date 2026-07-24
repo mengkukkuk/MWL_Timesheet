@@ -1,31 +1,31 @@
 {
   "_lib-!~{003}~.js": {
-    "file": "assets/lib-BwPnxY_s.css",
+    "file": "assets/lib-BGAZQ1vR.css",
     "src": "_lib-!~{003}~.js"
   },
-  "_lib-Cu04kng9.js": {
-    "file": "assets/lib-Cu04kng9.js",
+  "_lib-DsKtRIWC.js": {
+    "file": "assets/lib-DsKtRIWC.js",
     "name": "lib",
     "css": [
-      "assets/lib-BwPnxY_s.css"
+      "assets/lib-BGAZQ1vR.css"
     ]
   },
   "dashboard.html": {
-    "file": "assets/dashboard-Cx7GDbLP.js",
+    "file": "assets/dashboard-DGut8IIh.js",
     "name": "dashboard",
     "src": "dashboard.html",
     "isEntry": true,
     "imports": [
-      "_lib-Cu04kng9.js"
+      "_lib-DsKtRIWC.js"
     ]
   },
   "login.html": {
-    "file": "assets/login-_6kldigf.js",
+    "file": "assets/login-Kh1m-qfZ.js",
     "name": "login",
     "src": "login.html",
     "isEntry": true,
     "imports": [
-      "_lib-Cu04kng9.js"
+      "_lib-DsKtRIWC.js"
     ]
   }
 }
