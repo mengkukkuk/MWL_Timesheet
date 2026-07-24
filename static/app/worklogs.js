@@ -14,244 +14,45 @@ async function loadWorklogs() {
 
     document.getElementById('btn-add-worklog').classList.toggle('hidden', !canEditMember(currentMemberId));
 
-    updateMissingEntryCount();
-    clearFilters(false);
-    populateFilterProject();
-    applyFilters();
+    // The Work Log table/calendar are now a React island (#worklog-view-root,
+    // WorklogIsland.tsx) — stash the payload and notify it to (re)render.
+    window.__mwlWorklogs = {
+        worklogs: worklogData,
+        holidays: holidayData,
+        year: parseInt(year, 10),
+        month: parseInt(month, 10),
+    };
+    window.dispatchEvent(new CustomEvent('mwl:worklogs'));
 }
 
-function populateFilterProject() {
-    const sel = document.getElementById('filter-project');
-    const val = sel.value;
-    sel.innerHTML = `<option value="">${t('wl.all_projects')}</option>`;
-    const seen = new Set();
-    worklogData.forEach(w => {
-        if (w.project && !seen.has(w.project)) {
-            seen.add(w.project);
-            const opt = document.createElement('option');
-            opt.value = w.project;
-            opt.textContent = w.project;
-            sel.appendChild(opt);
-        }
-    });
-    sel.value = val;
-}
+// ── Bulk select (selection state now lives in the React island; this module
+// var is the target-ids buffer the island passes in when it opens the bulk
+// modal / triggers a bulk delete) ──
+let _bulkTargetIds = [];
 
-function applyFilters() {
-    const search  = document.getElementById('filter-search').value.toLowerCase().trim();
-    const status  = document.getElementById('filter-status').value;
-    const project = document.getElementById('filter-project').value;
-
-    const filtered = worklogData.filter(w => {
-        if (status  && w.status  !== status)  return false;
-        if (project && w.project !== project) return false;
-        if (search) {
-            const hay = `${w.project || ''} ${w.task || ''} ${w.note || ''}`.toLowerCase();
-            if (!hay.includes(search)) return false;
-        }
-        return true;
-    });
-
-    const countEl = document.getElementById('filter-count');
-    if (search || status || project) {
-        countEl.textContent = t('wl.filter_count', filtered.length, worklogData.length);
-        countEl.classList.remove('hidden');
-    } else {
-        countEl.classList.add('hidden');
-    }
-
-    renderCurrentView(filtered);
-}
-
-function updateMissingEntryCount() {
-    const bar   = document.getElementById('missing-count-bar');
-    const label = document.getElementById('missing-count-label');
-    if (!bar || !label) return;
-
-    if (!currentMemberId) { bar.classList.add('hidden'); return; }
-
-    const year  = parseInt(document.getElementById('year-select').value);
-    const month = parseInt(document.getElementById('month-select').value);
-    const daysInMonth = new Date(year, month, 0).getDate();
-
-    const daysWithEntry = new Set();
-    const holidayWithEntry = new Set();
-    worklogData.forEach(w => {
-        if (!w.log_date) return;
-        daysWithEntry.add(parseInt(w.log_date.split('-')[2]));
-    });
-
-    holidayData.forEach(h => {
-        if (!h.date) return;
-        holidayWithEntry.add(parseInt(h.date.split('-')[2]));
-    });
-
-    let missing = 0;
-    for (let d = 1; d <= daysInMonth; d++) {
-        const dow = new Date(year, month - 1, d).getDay(); // 0=Sun, 6=Sat
-        if (dow === 0 || dow === 6) continue;        // skip weekends
-        if (holidayWithEntry.has(d)) continue;       // skip holidays
-        if (!daysWithEntry.has(d)) missing++;
-    }
-
-    if (missing === 0) {
-        bar.classList.add('hidden');
-    } else {
-        label.textContent = `Total missing entry = ${missing} day${missing !== 1 ? 's' : ''}`;
-        bar.classList.remove('hidden');
-    }
-}
-
-function clearFilters(rerender = true) {
-    document.getElementById('filter-search').value  = '';
-    document.getElementById('filter-status').value  = '';
-    document.getElementById('filter-project').value = '';
-    document.getElementById('filter-count').classList.add('hidden');
-    if (rerender) renderCurrentView(worklogData);
-}
-
-function renderCurrentView(data) {
-    if (currentWorklogView === 'calendar') {
-        renderWorklogs(data);       // keep table in sync (hidden)
-        renderCalendar(data);
-    } else {
-        renderWorklogs(data);
-    }
-}
-
-// ── View Toggle ──
-function setWorklogView(view) {
-    currentWorklogView = view;
-    document.getElementById('toggle-table').classList.toggle('active', view === 'table');
-    document.getElementById('toggle-calendar').classList.toggle('active', view === 'calendar');
-    document.getElementById('worklog-table-view').classList.toggle('hidden', view !== 'table');
-    document.getElementById('worklog-calendar-view').classList.toggle('hidden', view !== 'calendar');
-    if (view === 'calendar') {
-        applyFilters();   // re-render calendar with current filters
-    }
-}
-
-// ── Worklog multi-select state ──
-let worklogSelectedIds = new Set();
-let _worklogVisibleData = [];
-
-function renderWorklogs(data) {
-    const canEdit = canEditMember(currentMemberId);
-    const tbody   = document.getElementById('worklog-body');
-    const empty   = document.getElementById('worklog-empty');
-    const thCb    = document.getElementById('wl-th-checkbox');
-    tbody.innerHTML = '';
-    _worklogVisibleData = data;
-    // Drop selections that are no longer visible (e.g. month changed)
-    const visibleIds = new Set(data.map(w => w.id));
-    [...worklogSelectedIds].forEach(id => { if (!visibleIds.has(id)) worklogSelectedIds.delete(id); });
-    if (thCb) thCb.style.display = canEdit ? '' : 'none';
-
-    if (data.length === 0) {
-        empty.classList.remove('hidden');
-        const emptyAddBtn = empty.querySelector('button');
-        if (emptyAddBtn) emptyAddBtn.classList.toggle('hidden', !canEdit);
-        _updateWorklogBulkBar();
-        return;
-    }
-    empty.classList.add('hidden');
-
-    data.forEach(w => {
-        const tr = document.createElement('tr');
-        tr.className = 'border-b border-gray-100';
-        const dateStr   = formatDate(w.log_date);
-        const statusCls = w.status === 'Done' ? 'badge-done' : w.status === 'In Progress' ? 'badge-progress' : w.status === 'Man day' ? 'badge-manday' : 'badge-pending';
-        const isSelected = worklogSelectedIds.has(w.id);
-        const rowEditable = canEdit && Number(w.IsEditRow) !== 0;
-        const cbCell = rowEditable
-            ? `<td class="py-2 px-2 text-center"><input type="checkbox" data-wl-cb="${w.id}" ${isSelected ? 'checked' : ''} onclick="onWorklogRowToggle(event, ${w.id})" class="rounded"></td>`
-            : (canEdit ? `<td></td>` : '');
-        const actions   = rowEditable ? `
-                <button class="btn-icon" onclick='editWorklog(${JSON.stringify(w)})' title="Edit">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                </button>
-                <button class="btn-icon danger" onclick="deleteWorklog(${w.id})" title="Delete">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </button>` : '';
-        tr.innerHTML = `
-            ${cbCell}
-            <td class="py-2 px-2 whitespace-nowrap">${dateStr}</td>
-            <td class="py-2 px-2"><span class="project-name-cell" title="${esc(w.project_description || w.project || '')}">${esc(w.project || '')}</span></td>
-            <td class="py-2 px-2">${esc(w.task || '')}</td>
-            <td class="py-2 px-2 text-center">${w.start_time || ''}</td>
-            <td class="py-2 px-2 text-center">${w.end_time || ''}</td>
-            <td class="py-2 px-2 text-right font-medium">${w.hours != null ? w.hours.toFixed(2) : ''}</td>
-            <td class="py-2 px-2 text-center"><span class="badge ${statusCls}">${w.status || ''}</span></td>
-            <td class="py-2 px-2 text-gray-500">${esc(w.note || '')}</td>
-            <td class="py-2 px-2 whitespace-nowrap">${actions}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-    _updateWorklogBulkBar();
-}
-
-function onWorklogRowToggle(ev, id) {
-    ev.stopPropagation();
-    if (ev.target.checked) worklogSelectedIds.add(id);
-    else worklogSelectedIds.delete(id);
-    _updateWorklogBulkBar();
-}
-
-function onWorklogSelectAll(ev) {
-    const checked = ev.target.checked;
-    _worklogVisibleData.forEach(w => {
-        if (checked) worklogSelectedIds.add(w.id);
-        else worklogSelectedIds.delete(w.id);
-    });
-    document.querySelectorAll('[data-wl-cb]').forEach(cb => { cb.checked = checked; });
-    _updateWorklogBulkBar();
-}
-
-function clearWorklogSelection() {
-    worklogSelectedIds.clear();
-    document.querySelectorAll('[data-wl-cb]').forEach(cb => { cb.checked = false; });
-    const all = document.getElementById('wl-select-all');
-    if (all) { all.checked = false; all.indeterminate = false; }
-    _updateWorklogBulkBar();
-}
-
-function _updateWorklogBulkBar() {
-    const bar = document.getElementById('wl-bulk-bar');
-    const count = document.getElementById('wl-bulk-count');
-    const all = document.getElementById('wl-select-all');
-    if (!bar || !count) return;
-    const n = worklogSelectedIds.size;
-    bar.classList.toggle('hidden', n === 0);
-    count.textContent = String(n);
-    if (all) {
-        const visN = _worklogVisibleData.length;
-        const sel = _worklogVisibleData.filter(w => worklogSelectedIds.has(w.id)).length;
-        all.checked = visN > 0 && sel === visN;
-        all.indeterminate = sel > 0 && sel < visN;
-    }
-}
-
-async function bulkDeleteWorklogs() {
-    const ids = [...worklogSelectedIds];
-    if (!ids.length) return;
-    if (!confirm(`Delete ${ids.length} selected entr${ids.length === 1 ? 'y' : 'ies'}?`)) return;
+async function bulkDeleteWorklogs(ids) {
+    if (Array.isArray(ids)) _bulkTargetIds = ids;
+    const targets = _bulkTargetIds;
+    if (!targets.length) return;
+    if (!confirm(`Delete ${targets.length} selected entr${targets.length === 1 ? 'y' : 'ies'}?`)) return;
     let ok = 0, fail = 0;
-    for (const id of ids) {
+    for (const id of targets) {
         const res = await api(`/api/worklogs/${id}`, { method: 'DELETE' });
         if (res && !res.error) ok++; else fail++;
     }
     if (ok) toast(`Deleted ${ok} entr${ok === 1 ? 'y' : 'ies'}`);
     if (fail) toast(`${fail} delete${fail === 1 ? '' : 's'} failed`, 'error');
-    clearWorklogSelection();
+    _bulkTargetIds = [];
     await loadWorklogs();
 }
 
-function openBulkEditModal() {
-    if (!worklogSelectedIds.size) return;
+function openBulkEditModal(ids) {
+    if (Array.isArray(ids)) _bulkTargetIds = ids;
+    if (!_bulkTargetIds.length) return;
     const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     const setVal  = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
     const setChk  = (id, v) => { const el = document.getElementById(id); if (el) el.checked = v; };
-    setText('wl-bulk-edit-count', String(worklogSelectedIds.size));
+    setText('wl-bulk-edit-count', String(_bulkTargetIds.length));
     setChk('bulk-apply-project', false);
     setChk('bulk-apply-status',  false);
     setChk('bulk-apply-note',    false);
@@ -290,7 +91,7 @@ async function confirmBulkEdit(ev) {
     const newProj   = document.getElementById('bulk-project').value;
     const newStatus = document.getElementById('bulk-status').value;
     const newNote   = document.getElementById('bulk-note').value;
-    const ids = [...worklogSelectedIds];
+    const ids = _bulkTargetIds;
     let ok = 0, fail = 0;
     // PUT requires the full payload — fetch each existing entry from worklogData,
     // override only the bulk-changed fields, and send back.
@@ -315,14 +116,10 @@ async function confirmBulkEdit(ev) {
     if (ok) toast(`Updated ${ok} entr${ok === 1 ? 'y' : 'ies'}`);
     if (fail) toast(`${fail} update${fail === 1 ? '' : 's'} failed`, 'error');
     closeBulkEditModal();
-    clearWorklogSelection();
     await loadWorklogs();
 }
 
 try {
-    window.onWorklogRowToggle = onWorklogRowToggle;
-    window.onWorklogSelectAll = onWorklogSelectAll;
-    window.clearWorklogSelection = clearWorklogSelection;
     window.bulkDeleteWorklogs = bulkDeleteWorklogs;
     window.openBulkEditModal = openBulkEditModal;
     window.closeBulkEditModal = closeBulkEditModal;

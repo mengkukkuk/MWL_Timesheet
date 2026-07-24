@@ -8,7 +8,6 @@ function isElevated() {
 let members = [];
 let projects = [];
 let worklogData = [];
-let currentWorklogView = 'table'; // 'table' or 'calendar'
 let _multiAddMode = false;
 const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
@@ -198,17 +197,12 @@ async function showTab(name) {
     if (name === 'worklog') {
         const noMemberEl  = document.getElementById('worklog-no-member');
         const contentEl   = document.getElementById('worklog-content');
-        const tableView   = document.getElementById('worklog-table-view');
-        const calView     = document.getElementById('worklog-calendar-view');
         if (!currentMemberId) {
             if (noMemberEl) noMemberEl.classList.remove('hidden');
             if (contentEl)  contentEl.classList.add('hidden');
         } else {
             if (noMemberEl) noMemberEl.classList.add('hidden');
             if (contentEl)  contentEl.classList.remove('hidden');
-            // Restore the correct view without showing both at once
-            if (tableView) tableView.classList.toggle('hidden', currentWorklogView !== 'table');
-            if (calView)   calView.classList.toggle('hidden',   currentWorklogView !== 'calendar');
             loadWorklogs();
         }
         return;
@@ -398,12 +392,8 @@ function onContextChange() {
         // Unhide worklog content pane that showTab('worklog') hid while no member was selected
         const noMemberEl = document.getElementById('worklog-no-member');
         const contentEl  = document.getElementById('worklog-content');
-        const tableView  = document.getElementById('worklog-table-view');
-        const calView    = document.getElementById('worklog-calendar-view');
         if (noMemberEl) noMemberEl.classList.add('hidden');
         if (contentEl)  contentEl.classList.remove('hidden');
-        if (tableView)  tableView.classList.toggle('hidden', currentWorklogView !== 'table');
-        if (calView)    calView.classList.toggle('hidden',   currentWorklogView !== 'calendar');
         loadWorklogs();
     }
     else if (active && active.id === 'tab-allowance') {

@@ -13,6 +13,11 @@
     {% for href in dash_assets.css %}
     <link rel="stylesheet" href="{{ href }}">
     {% endfor %}
+    <!-- React worklog island (Vite bundle): CSS in head, JS module before </body>. -->
+    {% set wl_assets = vite_asset('worklog') %}
+    {% for href in wl_assets.css %}
+    <link rel="stylesheet" href="{{ href }}">
+    {% endfor %}
     <!-- Chart.js is lazy-loaded on demand by dashboard/projects-summary modules to reduce initial payload. -->
     <!-- Eager frontend modules: load in parallel via `defer` (executes in document order, downloads concurrently). -->
     <script defer src="/static/app/i18n.js?v={{ static_v('app/i18n.js') }}"></script>
@@ -210,22 +215,11 @@
             </div>
             <div id="worklog-content" class="hidden">
             <div class="flex flex-wrap items-center gap-2 mb-4">
-                <!-- Month selector + view toggle -->
+                <!-- Month selector (table/calendar toggle, filters, missing-entry bar and bulk
+                     bar now live in the React worklog island below) -->
                 <div class="flex items-center gap-2 flex-none">
                     <label class="text-sm font-medium text-gray-600" data-i18n="wl.month_label">Month:</label>
                     <select id="month-select" onchange="loadWorklogs()" class="input-field w-36"></select>
-                </div>
-                <div class="view-toggle flex-none" id="view-toggle">
-                    <button id="toggle-table" class="view-toggle-btn active" onclick="setWorklogView('table')" title="Table view" aria-label="Table view">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                        </svg>
-                    </button>
-                    <button id="toggle-calendar" class="view-toggle-btn" onclick="setWorklogView('calendar')" title="Calendar view" aria-label="Calendar view">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                        </svg>
-                    </button>
                 </div>
                 <!-- Spacer pushes buttons right on wide screens -->
                 <div class="flex-1"></div>
@@ -245,105 +239,9 @@
                 </button>
             </div>
 
-            <!-- Filter Bar -->
-            <div class="flex flex-wrap items-center gap-2 mb-3">
-                <div class="search-wrap relative flex-1" style="min-width:140px;">
-                    <svg class="search-icon absolute w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
-                    </svg>
-                    <input id="filter-search" type="text" placeholder="...Search by project, task, or note..."
-                           oninput="applyFilters()" class="input-field w-full pl-10" data-i18n-ph="wl.search_ph">
-                </div>
-                <select id="filter-status" onchange="applyFilters()" class="input-field" style="min-width:7rem;flex:0 1 auto;">
-                    <option value="" data-i18n="wl.all_status">All Status</option>
-                    <option value="Done">Done</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Man day">Man day</option>
-                </select>
-                <select id="filter-project" onchange="applyFilters()" class="input-field" style="min-width:8rem;flex:1 1 auto;">
-                    <option value="" data-i18n="wl.all_projects">All Projects</option>
-                </select>
-                <button onclick="clearFilters()" class="btn-secondary text-sm px-3 whitespace-nowrap flex-none" data-i18n="wl.clear">Clear</button>
-                <span id="filter-count" class="hidden text-xs text-gray-400 whitespace-nowrap"></span>
-            </div>
-
-            <!-- Missing entry count bar -->
-            <div id="missing-count-bar" class="hidden mb-3 -mt-1">
-                <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-2.5 py-1">
-                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    <span id="missing-count-label"></span>
-                </span>
-            </div>
-
-            <!-- Bulk action bar (shown when ≥1 row selected) -->
-            <div id="wl-bulk-bar" class="hidden flex flex-wrap items-center gap-2 mb-3 p-2 rounded-lg bg-indigo-50 border border-indigo-200">
-                <span class="text-sm text-indigo-700"><span id="wl-bulk-count">0</span> <span data-i18n="wl.bulk_selected">selected</span></span>
-                <div class="flex-1"></div>
-                <button onclick="openBulkEditModal()" class="btn-secondary text-sm px-3" data-i18n="wl.bulk_edit">Bulk Edit</button>
-                <button onclick="bulkDeleteWorklogs()" class="btn-secondary text-sm px-3 text-red-600 border-red-200 hover:bg-red-50" data-i18n="wl.bulk_delete">Bulk Delete</button>
-                <button onclick="clearWorklogSelection()" class="btn-secondary text-sm px-3" data-i18n="btn.cancel">Cancel</button>
-            </div>
-
-            <!-- Table View -->
-            <div id="worklog-table-view">
-                <div class="card bg-white">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm" id="worklog-table">
-                            <thead>
-                                <tr class="border-b border-gray-200">
-                                    <th class="py-2 px-2 w-8" id="wl-th-checkbox">
-                                        <input type="checkbox" id="wl-select-all" onclick="onWorklogSelectAll(event)" class="rounded">
-                                    </th>
-                                    <th class="text-left py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_date">Date</th>
-                                    <th class="text-left py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_project">Project</th>
-                                    <th class="text-left py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_task">Task</th>
-                                    <th class="text-center py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_start">Start</th>
-                                    <th class="text-center py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_end">End</th>
-                                    <th class="text-right py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_hours">Hours</th>
-                                    <th class="text-center py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_status">Status</th>
-                                    <th class="text-left py-2 px-2 text-gray-500 font-medium" data-i18n="wl.col_note">Note</th>
-                                    <th class="py-2 px-2"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="worklog-body"></tbody>
-                        </table>
-                    </div>
-                    <div id="worklog-empty" class="hidden text-center py-10 text-gray-400">
-                        <p data-i18n="wl.no_entries">No entries for this month yet</p>
-                        <button onclick="openAddWorklog()" class="text-indigo-600 underline text-sm mt-1" data-i18n="wl.add_first">Add your first entry</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Calendar View -->
-            <div id="worklog-calendar-view" class="hidden">
-                <div class="cal-container card bg-white">
-                    <!-- Day-of-week header -->
-                    <div class="cal-grid cal-header-grid">
-                        <div class="cal-dow" data-i18n="cal.mon">Mon</div>
-                        <div class="cal-dow" data-i18n="cal.tue">Tue</div>
-                        <div class="cal-dow" data-i18n="cal.wed">Wed</div>
-                        <div class="cal-dow" data-i18n="cal.thu">Thu</div>
-                        <div class="cal-dow" data-i18n="cal.fri">Fri</div>
-                        <div class="cal-dow cal-weekend-label" data-i18n="cal.sat">Sat</div>
-                        <div class="cal-dow cal-weekend-label" data-i18n="cal.sun">Sun</div>
-                    </div>
-                    <!-- Day cells rendered by JS -->
-                    <div id="cal-body" class="cal-grid cal-body-grid"></div>
-                </div>
-                <!-- Stat summary bar -->
-                <div id="cal-summary" class="flex items-center gap-4 mt-3 px-1">
-                    <span class="text-xs text-gray-400" id="cal-summary-text"></span>
-                    <span class="flex items-center gap-3 ml-auto">
-                        <span class="flex items-center gap-1"><span class="cal-legend-dot" style="background:#059669"></span><span class="text-xs text-gray-500" data-i18n="legend.done">Done</span></span>
-                        <span class="flex items-center gap-1"><span class="cal-legend-dot" style="background:#d97706"></span><span class="text-xs text-gray-500" data-i18n="legend.in_progress">In Progress</span></span>
-                        <span class="flex items-center gap-1"><span class="cal-legend-dot" style="background:#9ca3af"></span><span class="text-xs text-gray-500" data-i18n="legend.pending">Pending</span></span>
-                    </span>
-                </div>
-            </div>
+            <!-- React worklog island: filter bar, view toggle, missing-entry bar, bulk bar,
+                 and the active table/calendar view (WorklogIsland.tsx). -->
+            <div id="worklog-view-root"></div>
             </div><!-- /worklog-content -->
         </div>
 
@@ -1378,6 +1276,10 @@
     <!-- Frontend modules are loaded via `<script defer>` in the <head>, in dependency order. -->
     <!-- React dashboard island bundle (mounts into #dashboard-root; reads #member-select/#year-select). -->
     {% for src in dash_assets.js %}
+    <script type="module" src="{{ src }}"></script>
+    {% endfor %}
+    <!-- React worklog island bundle (mounts into #worklog-view-root; reads #member-select/#year-select/#month-select). -->
+    {% for src in wl_assets.js %}
     <script type="module" src="{{ src }}"></script>
     {% endfor %}
 </body>
