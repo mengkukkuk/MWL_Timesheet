@@ -7,7 +7,7 @@
 // Left brand panel carries the WorkdayTimeline signature; right panel is the
 // disciplined auth card that switches between login / register / reset.
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { api, t, toggleLang, currentLang } from '../lib'
 import type { LoginResp } from '../lib'
 //import { WorkdayTimeline } from './WorkdayTimeline'
@@ -48,11 +48,18 @@ function clearRemembered(): void {
   }
 }
 
+// Small live readout shown on the mobile peek bar — gives the "Workday
+// clock" label something to point at before the user taps into it.
+function formatPeekTime(d: Date): string {
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
 export function LoginApp() {
   const [mode, setMode] = useState<Mode>('login')
   const [msg, setMsg] = useState<Msg>(null)
   const [, forceLang] = useState(0)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('form')
+  const [peekTime, setPeekTime] = useState(() => new Date())
 
   useEffect(() => {
     const onLang = () => {
@@ -61,6 +68,11 @@ export function LoginApp() {
     }
     window.addEventListener('mwl:langchange', onLang)
     return () => window.removeEventListener('mwl:langchange', onLang)
+  }, [])
+
+  useEffect(() => {
+    const id = window.setInterval(() => setPeekTime(new Date()), 15000)
+    return () => window.clearInterval(id)
   }, [])
 
   const switchMode = (m: Mode) => {
@@ -74,11 +86,20 @@ export function LoginApp() {
         <section className="mwl-auth">
           <button
             type="button"
+            className="mwl-login__langtoggle-mobile"
+            onClick={toggleLang}
+            aria-label="Toggle language"
+          >
+            {currentLang() === 'en' ? 'TH' : 'EN'}
+          </button>
+          <button
+            type="button"
             className="mwl-login__peek"
             onClick={() => setMobilePanel('brand')}
           >
             <img className="mwl-login__peek-mark" src="/static/mwllogo.png" alt="" />
-            <span className="mwl-login__peek-text">MeterWorklog · Workday clock</span>
+            <span className="mwl-login__peek-text">Workday clock</span>
+            <span className="mwl-login__peek-time">{formatPeekTime(peekTime)}</span>
             <ChevronRight size={16} />
           </button>
           <div className="mwl-auth__card">
@@ -218,8 +239,11 @@ function LoginForm({ onMsg, msg, onSwitch }: FormProps) {
         <p className="mwl-auth__hint">{t('login.title')}</p>
       </div>
       {locked ? (
-        <div className="mwl-msg mwl-msg--err">
-          {'\uD83D\uDD12'} Account locked. Try again in {lockLabel()}.
+        <div className="mwl-msg mwl-msg--err mwl-msg--lock">
+          <Lock size={15} />
+          <span>
+            Too many failed attempts. Try again in {lockLabel()} {'\u2014'} it clears on its own.
+          </span>
         </div>
       ) : (
         <MessageBox msg={msg} />
@@ -253,13 +277,15 @@ function LoginForm({ onMsg, msg, onSwitch }: FormProps) {
         />
         <span>{t('login.remember')}</span>
       </label>
-      <button className="mwl-btn" type="submit" disabled={busy || locked}>
-        {locked
-          ? `Locked (${lockLabel()})`
-          : busy
-            ? t('login.signing_in')
-            : t('login.login_btn')}
-      </button>
+      <div className="mwl-auth__submitbar">
+        <button className="mwl-btn" type="submit" disabled={busy || locked}>
+          {locked
+            ? `Locked (${lockLabel()})`
+            : busy
+              ? t('login.signing_in')
+              : t('login.login_btn')}
+        </button>
+      </div>
       <div className="mwl-linkrow">
         <button type="button" className="mwl-link" onClick={() => onSwitch('register')}>
           {t('login.create_link')}
@@ -367,9 +393,11 @@ function RegisterForm({ onMsg, msg, onSwitch }: FormProps) {
         />
         <EmployeeStatus lookup={lookup} />
       </div>
-      <button className="mwl-btn" type="submit" disabled={busy}>
-        {busy ? t('login.creating') : t('login.create_link')}
-      </button>
+      <div className="mwl-auth__submitbar">
+        <button className="mwl-btn" type="submit" disabled={busy}>
+          {busy ? t('login.creating') : t('login.create_link')}
+        </button>
+      </div>
       <div className="mwl-linkrow" style={{ justifyContent: 'center' }}>
         <span style={{ color: 'var(--ink-50)' }}>
           {t('login.have_account')}{' '}
@@ -509,9 +537,11 @@ function ResetForm({ onMsg, msg, onSwitch }: FormProps) {
           required
         />
       </div>
-      <button className="mwl-btn" type="submit" disabled={busy}>
-        {busy ? t('login.resetting') : t('login.reset_btn')}
-      </button>
+      <div className="mwl-auth__submitbar">
+        <button className="mwl-btn" type="submit" disabled={busy}>
+          {busy ? t('login.resetting') : t('login.reset_btn')}
+        </button>
+      </div>
       <div className="mwl-linkrow" style={{ justifyContent: 'center' }}>
         <button type="button" className="mwl-link" onClick={() => onSwitch('login')}>
           {t('login.sign_in_link')}

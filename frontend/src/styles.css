@@ -178,6 +178,13 @@
   font-weight: 500;
   color: var(--ink-70);
 }
+.mwl-login__peek-time {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--indigo);
+}
 .mwl-login__peek svg {
   color: var(--indigo);
   flex-shrink: 0;
@@ -195,6 +202,22 @@
   color: var(--paper-90);
   font-size: 0.8rem;
   font-family: var(--font-body);
+  cursor: pointer;
+}
+.mwl-login__langtoggle-mobile {
+  display: none;
+  position: absolute;
+  top: max(1.1rem, env(safe-area-inset-top));
+  right: 1.1rem;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-70);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
   cursor: pointer;
 }
 
@@ -643,6 +666,7 @@
 
 /* Right auth panel */
 .mwl-auth {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -779,6 +803,20 @@
   color: var(--success);
   border: 1px solid rgba(5, 150, 105, 0.2);
 }
+.mwl-msg--lock {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.mwl-msg--lock svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+/* Primary submit action. Transparent wrapper on desktop (spacing still
+   comes from .mwl-linkrow's margin-top below it); becomes a thumb-zone
+   sticky bar on mobile (see >860px override) so the CTA stays reachable
+   without hunting for it after scrolling a longer form. */
 
 .mwl-preview {
   margin-top: 0.85rem;
@@ -1456,17 +1494,63 @@
     width: 50%;
     flex-shrink: 0;
     order: 0;
+    /* The panel currently slid off-screen is hidden from view, tab order,
+       and screen readers — visible/interactive again the instant it starts
+       sliding back in, but only removed once its own slide-out finishes. */
+    transition: visibility 0s linear 0.42s;
+  }
+  .mwl-login__track > .mwl-brand {
+    visibility: hidden;
+  }
+  .mwl-login--show-brand .mwl-login__track > .mwl-brand {
+    visibility: visible;
+    transition-delay: 0s;
+  }
+  .mwl-login--show-brand .mwl-login__track > .mwl-auth {
+    visibility: hidden;
+    transition-delay: 0.42s;
   }
   .mwl-auth {
     align-items: flex-start;
-    padding: 1.75rem 1.25rem;
+    /* Bottom padding reserves room for the fixed thumb-zone CTA bar (see
+       .mwl-auth__submitbar) so it never covers the last form content. */
+    padding: max(1.75rem, calc(env(safe-area-inset-top) + 0.5rem))
+      max(1.25rem, env(safe-area-inset-right))
+      calc(5.5rem + env(safe-area-inset-bottom))
+      max(1.25rem, env(safe-area-inset-left));
   }
   .mwl-brand {
-    padding: 1.75rem 1.5rem 2rem;
+    padding: max(1.75rem, calc(env(safe-area-inset-top) + 0.5rem))
+      max(1.5rem, env(safe-area-inset-right))
+      calc(2rem + env(safe-area-inset-bottom))
+      max(1.5rem, env(safe-area-inset-left));
   }
   .mwl-login__peek,
-  .mwl-login__back {
+  .mwl-login__back,
+  .mwl-login__langtoggle-mobile {
     display: inline-flex;
+  }
+  /* Thumb-zone CTA: pin the primary action to the bottom of the viewport so
+     it's reachable one-handed regardless of scroll position. `position:
+     fixed` (not sticky) — .mwl-login needs overflow-x:hidden to clip the
+     slider track, and ANY non-visible overflow on an ancestor traps
+     position:sticky even when that ancestor never actually scrolls. Fixed
+     isn't trapped by overflow, only by an ancestor's `transform`, and the
+     only transformed ancestor (.mwl-login__track) is untransformed
+     whenever this form panel is the visible one. */
+  .mwl-auth__submitbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    padding: 0.65rem max(1.25rem, env(safe-area-inset-right))
+      calc(0.65rem + env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+    background: linear-gradient(to top, #f7f8fb 60%, rgba(247, 248, 251, 0));
+  }
+  .mwl-auth__submitbar .mwl-btn {
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
   }
   .mwl-staff {
     flex-direction: column;
@@ -1476,7 +1560,9 @@
 }
 
 @media (max-width: 860px) and (prefers-reduced-motion: reduce) {
-  .mwl-login__track {
+  .mwl-login__track,
+  .mwl-login__track > .mwl-auth,
+  .mwl-login__track > .mwl-brand {
     transition: none;
   }
 }

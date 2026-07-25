@@ -1,40 +1,40 @@
 {
   "_lib-!~{004}~.js": {
-    "file": "assets/lib-c-wUBPUc.css",
+    "file": "assets/lib-BlewljFD.css",
     "src": "_lib-!~{004}~.js"
   },
-  "_lib-UqCM-wk5.js": {
-    "file": "assets/lib-UqCM-wk5.js",
+  "_lib-4EpfbpXE.js": {
+    "file": "assets/lib-4EpfbpXE.js",
     "name": "lib",
     "css": [
-      "assets/lib-c-wUBPUc.css"
+      "assets/lib-BlewljFD.css"
     ]
   },
   "dashboard.html": {
-    "file": "assets/dashboard-DnEN9kPv.js",
+    "file": "assets/dashboard-prralN8r.js",
     "name": "dashboard",
     "src": "dashboard.html",
     "isEntry": true,
     "imports": [
-      "_lib-UqCM-wk5.js"
+      "_lib-4EpfbpXE.js"
     ]
   },
   "login.html": {
-    "file": "assets/login-BVuX3eP7.js",
+    "file": "assets/login-DlbnJ18_.js",
     "name": "login",
     "src": "login.html",
     "isEntry": true,
     "imports": [
-      "_lib-UqCM-wk5.js"
+      "_lib-4EpfbpXE.js"
     ]
   },
   "worklog.html": {
-    "file": "assets/worklog-ZW9N2y3Q.js",
+    "file": "assets/worklog-DRjrtCU3.js",
     "name": "worklog",
     "src": "worklog.html",
     "isEntry": true,
     "imports": [
-      "_lib-UqCM-wk5.js"
+      "_lib-4EpfbpXE.js"
     ]
   }
 }
