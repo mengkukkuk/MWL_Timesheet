@@ -1,40 +1,40 @@
 {
   "_lib-!~{004}~.js": {
-    "file": "assets/lib-BlewljFD.css",
+    "file": "assets/lib-JKeAaClm.css",
     "src": "_lib-!~{004}~.js"
   },
-  "_lib-4EpfbpXE.js": {
-    "file": "assets/lib-4EpfbpXE.js",
+  "_lib-4gpk1wRT.js": {
+    "file": "assets/lib-4gpk1wRT.js",
     "name": "lib",
     "css": [
-      "assets/lib-BlewljFD.css"
+      "assets/lib-JKeAaClm.css"
     ]
   },
   "dashboard.html": {
-    "file": "assets/dashboard-prralN8r.js",
+    "file": "assets/dashboard-BH_qh9LQ.js",
     "name": "dashboard",
     "src": "dashboard.html",
     "isEntry": true,
     "imports": [
-      "_lib-4EpfbpXE.js"
+      "_lib-4gpk1wRT.js"
     ]
   },
   "login.html": {
-    "file": "assets/login-DlbnJ18_.js",
+    "file": "assets/login-MxEOcs8H.js",
     "name": "login",
     "src": "login.html",
     "isEntry": true,
     "imports": [
-      "_lib-4EpfbpXE.js"
+      "_lib-4gpk1wRT.js"
     ]
   },
   "worklog.html": {
-    "file": "assets/worklog-DRjrtCU3.js",
+    "file": "assets/worklog-CkhXnzW_.js",
     "name": "worklog",
     "src": "worklog.html",
     "isEntry": true,
     "imports": [
-      "_lib-4EpfbpXE.js"
+      "_lib-4gpk1wRT.js"
     ]
   }
 }

@@ -43,6 +43,17 @@
 /* ─────────────────────────────────────────────────────────────────────────
    LOGIN
    ───────────────────────────────────────────────────────────────────────── */
+/* templates/login.html loads no Tailwind, so nothing supplies a preflight
+   border-box here. Without it `.mwl-input { width: 100% }` adds its padding
+   and border on top of the card width and overflows on narrow screens.
+   Scoped to the login root — the vanilla Tailwind pages keep their own reset. */
+.mwl-login,
+.mwl-login *,
+.mwl-login *::before,
+.mwl-login *::after {
+  box-sizing: border-box;
+}
+
 .mwl-login {
   display: grid;
   grid-template-columns: 1.05fr 1fr;
@@ -51,18 +62,6 @@
   color: var(--ink-90);
   background: var(--surface);
 }
-/* DOM order is auth-first / brand-second (mobile slider order below); pin
-   the desktop visual order back to brand-left / auth-right via `order`. */
-.mwl-login__track {
-  display: contents;
-}
-.mwl-brand {
-  order: 1;
-}
-.mwl-auth {
-  order: 2;
-}
-
 /* Left brand panel — deep ink, centered hero stack (logo / headline / duty
    clock) with the signature workday timeline motif retired in favor of the
    clock's own shift-arc dial. */
@@ -139,71 +138,9 @@
   margin: 0;
 }
 
-/* Mobile-only slider controls (hidden on desktop; see the >860px override
-   near the responsive rules at the bottom of this section). */
-.mwl-login__peek {
-  display: none;
-  align-items: center;
-  gap: 0.6rem;
-  width: 100%;
-  margin-bottom: 1.2rem;
-  padding: 0.55rem 0.9rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  box-shadow: var(--shadow-card);
-  cursor: pointer;
-  text-align: left;
-  font-family: var(--font-body);
-}
-.mwl-login__peek:hover {
-  border-color: var(--indigo-glow);
-}
-.mwl-login__peek-mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  object-fit: contain;
-  background: var(--surface);
-  padding: 3px;
-  flex-shrink: 0;
-}
-.mwl-login__peek-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 0.84rem;
-  font-weight: 500;
-  color: var(--ink-70);
-}
-.mwl-login__peek-time {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--indigo);
-}
-.mwl-login__peek svg {
-  color: var(--indigo);
-  flex-shrink: 0;
-}
-.mwl-login__back {
-  display: none;
-  align-items: center;
-  gap: 0.35rem;
-  align-self: flex-start;
-  margin-bottom: 1rem;
-  padding: 0.4rem 0.7rem 0.4rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--paper-90);
-  font-size: 0.8rem;
-  font-family: var(--font-body);
-  cursor: pointer;
-}
+/* Mobile-only language toggle. The brand panel carries `.mwl-langtoggle` on
+   desktop, but that panel is dropped below 860px, so the auth panel needs
+   its own. */
 .mwl-login__langtoggle-mobile {
   display: none;
   position: absolute;
@@ -1473,42 +1410,16 @@
    RESPONSIVE + REDUCED MOTION
    ───────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
-  /* Two-panel horizontal slider: the sign-in form is the default view; the
-     peek bar / back button (see .mwl-login__peek, .mwl-login__back) slide
-     the workday-clock brand panel in from the right and back. */
+  /* Single panel below 860px: the sign-in form is the whole page. The brand
+     panel and its workday clock are dropped rather than shrunk — the old
+     two-panel slider forced the form into a 50%-of-200% track, which
+     overflowed horizontally on narrow viewports (iPhone SE, 375px). */
   .mwl-login {
     display: block;
-    overflow-x: hidden;
     min-height: 100vh;
   }
-  .mwl-login__track {
-    display: flex;
-    width: 200%;
-    transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .mwl-login--show-brand .mwl-login__track {
-    transform: translateX(-50%);
-  }
-  .mwl-login__track > .mwl-auth,
-  .mwl-login__track > .mwl-brand {
-    width: 50%;
-    flex-shrink: 0;
-    order: 0;
-    /* The panel currently slid off-screen is hidden from view, tab order,
-       and screen readers — visible/interactive again the instant it starts
-       sliding back in, but only removed once its own slide-out finishes. */
-    transition: visibility 0s linear 0.42s;
-  }
-  .mwl-login__track > .mwl-brand {
-    visibility: hidden;
-  }
-  .mwl-login--show-brand .mwl-login__track > .mwl-brand {
-    visibility: visible;
-    transition-delay: 0s;
-  }
-  .mwl-login--show-brand .mwl-login__track > .mwl-auth {
-    visibility: hidden;
-    transition-delay: 0.42s;
+  .mwl-brand {
+    display: none;
   }
   .mwl-auth {
     align-items: flex-start;
@@ -1519,25 +1430,11 @@
       calc(5.5rem + env(safe-area-inset-bottom))
       max(1.25rem, env(safe-area-inset-left));
   }
-  .mwl-brand {
-    padding: max(1.75rem, calc(env(safe-area-inset-top) + 0.5rem))
-      max(1.5rem, env(safe-area-inset-right))
-      calc(2rem + env(safe-area-inset-bottom))
-      max(1.5rem, env(safe-area-inset-left));
-  }
-  .mwl-login__peek,
-  .mwl-login__back,
   .mwl-login__langtoggle-mobile {
     display: inline-flex;
   }
   /* Thumb-zone CTA: pin the primary action to the bottom of the viewport so
-     it's reachable one-handed regardless of scroll position. `position:
-     fixed` (not sticky) — .mwl-login needs overflow-x:hidden to clip the
-     slider track, and ANY non-visible overflow on an ancestor traps
-     position:sticky even when that ancestor never actually scrolls. Fixed
-     isn't trapped by overflow, only by an ancestor's `transform`, and the
-     only transformed ancestor (.mwl-login__track) is untransformed
-     whenever this form panel is the visible one. */
+     it's reachable one-handed regardless of scroll position. */
   .mwl-auth__submitbar {
     position: fixed;
     left: 0;
@@ -1556,14 +1453,6 @@
     flex-direction: column;
     align-items: flex-start;
     text-align: left;
-  }
-}
-
-@media (max-width: 860px) and (prefers-reduced-motion: reduce) {
-  .mwl-login__track,
-  .mwl-login__track > .mwl-auth,
-  .mwl-login__track > .mwl-brand {
-    transition: none;
   }
 }
 

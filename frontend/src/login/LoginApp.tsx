@@ -4,19 +4,17 @@
 //   POST /api/register         (employee_id link; pending-approval result)
 //   POST /api/reset-password   (username + staff_id + new password)
 //   GET  /api/employee-lookup/<id>  (live preview, via useEmployeeLookup)
-// Left brand panel carries the WorkdayTimeline signature; right panel is the
+// Left brand panel carries the workday-clock signature; right panel is the
 // disciplined auth card that switches between login / register / reset.
+// Below 860px the brand panel is dropped entirely (see styles.css) — the form
+// is the whole page, so narrow viewports never have to share their width.
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import { api, t, toggleLang, currentLang } from '../lib'
 import type { LoginResp } from '../lib'
 //import { WorkdayTimeline } from './WorkdayTimeline'
 import { useEmployeeLookup } from './useEmployeeLookup'
 import {ClockTimerWidget} from "../components/ClockTimerWidget.tsx";
-
-// Mobile viewport is a two-panel horizontal slider: the sign-in form is the
-// default view; a peek bar slides the workday-clock brand panel into view.
-type MobilePanel = 'form' | 'brand'
 
 type Mode = 'login' | 'register' | 'reset'
 type Msg = { text: string; kind: 'err' | 'ok' } | null
@@ -48,18 +46,10 @@ function clearRemembered(): void {
   }
 }
 
-// Small live readout shown on the mobile peek bar — gives the "Workday
-// clock" label something to point at before the user taps into it.
-function formatPeekTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-}
-
 export function LoginApp() {
   const [mode, setMode] = useState<Mode>('login')
   const [msg, setMsg] = useState<Msg>(null)
   const [, forceLang] = useState(0)
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>('form')
-  const [peekTime, setPeekTime] = useState(() => new Date())
 
   useEffect(() => {
     const onLang = () => {
@@ -70,86 +60,61 @@ export function LoginApp() {
     return () => window.removeEventListener('mwl:langchange', onLang)
   }, [])
 
-  useEffect(() => {
-    const id = window.setInterval(() => setPeekTime(new Date()), 15000)
-    return () => window.clearInterval(id)
-  }, [])
-
   const switchMode = (m: Mode) => {
     setMode(m)
     setMsg(null)
   }
 
   return (
-    <div className={`mwl-login${mobilePanel === 'brand' ? ' mwl-login--show-brand' : ''}`}>
-      <div className="mwl-login__track">
-        <section className="mwl-auth">
-          <button
-            type="button"
-            className="mwl-login__langtoggle-mobile"
-            onClick={toggleLang}
-            aria-label="Toggle language"
-          >
-            {currentLang() === 'en' ? 'TH' : 'EN'}
-          </button>
-          <button
-            type="button"
-            className="mwl-login__peek"
-            onClick={() => setMobilePanel('brand')}
-          >
-            <img className="mwl-login__peek-mark" src="/static/mwllogo.png" alt="" />
-            <span className="mwl-login__peek-text">Workday clock</span>
-            <span className="mwl-login__peek-time">{formatPeekTime(peekTime)}</span>
-            <ChevronRight size={16} />
-          </button>
-          <div className="mwl-auth__card">
-            {mode === 'login' && (
-              <LoginForm onMsg={setMsg} msg={msg} onSwitch={switchMode} />
-            )}
-            {mode === 'register' && (
-              <RegisterForm onMsg={setMsg} msg={msg} onSwitch={switchMode} />
-            )}
-            {mode === 'reset' && (
-              <ResetForm onMsg={setMsg} msg={msg} onSwitch={switchMode} />
-            )}
+    <div className="mwl-login">
+      <section className="mwl-brand">
+        <button
+          className="mwl-langtoggle"
+          onClick={toggleLang}
+          aria-label="Toggle language"
+        >
+          {currentLang() === 'en' ? 'TH' : 'EN'}
+        </button>
+
+        <div className="mwl-brand__hero">
+          <div className="mwl-brand__logo">
+            <img className="mwl-brand__logo-mark" src="/static/mwllogo.png" alt="" />
+            <span>MeterWorklog</span>
           </div>
-        </section>
+          <h1 className="mwl-brand__headline">
+            Every hour, <em>accounted for.</em>
+          </h1>
+          <p className="mwl-brand__sub">
+            Log the workday against its real boundaries — start, lunch, and the
+            8-hour close.
+          </p>
+          <ClockTimerWidget />
+        </div>
 
-        <section className="mwl-brand">
-          <button
-            className="mwl-langtoggle"
-            onClick={toggleLang}
-            aria-label="Toggle language"
-          >
-            {currentLang() === 'en' ? 'TH' : 'EN'}
-          </button>
-          <button
-            type="button"
-            className="mwl-login__back"
-            onClick={() => setMobilePanel('form')}
-          >
-            <ChevronLeft size={16} />
-            Back to sign in
-          </button>
+        <div className="mwl-brand__footnote">{t('login.title')}</div>
+      </section>
 
-          <div className="mwl-brand__hero">
-            <div className="mwl-brand__logo">
-              <img className="mwl-brand__logo-mark" src="/static/mwllogo.png" alt="" />
-              <span>MeterWorklog</span>
-            </div>
-            <h1 className="mwl-brand__headline">
-              Every hour, <em>accounted for.</em>
-            </h1>
-            <p className="mwl-brand__sub">
-              Log the workday against its real boundaries — start, lunch, and the
-              8-hour close.
-            </p>
-            <ClockTimerWidget />
-          </div>
-
-          <div className="mwl-brand__footnote">{t('login.title')}</div>
-        </section>
-      </div>
+      <section className="mwl-auth">
+        <button
+          type="button"
+          className="mwl-login__langtoggle-mobile"
+          onClick={toggleLang}
+          aria-label="Toggle language"
+        >
+          {currentLang() === 'en' ? 'TH' : 'EN'}
+        </button>
+        <div className="mwl-auth__card">
+          {mode === 'login' && (
+            <LoginForm onMsg={setMsg} msg={msg} onSwitch={switchMode} />
+          )}
+          {mode === 'register' && (
+            <RegisterForm onMsg={setMsg} msg={msg} onSwitch={switchMode} />
+          )}
+          {mode === 'reset' && (
+            <ResetForm onMsg={setMsg} msg={msg} onSwitch={switchMode} />
+          )}
+        </div>
+      </section>
     </div>
   )
 }
