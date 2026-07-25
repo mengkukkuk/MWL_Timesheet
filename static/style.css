@@ -1721,6 +1721,16 @@ body {
     .cal-add-btn       { display: none; }
 }
 
+/* File Share: break out of the max-w-7xl main container to 85% of viewport.
+   margin-left:50% + translateX(-50%) re-centers the wider block on the viewport,
+   regardless of the narrower centered parent. Scoped to this view only. */
+#view-files {
+    width: 85vw;
+    max-width: 85vw;
+    margin-left: 50%;
+    transform: translateX(-50%);
+}
+
 /* File Share — folder tree */
 .folder-tree-node {
     padding: 4px 8px;

@@ -51,15 +51,29 @@
   color: var(--ink-90);
   background: var(--surface);
 }
+/* DOM order is auth-first / brand-second (mobile slider order below); pin
+   the desktop visual order back to brand-left / auth-right via `order`. */
+.mwl-login__track {
+  display: contents;
+}
+.mwl-brand {
+  order: 1;
+}
+.mwl-auth {
+  order: 2;
+}
 
-/* Left brand panel — deep ink with the signature workday timeline */
+/* Left brand panel — deep ink, centered hero stack (logo / headline / duty
+   clock) with the signature workday timeline motif retired in favor of the
+   clock's own shift-arc dial. */
 .mwl-brand {
   position: relative;
   overflow: hidden;
   padding: clamp(2rem, 4vw, 4rem);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
+  text-align: center;
   color: var(--paper-90);
   background:
     radial-gradient(120% 90% at 15% 10%, #1b2344 0%, transparent 60%),
@@ -67,22 +81,39 @@
     var(--ink);
 }
 
+/* Vertically centers the hero cluster between the language toggle and the
+   footnote, while the footnote itself stays pinned to the bottom. */
+.mwl-brand__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: auto 0;
+}
+.mwl-brand__footnote {
+  margin-top: 2rem;
+  font-size: 0.8rem;
+  color: var(--paper-50);
+}
+
+/* Hero logo lockup — the page's primary mark, not a corner wordmark. */
 .mwl-brand__logo {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.85rem;
   font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  font-size: 1.5rem;
+  margin-bottom: 1.7rem;
 }
 .mwl-brand__logo-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
   object-fit: contain;
-  background: rgba(255, 255, 255, 0.06);
-  padding: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 10px;
 }
 
 .mwl-brand__headline {
@@ -106,6 +137,65 @@
   line-height: 1.55;
   color: var(--paper-70);
   margin: 0;
+}
+
+/* Mobile-only slider controls (hidden on desktop; see the >860px override
+   near the responsive rules at the bottom of this section). */
+.mwl-login__peek {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  margin-bottom: 1.2rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+}
+.mwl-login__peek:hover {
+  border-color: var(--indigo-glow);
+}
+.mwl-login__peek-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  object-fit: contain;
+  background: var(--surface);
+  padding: 3px;
+  flex-shrink: 0;
+}
+.mwl-login__peek-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ink-70);
+}
+.mwl-login__peek svg {
+  color: var(--indigo);
+  flex-shrink: 0;
+}
+.mwl-login__back {
+  display: none;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+  margin-bottom: 1rem;
+  padding: 0.4rem 0.7rem 0.4rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper-90);
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  cursor: pointer;
 }
 
 /* Signature: ambient workday timeline (08:30 · 12:00 · 13:00 · 17:30) */
@@ -199,9 +289,362 @@
   color: var(--paper-50);
 }
 
+/* Duty clock — signature login instrument. Frosted-ink card matching the
+   mwl-tcard / mwl-langtoggle glass treatment already used on dark panels. */
+.mwl-clock {
+  position: relative;
+  text-align: left;
+  margin: 1.8rem 0 0.5rem;
+  padding: 1.4rem 1.6rem 1.6rem;
+  width: 100%;
+  max-width: 460px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.mwl-clock__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.mwl-clock__title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.mwl-clock__title-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(129, 140, 248, 0.14);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  color: var(--indigo-glow);
+}
+.mwl-clock__title-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.mwl-clock__eyebrow {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-90);
+}
+.mwl-clock__eyebrow--locked {
+  color: #fecaca;
+}
+.mwl-clock__sub {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--paper-50);
+  margin-top: 2px;
+}
+
+.mwl-clock__tabs {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.mwl-clock__tab {
+  padding: 0.36rem 0.75rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--paper-50);
+  border-radius: 999px;
+  transition: background 0.15s, color 0.15s;
+}
+.mwl-clock__tab:hover {
+  color: var(--paper-90);
+}
+.mwl-clock__tab--active {
+  background: linear-gradient(180deg, var(--indigo-glow), var(--violet));
+  color: var(--ink);
+}
+
+.mwl-clock__body {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+.mwl-clock__dial {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  flex-shrink: 0;
+}
+.mwl-clock__face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.mwl-clock__face-bg {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+.mwl-clock__shift-arc {
+  stroke: rgba(129, 140, 248, 0.35);
+}
+.mwl-clock__ring {
+  stroke: var(--indigo-glow);
+  transition: stroke-dashoffset 0.2s linear;
+}
+.mwl-clock__ring--lockout {
+  stroke: var(--rose);
+  transition: stroke-dashoffset 1s linear;
+}
+.mwl-clock__tick {
+  fill: var(--indigo-glow);
+}
+.mwl-clock__hand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 2px;
+  transform-origin: 50% 100%;
+}
+.mwl-clock__hand--hour {
+  width: 2.5px;
+  height: 29px;
+  margin: -29px 0 0 -1.25px;
+  background: var(--paper-90);
+}
+.mwl-clock__hand--min {
+  width: 2px;
+  height: 44px;
+  margin: -44px 0 0 -1px;
+  background: var(--indigo-glow);
+}
+.mwl-clock__hand--sec {
+  width: 1.5px;
+  height: 49px;
+  margin: -49px 0 0 -0.75px;
+  background: var(--violet);
+}
+.mwl-clock__pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--indigo-glow);
+  border: 2px solid var(--ink);
+}
+.mwl-clock__lock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  color: #fecaca;
+}
+.mwl-clock__lock svg {
+  width: 28px;
+  height: 28px;
+}
+.mwl-clock__lock span {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.mwl-clock__panel {
+  flex: 1;
+  min-width: 0;
+}
+.mwl-clock__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+.mwl-clock__label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-50);
+}
+.mwl-clock__live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: #6ee7b7;
+}
+.mwl-clock__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.mwl-clock__dot--pulse {
+  animation: mwl-clock-pulse 1.6s ease-in-out infinite;
+}
+@keyframes mwl-clock-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.mwl-clock__value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 2.15rem;
+  line-height: 1;
+  color: var(--paper-90);
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+.mwl-clock__value--accent {
+  color: var(--indigo-glow);
+}
+.mwl-clock__value--lock {
+  color: #fecaca;
+  font-size: 2.2rem;
+}
+.mwl-clock__value-ms {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--paper-50);
+}
+.mwl-clock__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--paper-50);
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mwl-clock__actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+.mwl-clock__action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--r-sm);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.84rem;
+  transition: transform 0.12s, opacity 0.15s;
+}
+.mwl-clock__action:hover {
+  transform: translateY(-1px);
+}
+.mwl-clock__action:active {
+  transform: translateY(0);
+}
+.mwl-clock__action--primary {
+  color: #fff;
+  background: linear-gradient(180deg, var(--indigo), var(--indigo-600));
+}
+.mwl-clock__action--pause {
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--indigo-glow), var(--violet));
+}
+.mwl-clock__action--ghost {
+  flex: 0 0 auto;
+  width: 38px;
+  padding: 0;
+  color: var(--paper-70);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.mwl-clock__bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin: 0.6rem 0;
+}
+.mwl-clock__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--indigo-glow), var(--violet));
+  transition: width 0.5s ease;
+}
+.mwl-clock__bounds {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+.mwl-clock__bounds div:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.mwl-clock__bounds div:first-child {
+  display: flex;
+  flex-direction: column;
+}
+.mwl-clock__bounds b {
+  color: var(--paper-90);
+  font-weight: 500;
+}
+.mwl-clock__bounds span {
+  color: var(--paper-50);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mwl-clock__lockmsg {
+  font-size: 0.8rem;
+  color: var(--paper-70);
+  line-height: 1.4;
+  margin-top: 0.3rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mwl-clock__dot--pulse,
+  .mwl-clock__ring,
+  .mwl-clock__ring--lockout,
+  .mwl-clock__action {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* Right auth panel */
 .mwl-auth {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: clamp(1.5rem, 4vw, 3.5rem);
@@ -992,21 +1435,49 @@
    RESPONSIVE + REDUCED MOTION
    ───────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
+  /* Two-panel horizontal slider: the sign-in form is the default view; the
+     peek bar / back button (see .mwl-login__peek, .mwl-login__back) slide
+     the workday-clock brand panel in from the right and back. */
   .mwl-login {
-    grid-template-columns: 1fr;
+    display: block;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+  .mwl-login__track {
+    display: flex;
+    width: 200%;
+    transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .mwl-login--show-brand .mwl-login__track {
+    transform: translateX(-50%);
+  }
+  .mwl-login__track > .mwl-auth,
+  .mwl-login__track > .mwl-brand {
+    width: 50%;
+    flex-shrink: 0;
+    order: 0;
+  }
+  .mwl-auth {
+    align-items: flex-start;
+    padding: 1.75rem 1.25rem;
   }
   .mwl-brand {
-    padding: 1.5rem;
+    padding: 1.75rem 1.5rem 2rem;
   }
-  .mwl-brand__headline,
-  .mwl-brand__sub,
-  .mwl-timeline {
-    display: none;
+  .mwl-login__peek,
+  .mwl-login__back {
+    display: inline-flex;
   }
   .mwl-staff {
     flex-direction: column;
     align-items: flex-start;
     text-align: left;
+  }
+}
+
+@media (max-width: 860px) and (prefers-reduced-motion: reduce) {
+  .mwl-login__track {
+    transition: none;
   }
 }
 
