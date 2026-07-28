@@ -8,6 +8,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+    <!-- React router shell (Vite bundle): drives real tab URLs via #root; see
+         frontend/src/main.tsx + router.tsx. CSS in head, JS module before </body>. -->
+    {% set app_assets = vite_asset('app') %}
+    {% for href in app_assets.css %}
+    <link rel="stylesheet" href="{{ href }}">
+    {% endfor %}
     <!-- React dashboard island (Vite bundle): CSS in head, JS module before </body>. -->
     {% set dash_assets = vite_asset('dashboard') %}
     {% for href in dash_assets.css %}
@@ -79,6 +85,9 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
+    <!-- Router shell mount point — renders nothing visible; drives real tab
+         URLs and hands off to the vanilla showTab(name) below. -->
+    <div id="root"></div>
 
     <!-- Top Nav -->
     <nav class="bg-white shadow-sm border-b border-gray-200">
@@ -89,12 +98,12 @@
             </div>
             <!-- Tab buttons — grow to fill, wrap on small screens -->
             <div class="flex items-center gap-1 flex-wrap flex-1 justify-center min-w-0 py-0.5">
-                <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn active px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.dashboard">Dashboard</button>
-                <button onclick="showTab('worklog')" id="tab-worklog" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.worklog">Work Log</button>
-                <button onclick="showTab('allowance')" id="tab-allowance" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.allowance">Allowance</button>
-                <button onclick="showTab('files')" id="tab-files" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.files">File Share</button>
-                <button onclick="showTab('projects-summary')" id="tab-projects-summary" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium hidden" data-i18n="nav.projects_summary">Projects Summary</button>
-                <button onclick="showTab('settings')" id="tab-settings" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium relative">
+                <button onclick="mwlNavigate('dashboard')" id="tab-dashboard" class="tab-btn active px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.dashboard">Dashboard</button>
+                <button onclick="mwlNavigate('worklog')" id="tab-worklog" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.worklog">Work Log</button>
+                <button onclick="mwlNavigate('allowance')" id="tab-allowance" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.allowance">Allowance</button>
+                <button onclick="mwlNavigate('files')" id="tab-files" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.files">File Share</button>
+                <button onclick="mwlNavigate('projects-summary')" id="tab-projects-summary" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium hidden" data-i18n="nav.projects_summary">Projects Summary</button>
+                <button onclick="mwlNavigate('settings')" id="tab-settings" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium relative">
                     <span data-i18n="nav.settings">Settings</span>
                     <span id="nav-pending-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center" style="display:none">0</span>
                 </button>
@@ -175,7 +184,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
                 <p class="text-lg" data-i18n="wl.no_member_title">Select a team member to view their dashboard</p>
-                <p class="text-sm mt-1"><span data-i18n="wl.no_member_hint2">Or go to</span> <button onclick="showTab('settings')" class="text-indigo-600 underline" data-i18n="wl.no_member_settings">Settings</button> <span data-i18n="wl.no_member_hint3">to add one</span></p>
+                <p class="text-sm mt-1"><span data-i18n="wl.no_member_hint2">Or go to</span> <button onclick="mwlNavigate('settings')" class="text-indigo-600 underline" data-i18n="wl.no_member_settings">Settings</button> <span data-i18n="wl.no_member_hint3">to add one</span></p>
             </div>
 
             <div id="dashboard-content" class="hidden">
@@ -1215,6 +1224,10 @@
     <div id="toast" class="toast hidden"></div>
 
     <!-- Frontend modules are loaded via `<script defer>` in the <head>, in dependency order. -->
+    <!-- React router shell bundle (mounts into #root; drives tab URLs, hands off to showTab()). -->
+    {% for src in app_assets.js %}
+    <script type="module" src="{{ src }}"></script>
+    {% endfor %}
     <!-- React dashboard island bundle (mounts into #dashboard-root; reads #member-select/#year-select). -->
     {% for src in dash_assets.js %}
     <script type="module" src="{{ src }}"></script>

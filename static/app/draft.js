@@ -672,7 +672,7 @@ async function saveDraftDeployment() {
         }
 
         renderDraftPanel();
-        if (typeof loadOverallDashboard === 'function') loadOverallDashboard();
+        window.dispatchEvent(new Event('mwl:dashboard'));
 
     } catch (err) {
         console.error('Deployment failed:', err);

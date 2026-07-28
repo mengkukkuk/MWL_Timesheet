@@ -2,6 +2,7 @@ import json as _json
 import re as _re
 
 from flask import Blueprint
+from flask import abort
 from flask import jsonify
 from flask import render_template
 from flask import request
@@ -14,10 +15,20 @@ from .auth import login_required
 
 core_bp = Blueprint('core', __name__)
 
-@core_bp.route('/')
+@core_bp.route('/', defaults={'path': ''})
+@core_bp.route('/<path:path>')
 @login_required
-def index():
-    return render_template('index.html')
+def spa(path):
+    # SPA catch-all (plan: purring-weaving-pillow.md PR1). templates/app.html
+    # is currently a byte-for-byte copy of templates/index.html — this swap
+    # is a zero-diff staging step before per-tab React-Router extraction.
+    # api/* and static/* (or anything with a file extension) 404 here so
+    # blueprint routes and Flask's static handler keep working; Flask/werkzeug
+    # already prefers explicit rules (e.g. /login in auth.py) over this
+    # generic <path:path> catch-all regardless of registration order.
+    if path.startswith(('api/', 'static/')) or '.' in path.rsplit('/', 1)[-1]:
+        abort(404)
+    return render_template('app.html')
 
 
 @core_bp.route('/api/settings', methods=['GET'])

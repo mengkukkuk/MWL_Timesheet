@@ -1,7 +1,8 @@
 // Monthly breakdown — the dashboard's signature element. Rendered from the
 // months[] already returned by /api/dashboard, so no extra request. Each row is
 // a keyboard-focusable button: activating it sets the vanilla #month-select and
-// calls window.showTab('worklog') (unchanged hand-off to the rest of the app).
+// navigates to /worklog via window.mwlNavigate (router-driven hand-off to the
+// rest of the app — see frontend/src/main.tsx + router.tsx).
 // The design spend: a proportional hours bar behind each Hours figure,
 // normalized to the busiest month, turning the column into a year sparkline —
 // echoing the login's workday-timeline motif. Figures are set in DM Mono.
@@ -18,7 +19,7 @@ export interface MonthRow {
 
 declare global {
   interface Window {
-    showTab?: (name: string) => void
+    mwlNavigate?: (tab: string, opts?: { replace?: boolean }) => void
   }
 }
 
@@ -34,7 +35,7 @@ function fmt(v: number | string | undefined): string {
 function openMonth(month: number): void {
   const sel = document.getElementById('month-select') as HTMLSelectElement | null
   if (sel) sel.value = String(month)
-  window.showTab?.('worklog')
+  window.mwlNavigate?.('worklog')
 }
 
 export function MonthlyLedger({ months }: { months: MonthRow[] }) {

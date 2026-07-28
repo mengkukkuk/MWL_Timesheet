@@ -114,7 +114,7 @@ export function TeamCard({
         </div>
       </div>
 
-      <SkillsBox memberId={member.id} skills={skills} canManage={canManageSkills} />
+      <SkillsBox memberId={member.id} memberName={member.name} skills={skills} canManage={canManageSkills} />
 
       {missing > 0 ? (
         <div className="mwl-tcard__missing">

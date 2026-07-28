@@ -1,16 +1,11 @@
 // Skills box — shared by the individual dashboard (limit 16, matrix layout)
 // and each team card (limit 3, preview). Parents own fetching and pass the
-// skill array in; editing hands off to the still-vanilla Skills Manager modal
-// via window.openSkillsManager(id). Sort mode is local state (replacing the
-// old global _skillSortMode in static/app/dashboard.js).
+// skill array in; editing opens the React-owned SkillsManagerModal (local
+// state, no window bridge). Sort mode is local state (replacing the old
+// global _skillSortMode in static/app/dashboard.js).
 import { useState } from 'react'
 import type { Skill } from '../lib'
-
-declare global {
-  interface Window {
-    openSkillsManager?: (memberId: string | number) => void
-  }
-}
+import { SkillsManagerModal } from './SkillsManagerModal'
 
 const PREVIEW_COUNT = 3
 type SortMode = 'level' | 'name'
@@ -38,14 +33,16 @@ function SkillBar({ level }: { level: number }) {
 
 interface SkillsBoxProps {
   memberId: string
+  memberName: string
   skills: Skill[]
   canManage: boolean
   /** Preview count. Individual dashboard passes 16 (matrix); team cards use 3. */
   limit?: number
 }
 
-export function SkillsBox({ memberId, skills, canManage, limit = PREVIEW_COUNT }: SkillsBoxProps) {
+export function SkillsBox({ memberId, memberName, skills, canManage, limit = PREVIEW_COUNT }: SkillsBoxProps) {
   const [sortMode, setSortMode] = useState<SortMode>('level')
+  const [managing, setManaging] = useState(false)
   const sorted = sortSkills(skills, sortMode)
   const visible = sorted.slice(0, limit)
   const overflow = sorted.length - visible.length
@@ -77,7 +74,7 @@ export function SkillsBox({ memberId, skills, canManage, limit = PREVIEW_COUNT }
               aria-label="Manage skills"
               onClick={(e) => {
                 e.stopPropagation()
-                window.openSkillsManager?.(memberId)
+                setManaging(true)
               }}
             >
               ✎
@@ -100,6 +97,14 @@ export function SkillsBox({ memberId, skills, canManage, limit = PREVIEW_COUNT }
         )}
         {overflow > 0 ? <div className="mwl-skill-more">+{overflow} more</div> : null}
       </div>
+      {managing ? (
+        <SkillsManagerModal
+          memberId={memberId}
+          memberName={memberName}
+          onClose={() => setManaging(false)}
+          onSaved={() => window.dispatchEvent(new Event('mwl:dashboard'))}
+        />
+      ) : null}
     </div>
   )
 }

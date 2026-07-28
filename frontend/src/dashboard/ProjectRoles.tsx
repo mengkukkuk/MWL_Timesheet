@@ -1,19 +1,14 @@
 // Project-role tags (Main / Support) for the individual dashboard. Reads
-// GET /api/members/{id}/project-roles. The "+" opens the still-vanilla
-// Add-Project modal via window.openAddProjectModal(type) — after it commits it
+// GET /api/members/{id}/project-roles. The "+" opens the React-owned
+// ProjectRoleModal (local state, no window bridge) — after it commits it
 // fires `mwl:dashboard`, which the parent island already listens for. Removing
 // a tag is React-owned: POST /api/projects/{id}/unassign, then dispatch
 // `mwl:dashboard` so both the individual and team views refresh.
+import { useState } from 'react'
 import type { ProjectRef, ProjectRolesResp } from '../lib'
 import { api, t, toast } from '../lib'
-
-declare global {
-  interface Window {
-    openAddProjectModal?: (type: 'main' | 'support') => void
-  }
-}
-
-type RoleType = 'main' | 'support'
+import type { RoleType } from './ProjectRoleModal'
+import { ProjectRoleModal } from './ProjectRoleModal'
 
 interface RoleColumnProps {
   label: string
@@ -21,6 +16,7 @@ interface RoleColumnProps {
   memberId: string
   items: ProjectRef[]
   canManage: boolean
+  onAdd: () => void
 }
 
 async function removeRole(pid: number, type: RoleType, memberId: string): Promise<void> {
@@ -35,7 +31,7 @@ async function removeRole(pid: number, type: RoleType, memberId: string): Promis
   }
 }
 
-function RoleColumn({ label, tone, memberId, items, canManage }: RoleColumnProps) {
+function RoleColumn({ label, tone, memberId, items, canManage, onAdd }: RoleColumnProps) {
   return (
     <div className="mwl-proles__col">
       <div className="mwl-proles__head">
@@ -46,7 +42,7 @@ function RoleColumn({ label, tone, memberId, items, canManage }: RoleColumnProps
             className="mwl-addbtn"
             title={`Add ${label.toLowerCase()} project`}
             aria-label={`Add ${label.toLowerCase()} project`}
-            onClick={() => window.openAddProjectModal?.(tone)}
+            onClick={onAdd}
           >
             +
           </button>
@@ -85,6 +81,8 @@ interface ProjectRolesProps {
 }
 
 export function ProjectRoles({ memberId, roles, canManage }: ProjectRolesProps) {
+  const [addType, setAddType] = useState<RoleType | null>(null)
+
   return (
     <div className="mwl-proles">
       <RoleColumn
@@ -93,6 +91,7 @@ export function ProjectRoles({ memberId, roles, canManage }: ProjectRolesProps) 
         memberId={memberId}
         items={roles.main}
         canManage={canManage}
+        onAdd={() => setAddType('main')}
       />
       <RoleColumn
         label={t('dash.support') || 'Support'}
@@ -100,7 +99,16 @@ export function ProjectRoles({ memberId, roles, canManage }: ProjectRolesProps) 
         memberId={memberId}
         items={roles.support}
         canManage={canManage}
+        onAdd={() => setAddType('support')}
       />
+      {addType ? (
+        <ProjectRoleModal
+          memberId={memberId}
+          type={addType}
+          onClose={() => setAddType(null)}
+          onAdded={() => window.dispatchEvent(new Event('mwl:dashboard'))}
+        />
+      ) : null}
     </div>
   )
 }

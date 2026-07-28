@@ -152,7 +152,7 @@ export function DashboardIsland() {
       <StaffIdentityCard member={data.member} memberId={memberId} />
       <StatCards data={data} />
       <ProjectRoles memberId={memberId} roles={roles} canManage={canManage} />
-      <SkillsBox memberId={memberId} skills={skills} canManage={canManage} limit={16} />
+      <SkillsBox memberId={memberId} memberName={data.member.name} skills={skills} canManage={canManage} limit={16} />
       <MonthlyLedger months={data.months} />
     </div>
   )

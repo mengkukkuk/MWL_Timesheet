@@ -90,12 +90,23 @@ def _load_vite_manifest():
 
 
 def _vite_asset(entry):
-    """Resolve a Vite entry name ('login' | 'dashboard') to its hashed asset
-    URLs. Returns {'js': [...], 'css': [...]} with the entry chunk, its imported
-    (shared) chunks, and all associated CSS, de-duplicated and in load order."""
+    """Resolve a Vite entry name ('login' | 'dashboard' | 'app') to its hashed
+    asset URLs. Returns {'js': [...], 'css': [...]} with the entry chunk, its
+    imported (shared) chunks, and all associated CSS, de-duplicated and in
+    load order."""
     manifest = _load_vite_manifest()
     key = f'{entry}.html'
     node = manifest.get(key)
+    if not node:
+        # Manifest keys are the entry's *source file* (rollupOptions.input
+        # value), not its input key — these only coincide by naming
+        # convention (e.g. dashboard -> dashboard.html). The 'app' entry's
+        # source is frontend/index.html (Vite's dev-server root file), so it
+        # needs a fallback lookup by the manifest node's own `name` field.
+        for candidate_key, candidate in manifest.items():
+            if candidate.get('isEntry') and candidate.get('name') == entry:
+                key, node = candidate_key, candidate
+                break
     if not node:
         return {'js': [], 'css': []}
     js, css, seen = [], [], set()

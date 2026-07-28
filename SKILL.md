@@ -35,11 +35,12 @@ Logs land in `<app>\logs\` (rotated at 5 MB):
 ## 2. Prerequisites (one-time per host)
 
 1. **Python 3.11+** with `py -m venv .venv` then `.venv\Scripts\pip install -r requirements.txt`.
-2. **Microsoft ODBC Driver 17 for SQL Server** — must match `DB_DRIVER` in `.env`.
-3. **NSSM** at `C:\Windows\System32\nssm.exe` (download from https://nssm.cc/download).
-4. **ngrok v3** unpacked to `<app>\ngrokv3\ngrok.exe`. Sign in at ngrok.com and reserve a domain.
-5. **Tailscale** (optional) — install from https://tailscale.com/download/windows and `tailscale up`. HTTPS must be enabled in the tailnet admin panel before `tailscale serve` will work.
-6. **`.env`** at repo root. The **full** key list is in
+2. **Node.js 20+** — required to build the React frontend: `cd frontend && npm install && npm run build` (produces `static/react/`, which the Flask app serves; not needed just to run pytest/backend-only work).
+3. **Microsoft ODBC Driver 17 for SQL Server** — must match `DB_DRIVER` in `.env`.
+4. **NSSM** at `C:\Windows\System32\nssm.exe` (download from https://nssm.cc/download).
+5. **ngrok v3** unpacked to `<app>\ngrokv3\ngrok.exe`. Sign in at ngrok.com and reserve a domain.
+6. **Tailscale** (optional) — install from https://tailscale.com/download/windows and `tailscale up`. HTTPS must be enabled in the tailnet admin panel before `tailscale serve` will work.
+7. **`.env`** at repo root. The **full** key list is in
    [CLAUDE.md §10](CLAUDE.md). Minimum required:
    ```env
    SECRET_KEY=<random-long-string>
@@ -223,7 +224,9 @@ Then have that user log out / in to refresh their session role.
 | [db.py](db.py) | Connection (`get_connection`) + migration runner (`init_db`) |
 | [init_db.sql](init_db.sql) | Schema, executed batch-by-batch on `\nGO\n` |
 | [init_db2.sql](init_db2.sql) | Alternate/older variant — **NOT auto-applied**; manual `sqlcmd -i` only |
-| [app/__init__.py](app/__init__.py) | Flask app factory, CSRF/origin check, blueprint registration |
+| [app/__init__.py](app/__init__.py) | Flask app factory, CSRF/origin check, blueprint registration, Vite manifest bridge (`vite_asset()`) |
 | [app/cache.py](app/cache.py) | In-process TTLCache for list endpoints (no Redis needed) |
+| [frontend/](frontend) | React/TypeScript source, built by Vite (`npm run build`) into `static/react/` — see [CLAUDE.md §6](CLAUDE.md) |
+| [static/react/](static/react) | Vite build **output** (git-ignored); do not edit directly, rebuild from `frontend/` instead |
 | [logintest/](logintest) | Out-of-scope: ad-hoc SQL login-setup helpers, not used by deploy |
 | [logs/](logs) | Service stdout/stderr (auto-rotated at 5 MB) |

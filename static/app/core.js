@@ -111,13 +111,24 @@ async function initializeApp() {
 
     // Restore last selected tab from previous session (if available)
     try {
+        // Signals to the React router shell (frontend/src/components/LegacyRoute.tsx)
+        // that /api/me + members/projects are loaded, so route-driven showTab()
+        // calls are safe from here on (see LegacyRoute's __mwlCoreReady guard).
+        window.__mwlCoreReady = true;
         const last = localStorage.getItem('lastTab');
         const allowedTabs = new Set(['dashboard', 'worklog', 'allowance', 'files', 'projects-summary', 'settings']);
-        let toShow = allowedTabs.has(last) ? last : 'dashboard';
+        // The URL path is authoritative on cold load (deep link / hard refresh)
+        // — only fall back to the last-visited tab for a bare "/" (root router
+        // redirect hasn't resolved yet at this point in script execution order).
+        const pathTab = window.location.pathname.replace(/^\//, '');
+        let toShow = allowedTabs.has(pathTab) ? pathTab : (allowedTabs.has(last) ? last : 'dashboard');
         // protect against unauthorized tabs
         if (toShow === 'settings' && !isElevated()) toShow = 'dashboard';
         if (toShow === 'projects-summary' && !isElevated()) toShow = 'dashboard';
         showTab(toShow);
+        // Sync the router's URL to the tab just restored (no-op until
+        // frontend/src/main.tsx has mounted and defined window.mwlNavigate).
+        if (typeof window.mwlNavigate === 'function') window.mwlNavigate(toShow, { replace: true });
         // Restore Squad Draft state (open/closed + selected project) after
         // core context (members/projects/currentUser) is ready. draft.js is
         // lazy-loaded — only fetch when needed, after first paint.
@@ -127,6 +138,7 @@ async function initializeApp() {
             }
         }).catch(() => { /* draft panel stays closed — non-critical */ });
     } catch (e) {
+        window.__mwlCoreReady = true;
         onContextChange();
     }
 }
@@ -176,7 +188,7 @@ function populateOverallMonthSelect() {
 
 function onOverallMonthChange() {
     if (currentMemberId) return;   // only relevant in Overall view
-    if (typeof loadOverallDashboard === 'function') loadOverallDashboard();
+    window.dispatchEvent(new Event('mwl:dashboard'));
 }
 try { window.onOverallMonthChange = onOverallMonthChange; } catch (e) {}
 
@@ -377,7 +389,7 @@ function onContextChange() {
         const mwrap = document.getElementById('overall-month-wrap');
         if (mwrap) mwrap.style.display = '';
         if (typeof populateOverallMonthSelect === 'function') populateOverallMonthSelect();
-        if (!active || active.id === 'tab-dashboard') loadOverallDashboard();
+        if (!active || active.id === 'tab-dashboard') window.dispatchEvent(new Event('mwl:dashboard'));
         return;
     }
     document.getElementById('overall-dashboard').classList.add('hidden');
@@ -387,7 +399,7 @@ function onContextChange() {
     document.getElementById('no-member-msg').classList.add('hidden');
     document.getElementById('dashboard-content').classList.remove('hidden');
 
-    if (active && active.id === 'tab-dashboard') loadDashboard();
+    if (active && active.id === 'tab-dashboard') window.dispatchEvent(new Event('mwl:dashboard'));
     else if (active && active.id === 'tab-worklog') {
         // Unhide worklog content pane that showTab('worklog') hid while no member was selected
         const noMemberEl = document.getElementById('worklog-no-member');

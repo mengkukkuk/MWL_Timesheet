@@ -1,5 +1,7 @@
-// ── MeterWorklog i18n — TH / EN ──
-const _i18n = {
+// AUTO-PORTED from static/app/i18n.js — TH / EN translation dictionary.
+// This is the source of truth for React components; static/app/i18n.js keeps
+// its own independent copy until every tab is migrated (see plan PR10).
+export const dict = {
     en: {
         // Nav
         'nav.dashboard': 'Dashboard',
@@ -61,9 +63,9 @@ const _i18n = {
         'dash.team_overview': 'Team Overview',
         'dash.has_project': 'Has project',
         'dash.no_project': 'No project',
-        'dash.members_count': n => `${n} member${n !== 1 ? 's' : ''}`,
+        'dash.members_count': (n: number) => `${n} member${n !== 1 ? 's' : ''}`,
         'dash.overall_month_label': 'Month:',
-        'dash.missing_n_days': n => `Missing ${n} day${n !== 1 ? 's' : ''}`,
+        'dash.missing_n_days': (n: number) => `Missing ${n} day${n !== 1 ? 's' : ''}`,
 
         // Dashboard cards
         'dash.total_hours': 'Total Hours',
@@ -105,7 +107,7 @@ const _i18n = {
         'wl.all_status': 'All Status',
         'wl.all_projects': 'All Projects',
         'wl.clear': 'Clear',
-        'wl.filter_count': (f, t) => `${f} of ${t} entries`,
+        'wl.filter_count': (f: any, t: any) => `${f} of ${t} entries`,
 
         // Table headers
         'wl.col_date': 'Date',
@@ -149,7 +151,7 @@ const _i18n = {
         // Calendar day-of-week
         'cal.mon': 'Mon', 'cal.tue': 'Tue', 'cal.wed': 'Wed',
         'cal.thu': 'Thu', 'cal.fri': 'Fri', 'cal.sat': 'Sat', 'cal.sun': 'Sun',
-        'cal.summary': (e, h) => `${e} entries · ${h} hours this month`,
+        'cal.summary': (e: any, h: any) => `${e} entries · ${h} hours this month`,
 
         // Calendar legend
         'legend.done': 'Done',
@@ -289,8 +291,8 @@ const _i18n = {
         'toast.entry_added': 'Entry added',
         'toast.entry_updated': 'Entry updated',
         'toast.entry_deleted': 'Entry deleted',
-        'toast.added_multi': (ok, mems, dayLabel) => `Added ${ok} entr${ok === 1 ? 'y' : 'ies'} across ${mems} member${mems > 1 ? 's' : ''}${dayLabel}`,
-        'toast.added_days': (ok, days) => `Added ${ok} entries over ${days} days`,
+        'toast.added_multi': (ok: number, mems: number, dayLabel: any) => `Added ${ok} entr${ok === 1 ? 'y' : 'ies'} across ${mems} member${mems > 1 ? 's' : ''}${dayLabel}`,
+        'toast.added_days': (ok: any, days: any) => `Added ${ok} entries over ${days} days`,
         'toast.user_removed': 'User removed',
         'toast.role_updated': 'Role updated',
         'toast.pw_updated': 'Password updated',
@@ -366,9 +368,9 @@ const _i18n = {
         'dash.team_overview': 'ภาพรวมทีม',
         'dash.has_project': 'มีโปรเจกต์',
         'dash.no_project': 'ไม่มีโปรเจกต์',
-        'dash.members_count': n => `${n} คน`,
+        'dash.members_count': (n: any) => `${n} คน`,
         'dash.overall_month_label': 'เดือน:',
-        'dash.missing_n_days': n => `ขาดการบันทึก ${n} วัน`,
+        'dash.missing_n_days': (n: any) => `ขาดการบันทึก ${n} วัน`,
 
         // Dashboard cards
         'dash.total_hours': 'ชั่วโมงรวม',
@@ -410,7 +412,7 @@ const _i18n = {
         'wl.all_status': 'ทุกสถานะ',
         'wl.all_projects': 'ทุกโปรเจกต์',
         'wl.clear': 'ล้าง',
-        'wl.filter_count': (f, t) => `${f} จาก ${t} รายการ`,
+        'wl.filter_count': (f: any, t: any) => `${f} จาก ${t} รายการ`,
 
         // Table headers
         'wl.col_date': 'วันที่',
@@ -454,7 +456,7 @@ const _i18n = {
         // Calendar day-of-week
         'cal.mon': 'จ.', 'cal.tue': 'อ.', 'cal.wed': 'พ.',
         'cal.thu': 'พฤ.', 'cal.fri': 'ศ.', 'cal.sat': 'ส.', 'cal.sun': 'อา.',
-        'cal.summary': (e, h) => `${e} รายการ · ${h} ชั่วโมงในเดือนนี้`,
+        'cal.summary': (e: any, h: any) => `${e} รายการ · ${h} ชั่วโมงในเดือนนี้`,
 
         // Calendar legend
         'legend.done': 'เสร็จ',
@@ -594,8 +596,8 @@ const _i18n = {
         'toast.entry_added': 'เพิ่มรายการแล้ว',
         'toast.entry_updated': 'อัปเดตรายการแล้ว',
         'toast.entry_deleted': 'ลบรายการแล้ว',
-        'toast.added_multi': (ok, mems, dayLabel) => `เพิ่ม ${ok} รายการ สำหรับ ${mems} คน${dayLabel}`,
-        'toast.added_days': (ok, days) => `เพิ่ม ${ok} รายการ ใน ${days} วัน`,
+        'toast.added_multi': (ok: any, mems: any, dayLabel: any) => `เพิ่ม ${ok} รายการ สำหรับ ${mems} คน${dayLabel}`,
+        'toast.added_days': (ok: any, days: any) => `เพิ่ม ${ok} รายการ ใน ${days} วัน`,
         'toast.user_removed': 'ลบผู้ใช้แล้ว',
         'toast.role_updated': 'อัปเดตตำแหน่งแล้ว',
         'toast.pw_updated': 'อัปเดตรหัสผ่านแล้ว',
@@ -610,59 +612,5 @@ const _i18n = {
     }
 };
 
-// ── Core functions ──
-let _lang = 'en';
-try { const s = localStorage.getItem('appLang'); if (s === 'th' || s === 'en') _lang = s; } catch (e) {}
-
-function t(key, ...args) {
-    const dict = _i18n[_lang] || _i18n.en;
-    const val = (dict[key] !== undefined) ? dict[key] : (_i18n.en[key] !== undefined ? _i18n.en[key] : key);
-    return typeof val === 'function' ? val(...args) : val;
-}
-
-function applyTranslations() {
-    // Text content
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        el.textContent = t(el.dataset.i18n);
-    });
-    // Placeholder attributes
-    document.querySelectorAll('[data-i18n-ph]').forEach(el => {
-        el.placeholder = t(el.dataset.i18nPh);
-    });
-    // Update member select first option (placeholder)
-    const sel = document.getElementById('member-select');
-    if (sel && sel.options[0]) sel.options[0].text = t('sel.select_ph');
-    // Update toggle button label
-    const btn = document.getElementById('lang-toggle-btn');
-    if (btn) btn.textContent = _lang === 'th' ? 'EN' : 'TH';
-    document.documentElement.lang = _lang;
-}
-
-function toggleLang() {
-    _lang = _lang === 'en' ? 'th' : 'en';
-    try { localStorage.setItem('appLang', _lang); } catch (e) {}
-    applyTranslations();
-    // Re-render currently visible tab
-    try {
-        const active = document.querySelector('.tab-btn.active');
-        const mid = typeof currentMemberId !== 'undefined' ? currentMemberId : null;
-        if (active) {
-            if (active.id === 'tab-dashboard') {
-                window.dispatchEvent(new Event('mwl:dashboard'));
-            } else if (active.id === 'tab-worklog' && mid && typeof loadWorklogs === 'function') {
-                loadWorklogs();
-            } else if (active.id === 'tab-settings') {
-                if (typeof loadMembersList === 'function') loadMembersList();
-                if (typeof loadProjectsList === 'function') loadProjectsList();
-                if (typeof loadUsersList === 'function') loadUsersList();
-            }
-        }
-    } catch (e) {}
-}
-
-// Apply immediately on page load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyTranslations);
-} else {
-    applyTranslations();
-}
+export type Lang = keyof typeof dict
+export type DictKey = keyof (typeof dict)['en']

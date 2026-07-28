@@ -23,7 +23,7 @@ exposed externally via **ngrok** and/or **Tailscale Serve**.
 | ------------ | -------------------------------------------------------- |
 | Web server   | Flask 3.1 (dev) + Waitress 3.0 (prod, via NSSM)          |
 | Database     | Microsoft SQL Server (Express) via pyodbc + ODBC 17      |
-| Frontend     | Vanilla JavaScript SPA + Tailwind CSS (CDN), no build    |
+| Frontend     | Hybrid: vanilla JS SPA (Tailwind CDN, no build) being migrated to React 19 + TypeScript islands built with Vite, glued together by react-router — see §6 |
 | Auth         | Server-side sessions (Flask `session`, signed cookie)    |
 | Excel export | `openpyxl` against template workbooks in `templates/`    |
 | Service host | NSSM (`nssm.exe`) — registers the Python + ngrok procs   |
@@ -45,38 +45,62 @@ mwl deploy/
 ├── migrate_to_employee.py  # One-shot migration: members.id → EmployeeID
 │
 ├── app/                    # Flask app package — blueprints
-│   ├── __init__.py         # Flask factory, config, CSRF, blueprint reg
+│   ├── __init__.py         # Flask factory, config, CSRF, blueprint reg, Vite manifest bridge (vite_asset())
 │   ├── auth.py             # Login, logout, decorators (@login_required, @elevated_required, @admin_required)
 │   ├── cache.py            # In-process TTLCache (cachetools) for /api/members, /api/projects, /api/employees
 │   ├── constants.py        # Roles, ELEVATED_ROLES tuple
-│   ├── core.py             # /api/me, settings, misc plumbing
+│   ├── core.py             # SPA catch-all route (spa()), /api/settings, misc plumbing
 │   ├── members.py          # Legacy members table — GET only (POST/PUT/DELETE disabled; use /api/employees)
 │   ├── employees.py        # dbo.Employee CRUD (HR directory — authoritative)
 │   ├── projects.py         # Projects + per-employee role assignments
 │   ├── skills.py           # Per-employee skill records
 │   ├── worklogs.py         # Worklog CRUD + dashboard + projects-summary
+│   ├── allowance.py        # Daily allowance entries per employee/project (dbo.Allowance)
 │   ├── users.py            # User account admin (approve/role/reset)
 │   ├── avatars.py          # Profile photo upload/serve
 │   ├── files.py            # File-share tree, upload/download
 │   ├── exports.py          # Excel export from openpyxl templates
 │   └── helpers.py          # parse_time, parse_members, format_members
 │
+├── frontend/                # React + TypeScript build, compiled by Vite — see §6
+│   ├── vite.config.ts       # Entries (app/login/dashboard/worklog), dev proxy to Flask, manualChunks
+│   ├── package.json         # react, react-dom, react-router, @tanstack/react-query
+│   ├── index.html / login.html / dashboard.html / worklog.html   # one Vite entry HTML per bundle
+│   └── src/
+│       ├── main.tsx              # `app` entry — mounts #root, RouterProvider, exposes window.mwlNavigate
+│       ├── router.tsx            # createBrowserRouter: one path per tab, each rendering <LegacyRoute>
+│       ├── queryClient.ts        # TanStack Query client
+│       ├── lib.ts                # api<T>() fetch wrapper + shared payload types
+│       ├── i18n/                 # dict.ts + index.ts (ported from static/app/i18n.js)
+│       ├── components/LegacyRoute.tsx  # bridges a router path to the vanilla showTab(name)
+│       ├── lib/legacyBridge.ts   # two-way ?member=&y= URL <-> #member-select/#year-select sync
+│       ├── login/                # standalone login island (LoginApp.tsx, WorkdayTimeline.tsx, ...)
+│       ├── dashboard/            # dashboard island (DashboardIsland.tsx, TeamCard.tsx, MonthlyLedger.tsx, ...)
+│       └── worklog/              # worklog table/calendar island (WorklogIsland.tsx, WorklogTable.tsx, ...)
+│
 ├── static/
 │   ├── app.js              # Bootstrap shim — fires `modulesLoaded` event after defer scripts run
 │   ├── app.js.bak          # LEGACY pre-modularization monolith — should be deleted
 │   ├── style.css           # Custom CSS (extends Tailwind CDN)
 │   ├── mwllogo.png
-│   └── app/                # Frontend modules — eager via <script defer> + lazy via loadModuleOnce()
+│   ├── react/              # Vite build OUTPUT (git-ignored) — hashed js/css + .vite/manifest.json,
+│   │                       #   read by app/__init__.py's vite_asset() Jinja global. Run `npm run build`
+│   │                       #   in frontend/ to (re)generate.
+│   └── app/                # Vanilla frontend modules — eager via <script defer> + lazy via loadModuleOnce()
 │       ├── i18n.js         # TH / EN translation tables                      [EAGER]
-│       ├── core.js         # Tab router (showTab), api(), session, loader    [EAGER]
-│       ├── dashboard.js    # Per-employee monthly dashboard                  [EAGER]
+│       ├── core.js         # Tab router (showTab), api(), session, __mwlCoreReady flag, loader [EAGER]
 │       ├── worklogs.js     # Worklog table CRUD UI                           [EAGER]
 │       ├── calendar.js     # Calendar view of worklogs                       [EAGER]
+│       ├── allowance.js    # Allowance tab UI                                [EAGER]
 │       ├── export.js       # Single + bulk Excel export                      [EAGER]
 │       ├── settings.js     # Admin settings panel                            [LAZY]
 │       ├── files.js        # File-share UI                                   [LAZY]
+│       ├── file-preview.js # File preview modal                              [LAZY]
 │       ├── projects-summary.js  # Projects Summary tab (elevated only)       [LAZY]
 │       └── draft.js        # Squad Draft side panel                          [LAZY]
+│       # Note: the per-employee monthly dashboard is no longer a vanilla
+│       # module — it is the `dashboard` React island (frontend/src/dashboard/),
+│       # mounted inside templates/app.html.
 │
 ├── logintest/              # Ad-hoc SQL helpers (SYSTEM login setup) — NOT part of deploy pipeline
 │   ├── setup_system_login.sql   # Idempotent SYSTEM login setup (preferred if needed)
@@ -85,8 +109,14 @@ mwl deploy/
 │   └── worklog_deployaaaa.txt   # Stale chat-dump notes (candidate for deletion)
 │
 ├── templates/
-│   ├── index.html          # Single-page app shell (all tabs + modals)
-│   ├── login.html          # Login + register + password reset
+│   ├── app.html             # CURRENT SPA shell — rendered by core.spa() for every non-API/static
+│   │                         #   route. Loads the `app` Vite bundle (#root, react-router) plus all
+│   │                         #   eager static/app/*.js modules and every tab's view/modal markup
+│   │                         #   (still vanilla-rendered outside #root — see §6).
+│   ├── index.html            # PREDECESSOR of app.html — no route renders this anymore; kept only
+│   │                         #   until the plan's PR10 teardown (purring-weaving-pillow.md).
+│   ├── login.html            # Server-rendered login/register/reset page — deliberately NOT a
+│   │                         #   react-router route (see §6).
 │   ├── Monthly_Worklog_Template.xlsx       # openpyxl source for single export
 │   └── Monthly_Worklog_Template_All.xlsx   # openpyxl source for bulk export
 │
@@ -221,31 +251,105 @@ sent (SMTP config required).
 
 ---
 
-## 6. Frontend (SPA, no build step)
+## 6. Frontend — hybrid vanilla SPA + React/react-router (migration in progress)
 
-- Single page: [templates/index.html](templates/index.html) — contains
-  every tab's HTML (`view-dashboard`, `view-worklog`, `view-files`,
-  `view-projects-summary`, `view-settings`) plus all modals.
-- **Eager modules** are loaded by `<script defer>` tags directly in
-  [templates/index.html](templates/index.html) (lines ~13–18) in strict
-  dependency order: `i18n` → `core` → `dashboard` → `worklogs` →
-  `calendar` → `export`. Cache-busted via `?v={{ static_v('app/<file>.js') }}`
-  (mtime-based, no build step).
-- [static/app.js](static/app.js) is the **bootstrap shim** — after the
-  deferred scripts run, it fires a `modulesLoaded` event that other
-  modules await for cross-module globals.
-- **Lazy modules** (`settings`, `files`, `projects-summary`, `draft`)
-  are injected on demand by `loadModuleOnce(name)` in
+MWL is mid-migration from a pure vanilla-JS SPA to React, per
+`purring-weaving-pillow.md` (the migration plan; ask for its current path
+if you need it). **Routing/URL state has already been cut over to
+react-router (PR1); each tab's internal UI still renders via the original
+vanilla DOM/modules and migrates to React one tab at a time (PR2-PR9).**
+Until that finishes, changes to tab *content* go in `static/app/<tab>.js`
+or a vanilla view div, while changes to *navigation* go through
+`frontend/src/router.tsx`.
+
+### Shell & routing
+
+- [templates/app.html](templates/app.html) is the **only** template Flask
+  renders for in-app navigation. [app/core.py](app/core.py)'s `spa()`
+  catch-all route serves it for any path that isn't `/api/*`, `/static/*`,
+  or an explicit route (e.g. `/login`) — see §5.
+- `app.html` still contains every tab's HTML (`view-dashboard`,
+  `view-worklog`, `view-files`, `view-projects-summary`, `view-settings`,
+  `view-allowance`) plus all modals, exactly as the old `templates/index.html`
+  did — react-router doesn't render tab content, it only decides *which*
+  vanilla view is visible.
+- A `<div id="root"></div>` is mounted right after `<body>`. The `app`
+  Vite bundle (`frontend/src/main.tsx`) renders into it: a
+  `QueryClientProvider` + `RouterProvider` running `router.tsx`'s
+  `createBrowserRouter`. Each tab (`/dashboard`, `/worklog`, `/allowance`,
+  `/files`, `/projects-summary`, `/settings`) is its own route rendering
+  `<LegacyRoute tab="...">` ([frontend/src/components/LegacyRoute.tsx](frontend/src/components/LegacyRoute.tsx)),
+  which renders nothing itself but calls `window.showTab(tab)` — the same
+  vanilla tab-switcher `core.js` has always had. `/` and unknown paths
+  redirect to the last-visited tab (`localStorage.lastTab`) or `dashboard`.
+- Nav buttons in `app.html` call `onclick="mwlNavigate('<tab>')"` instead
+  of the old `showTab('<tab>')` — `window.mwlNavigate` (defined in
+  `main.tsx`) pushes a real router navigation so the URL/browser
+  history/back-button all work, then `LegacyRoute`'s effect calls
+  `showTab()` as a side effect of the route change.
+- `?member=&y=` query params are the source of truth for cross-tab
+  context, two-way synced with the vanilla `#member-select` /
+  `#year-select` DOM elements by `useLegacyContextSync()`
+  ([frontend/src/lib/legacyBridge.ts](frontend/src/lib/legacyBridge.ts)):
+  DOM → URL on every vanilla `change` event; URL → DOM on mount/deep-link/
+  back-forward, gated on `window.__mwlCoreReady` (set by `core.js`'s
+  `initializeApp()`) so it doesn't race `<select>` population.
+- `/login` stays a **separate, server-rendered page**
+  ([templates/login.html](templates/login.html)), never a react-router
+  route — the `login` Vite entry is a standalone React island, and
+  `lib.ts`'s `api()` does a hard `window.location.href = '/login'` on 401.
+
+### React islands (built by Vite)
+
+- Entries are configured in [frontend/vite.config.ts](frontend/vite.config.ts):
+  `app` (the router shell above), `login`, `dashboard`, `worklog`. Each
+  builds to `static/react/` with a content hash + a `.vite/manifest.json`.
+- [app/__init__.py](app/__init__.py)'s `vite_asset(entry)` Jinja global
+  reads that manifest and resolves an entry name to its hashed `<script>`/
+  `<link>` URLs (with a fallback lookup by the manifest node's own `name`
+  field, since manifest keys are source filenames like `index.html`, not
+  the `rollupOptions.input` key). Templates call it as
+  `{% set assets = vite_asset('dashboard') %}`.
+- `dashboard` (`frontend/src/dashboard/`) — the per-employee monthly
+  dashboard + Monthly Ledger; mounted at a fixed DOM node inside the
+  `dashboard` tab's vanilla view.
+- `worklog` (`frontend/src/worklog/`) — the worklog table + calendar,
+  mounted inside the `worklog` tab's vanilla view.
+- `login` (`frontend/src/login/`) — standalone island for `/login`.
+- Dev server: `cd frontend && npm run dev` (Vite on :5173) proxies `/api/*`
+  to Flask on :5123 and rewrites the `Origin` header (see the comment in
+  `vite.config.ts`) so `verify_api_csrf_origin()` doesn't 403 non-GET
+  requests made from the Vite dev origin. **Build for real verification**
+  with `npm run build` — the Flask app at :5123 only ever serves the
+  built `static/react/` output, not Vite's own dev-server root files.
+
+### Remaining vanilla modules
+
+- **Eager** modules load via `<script defer>` tags in `app.html`, in
+  dependency order: `i18n` → `core` → `worklogs` → `calendar` →
+  `allowance` → `export`. Cache-busted via
+  `?v={{ static_v('app/<file>.js') }}` (mtime-based, no build step).
+  [static/app.js](static/app.js) is the **bootstrap shim** — after the
+  deferred scripts run, it fires a `modulesLoaded` event other modules
+  await for cross-module globals.
+- **Lazy** modules (`settings`, `files`, `file-preview`, `projects-summary`,
+  `draft`) are injected on demand by `loadModuleOnce(name)` in
   [static/app/core.js](static/app/core.js) (script tag with
-  `?v=<STATIC_V[name]>` cache token, async=false to preserve init order).
-- Tab switching: `showTab(name)` in [static/app/core.js](static/app/core.js).
-  Permission-gated tabs (`settings`, `projects-summary`) early-return
-  unless `isElevated()`. Last selected tab persisted in `localStorage`.
-- API calls: `api(url, opts)` in [core.js](static/app/core.js). Auto-redirects
-  to `/login` on 401, toasts on 403/5xx, returns parsed JSON. Prefer
-  `api()` over raw `fetch()` so error handling stays consistent.
-- i18n: `t(key)` in [static/app/i18n.js](static/app/i18n.js); `data-i18n`
-  attributes on HTML elements get translated on language toggle (TH ↔ EN).
+  `?v=<STATIC_V[name]>` cache token, `async=false` to preserve init order).
+- Tab switching: `showTab(name)` in [static/app/core.js](static/app/core.js)
+  — now called both directly (legacy `onclick`s not yet converted) and
+  indirectly via `LegacyRoute`'s effect. Permission-gated tabs (`settings`,
+  `projects-summary`) early-return unless `isElevated()`. Cold-load tab
+  selection prefers the URL path over `localStorage.lastTab` (see
+  `initializeApp()`), so a deep link always wins.
+- API calls: `api(url, opts)` in [core.js](static/app/core.js) for vanilla
+  modules, or `api<T>()` in [frontend/src/lib.ts](frontend/src/lib.ts) for
+  React code. Both auto-redirect to `/login` on 401. Prefer these over raw
+  `fetch()` so error handling stays consistent.
+- i18n: vanilla modules use `t(key)` from
+  [static/app/i18n.js](static/app/i18n.js) with `data-i18n` attributes;
+  React code imports `dict.ts`/`index.ts` under `frontend/src/i18n/`, a
+  mechanical port of the same table.
 
 ---
 
@@ -468,14 +572,20 @@ If you need to restore from backup:
   that affects all employees (e.g. global toggles in `/api/settings/*`).
   Reserve `@admin_required` for Super_Ultimate_ADMIN-only operations
   (role changes, account approval).
-- **Frontend module convention** (revised): pick eager or lazy.
-  - **Eager** → add a `<script defer src="…?v={{ static_v(…) }}">` tag
-    to [templates/index.html](templates/index.html) in the right
-    dependency slot. Use this when the module is needed on first paint.
-  - **Lazy** → register the module name in `STATIC_V` in
+- **Frontend module convention** (revised): pick eager, lazy, or React.
+  - **Eager (vanilla)** → add a `<script defer src="…?v={{ static_v(…) }}">`
+    tag to [templates/app.html](templates/app.html) in the right
+    dependency slot. Use this when the module is needed on first paint
+    and hasn't migrated to React yet.
+  - **Lazy (vanilla)** → register the module name in `STATIC_V` in
     [static/app/core.js](static/app/core.js) and call
     `loadModuleOnce('<name>')` from `showTab()`. Use this for tabs that
     aren't visible until the user clicks into them.
+  - **React** → for a tab already ported (currently `dashboard`,
+    `worklog`), add components under `frontend/src/<tab>/` and wire them
+    into that tab's existing mount point; do not add a new Vite entry
+    unless the tab is being ported for the first time (see
+    `purring-weaving-pillow.md` for the per-tab migration order).
 - **Time math** for daily aggregates uses
   `((max(end) - min(start)) - lunch_overlap) / 60`
   with lunch = 12:00–13:00. See `get_dashboard()` and
@@ -485,17 +595,22 @@ If you need to restore from backup:
   function definition.
 - **Frontend filename convention**: hyphenated (`projects-summary.js`,
   not `projectsSummary.js`).
-- **Add a new tab**:
-  1. Nav button + view div in [templates/index.html](templates/index.html).
+- **Add a new tab** (still-vanilla tab; not yet ported to React):
+  1. Nav button + view div in [templates/app.html](templates/app.html),
+     with the button's `onclick` calling `mwlNavigate('<name>')` (not
+     `showTab('<name>')` directly) so the URL/history stay in sync.
   2. New module in `static/app/<name>.js`.
   3. **Eager** load → add a `<script defer src="/static/app/<name>.js?v={{ static_v('app/<name>.js') }}">`
-     tag in [templates/index.html](templates/index.html) (head section);
+     tag in [templates/app.html](templates/app.html) (head section);
      **lazy** load → add `<name>` to `STATIC_V` in
      [static/app/core.js](static/app/core.js) and call
      `loadModuleOnce('<name>')` from `showTab()`.
   4. Add the name to `showTab()`'s tab list, the `allowedTabs` Set, and
      the `if (name === ...)` data-loading branch in
-     [static/app/core.js](static/app/core.js).
+     [static/app/core.js](static/app/core.js) — **and** to `TAB_NAMES` in
+     [frontend/src/router.tsx](frontend/src/router.tsx) so react-router
+     registers a matching path. Missing either side breaks either
+     deep-linking (router) or the actual tab content (core.js).
   5. If admin-only, gate the nav button in `initializeApp()` and add a
      guard at the top of `showTab()`.
 - **Add a new API route**: pick the right blueprint (or create one),

@@ -1,7 +1,18 @@
 {
-  "_lib-BQPhJPr8.js": {
-    "file": "assets/lib-BQPhJPr8.js",
+  "_client-C3iWYkwz.js": {
+    "file": "assets/client-C3iWYkwz.js",
+    "name": "client",
+    "imports": [
+      "_query-DkV7qeyu.js",
+      "_react-vendor-KaNUfFDW.js"
+    ]
+  },
+  "_lib-Br4F0JqH.js": {
+    "file": "assets/lib-Br4F0JqH.js",
     "name": "lib",
+    "imports": [
+      "_query-DkV7qeyu.js"
+    ],
     "css": [
       "assets/lib-CWVEtecH.css"
     ]
@@ -10,31 +21,62 @@
     "file": "assets/lib-CWVEtecH.css",
     "src": "_lib-CWVEtecH.css"
   },
+  "_query-DkV7qeyu.js": {
+    "file": "assets/query-DkV7qeyu.js",
+    "name": "query"
+  },
+  "_react-vendor-KaNUfFDW.js": {
+    "file": "assets/react-vendor-KaNUfFDW.js",
+    "name": "react-vendor",
+    "imports": [
+      "_query-DkV7qeyu.js"
+    ]
+  },
   "dashboard.html": {
-    "file": "assets/dashboard-BJp6zIgO.js",
+    "file": "assets/dashboard-CoFpJ1q3.js",
     "name": "dashboard",
     "src": "dashboard.html",
     "isEntry": true,
     "imports": [
-      "_lib-BQPhJPr8.js"
+      "_client-C3iWYkwz.js",
+      "_query-DkV7qeyu.js",
+      "_lib-Br4F0JqH.js",
+      "_react-vendor-KaNUfFDW.js"
+    ]
+  },
+  "index.html": {
+    "file": "assets/app-DLSVLaaa.js",
+    "name": "app",
+    "src": "index.html",
+    "isEntry": true,
+    "imports": [
+      "_client-C3iWYkwz.js",
+      "_query-DkV7qeyu.js",
+      "_react-vendor-KaNUfFDW.js"
     ]
   },
   "login.html": {
-    "file": "assets/login-Btd0FO7o.js",
+    "file": "assets/login-BS1tN1rG.js",
     "name": "login",
     "src": "login.html",
     "isEntry": true,
     "imports": [
-      "_lib-BQPhJPr8.js"
+      "_client-C3iWYkwz.js",
+      "_query-DkV7qeyu.js",
+      "_lib-Br4F0JqH.js",
+      "_react-vendor-KaNUfFDW.js"
     ]
   },
   "worklog.html": {
-    "file": "assets/worklog-B5XADzGN.js",
+    "file": "assets/worklog-iv5XqdwI.js",
     "name": "worklog",
     "src": "worklog.html",
     "isEntry": true,
     "imports": [
-      "_lib-BQPhJPr8.js"
+      "_client-C3iWYkwz.js",
+      "_query-DkV7qeyu.js",
+      "_lib-Br4F0JqH.js",
+      "_react-vendor-KaNUfFDW.js"
     ]
   }
 }

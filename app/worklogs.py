@@ -555,6 +555,12 @@ def get_dashboard():
     else:
         member['avatar_url'] = None
 
+    # Year boundaries as sargable range bounds — YEAR(log_date) = ? wraps the
+    # column in a function and can't use IX_worklogs_employee_date(EmployeeID,
+    # log_date); a half-open range on the raw column can.
+    first_yr = date(year, 1, 1)
+    next_yr_start = date(year + 1, 1, 1)
+
     # Hours are computed per-day using the same logic as the calendar view:
     #   day_hours = ((max(end_time) - min(start_time)) - lunch_overlap) / 60
     # This avoids double-counting overlapping entries on the same day.
@@ -604,20 +610,19 @@ def get_dashboard():
                    SUM(CASE WHEN status = 'Done' THEN 1 ELSE 0 END) AS done,
                    SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress
             FROM worklogs
-            WHERE EmployeeID = ? AND YEAR(log_date) = ?
+            WHERE EmployeeID = ? AND log_date >= ? AND log_date < ?
             GROUP BY MONTH(log_date), log_date,
                      CASE WHEN status = 'Man day' THEN 1 ELSE 0 END
         ) day_agg
         GROUP BY month
         ORDER BY month
         """,
-        (employee_id, year),
+        (employee_id, first_yr, next_yr_start),
     )
 
     # ── Missing-entry days per month for this employee ──────────────────
     # Definition: weekday in month, NOT a holiday, AND employee has no worklog row that day.
-    first_yr = date(year, 1, 1)
-    last_yr  = date(year, 12, 31)
+    last_yr = date(year, 12, 31)
 
     holiday_rows = app_pkg.db.query(
         "SELECT [date] FROM dbo.holiday WHERE [date] BETWEEN ? AND ?",
@@ -642,10 +647,10 @@ def get_dashboard():
         """
         SELECT MONTH(log_date) AS m, COUNT(DISTINCT log_date) AS days_logged
         FROM worklogs
-        WHERE EmployeeID = ? AND YEAR(log_date) = ?
+        WHERE EmployeeID = ? AND log_date >= ? AND log_date < ?
         GROUP BY MONTH(log_date)
         """,
-        (employee_id, year),
+        (employee_id, first_yr, next_yr_start),
     )
     logged_per_month = {int(r['m']): int(r['days_logged']) for r in logged_rows}
 
