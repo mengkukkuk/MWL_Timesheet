@@ -3,7 +3,7 @@ import { monthName, t } from '../lib'
 import type { Member } from '../lib'
 
 interface SelectorProps {
-  elevated: boolean
+  canViewOthers: boolean
   members: Member[]
   memberId: string
   year: number
@@ -24,7 +24,7 @@ function yearOptions(current: number): number[] {
 }
 
 export function Selector({
-  elevated,
+  canViewOthers,
   members,
   memberId,
   year,
@@ -46,7 +46,7 @@ export function Selector({
         <select
           id="member-select"
           value={memberId}
-          disabled={!elevated}
+          disabled={!canViewOthers}
           onChange={(e) => setMemberId(e.target.value)}
           className="border border-gray-300 rounded-md px-2 py-1 text-sm bg-white disabled:bg-gray-100"
         >
@@ -67,7 +67,7 @@ export function Selector({
           </button>
         )}
 
-        {elevated && (
+        {canViewOthers && (
           <button
             id="btn-overall"
             type="button"

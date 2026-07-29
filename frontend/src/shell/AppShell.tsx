@@ -69,6 +69,7 @@ export function AppShell() {
   const {
     user,
     elevated,
+    canViewOthers,
     members,
     memberId,
     year,
@@ -92,7 +93,7 @@ export function AppShell() {
     navigate({ pathname: '/' + tab, search: location.search })
   }
 
-  const showOverallMonth = activeTab === 'dashboard' && elevated && !memberId
+  const showOverallMonth = activeTab === 'dashboard' && canViewOthers && !memberId
 
   const content = useMemo(() => {
     if (ELEVATED_TABS.has(activeTab) && !elevated) {
@@ -103,7 +104,7 @@ export function AppShell() {
     }
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardTab elevated={elevated} memberId={memberId} />
+        return <DashboardTab canViewOthers={canViewOthers} memberId={memberId} />
       case 'worklog':
         return (
           <WorklogIsland memberId={memberId} year={year} month={month} onMonthChange={setMonth} />
@@ -119,7 +120,7 @@ export function AppShell() {
       default:
         return null
     }
-  }, [activeTab, elevated, memberId, year, month, setMonth])
+  }, [activeTab, elevated, canViewOthers, memberId, year, month, setMonth])
 
   return (
     <>
@@ -131,7 +132,7 @@ export function AppShell() {
         onNavigate={onNavigate}
       />
       <Selector
-        elevated={elevated}
+        canViewOthers={canViewOthers}
         members={members}
         memberId={memberId}
         year={year}

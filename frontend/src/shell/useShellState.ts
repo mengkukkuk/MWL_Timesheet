@@ -23,6 +23,7 @@ declare global {
 export interface ShellState {
   user: MeResp | null
   elevated: boolean
+  canViewOthers: boolean
   members: Member[]
   memberId: string
   year: number
@@ -46,8 +47,24 @@ function clampMonth(raw: string | null): number {
 export function useShellState(): ShellState {
   const user = useCurrentUser()
   const elevated = isElevated(user?.role)
+  const [worklogOpen, setWorklogOpen] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const [searchParams, setSearchParams] = useSearchParams()
+
+  // The admin-controlled "Worklog Visibility" toggle (Settings tab) lets
+  // non-elevated (Staff) users browse the Team Overview and other members'
+  // read-only data; the backend already enforces this per-endpoint (see
+  // app/worklogs.py's `_worklog_open` checks) — this just unlocks the UI to match.
+  useEffect(() => {
+    let alive = true
+    api<{ worklog_open: boolean }>('/api/settings').then((r) => {
+      if (alive && r.ok && r.data) setWorklogOpen(!!r.data.worklog_open)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  const canViewOthers = elevated || worklogOpen
 
   const memberId = searchParams.get('member') ?? ''
   const yearParam = searchParams.get('y')
@@ -150,6 +167,7 @@ export function useShellState(): ShellState {
   return {
     user,
     elevated,
+    canViewOthers,
     members,
     memberId,
     year,

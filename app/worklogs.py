@@ -894,8 +894,9 @@ def get_overall_missing():
         logged = logged_map.get(eid, 0)
         out[eid] = max(0, expected - logged)
 
-    # Non-elevated → restrict to own row only
-    if session.get('role') not in ELEVATED_ROLES:
+    # Same visibility rule as worklogs/dashboard: non-elevated callers are
+    # restricted to their own row unless the admin has opened worklog visibility.
+    if not app_pkg._worklog_open and session.get('role') not in ELEVATED_ROLES:
         my = str(session.get('member_id') or '')
         out = {my: out.get(my, 0)} if my else {}
 

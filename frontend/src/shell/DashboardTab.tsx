@@ -2,8 +2,10 @@
 // dashboard bundle roots (dashboard/main.tsx mounted DashboardIsland,
 // ExportControls and TeamOverviewIsland into distinct legacy DOM nodes) with a
 // single component tree:
-//   - elevated + no member selected -> the Overall team grid (TeamOverviewIsland),
-//     with the member-count label it writes into imperatively (#overall-member-count).
+//   - canViewOthers (elevated, or Staff when the admin's Worklog Visibility
+//     setting is open — see useShellState) + no member selected -> the Overall
+//     team grid (TeamOverviewIsland), with the member-count label it writes
+//     into imperatively (#overall-member-count).
 //   - otherwise (a member is selected) -> the export buttons (ExportControls)
 //     above the per-employee monthly dashboard (DashboardIsland).
 // The islands themselves are unchanged: they read member/year/month from the
@@ -15,12 +17,12 @@ import { ExportControls } from '../dashboard/ExportControls'
 import { TeamOverviewIsland } from '../dashboard/TeamOverviewIsland'
 
 interface DashboardTabProps {
-  elevated: boolean
+  canViewOthers: boolean
   memberId: string
 }
 
-export function DashboardTab({ elevated, memberId }: DashboardTabProps) {
-  if (elevated && !memberId) {
+export function DashboardTab({ canViewOthers, memberId }: DashboardTabProps) {
+  if (canViewOthers && !memberId) {
     return (
       <div className="mwl-fadein">
         <div className="flex items-center justify-between mb-4">
