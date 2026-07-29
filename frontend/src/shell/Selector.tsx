@@ -38,7 +38,7 @@ export function Selector({
   const [overallMonth, setOverallMonth] = useState<number>(new Date().getMonth() + 1)
 
   return (
-    <div className="bg-gray-50 border-b border-gray-200">
+    <div className="sticky bg-gray-50 border-b border-gray-200 top-0 z-10 w-full">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-3">
         <label htmlFor="member-select" className="text-sm font-medium text-gray-700">
           {t('sel.member')}
@@ -53,7 +53,7 @@ export function Selector({
           <option value="">{t('sel.select_ph')}</option>
           {members.map((m) => (
             <option key={m.id} value={String(m.id)}>
-              {m.name}
+              {m.name} - {m.department}
             </option>
           ))}
         </select>

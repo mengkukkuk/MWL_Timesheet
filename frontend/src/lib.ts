@@ -5,7 +5,7 @@
 // touching.
 
 import { useEffect, useState } from 'react'
-import { t as i18nT, toggleLang as i18nToggleLang, currentLang as i18nCurrentLang } from './i18n'
+import { t as i18nT, toggleLang as i18nToggleLang, currentLang as i18nCurrentLang , tRaw} from './i18n'
 
 export { useLang } from './i18n'
 
@@ -16,7 +16,7 @@ export function toast(msg: string, type: 'success' | 'error' = 'success'): void 
 
 // Reads the month names array from the i18n dict (`months.full`).
 export function monthName(month: number): string {
-  const arr = i18nT('months.full' as never) as unknown
+  const arr = tRaw('months.full' as never) as unknown
   if (Array.isArray(arr) && typeof arr[month] === 'string') return arr[month] as string
   return String(month)
 }

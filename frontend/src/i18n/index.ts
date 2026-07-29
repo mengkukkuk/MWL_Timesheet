@@ -34,6 +34,11 @@ export function t(key: DictKey, ...args: unknown[]): string {
   return typeof val === 'function' ? (val as (...a: unknown[]) => string)(...args) : String(val)
 }
 
+export function tRaw(key: DictKey): unknown {
+  const table = dict[currentLangValue] ?? dict.en
+  return (table as Record<string, unknown>)[key] ?? (dict.en as Record<string, unknown>)[key] ?? key
+}
+
 export function setLang(lang: Lang): void {
   currentLangValue = lang
   try {
