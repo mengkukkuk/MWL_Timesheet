@@ -51,7 +51,11 @@ function buildMemberProjects(members: Member[], projects: ProjectRow[]): Record<
   return map
 }
 
-export function TeamOverviewIsland() {
+interface TeamOverviewIslandProps {
+  onSelectMember: (id: string) => void
+}
+
+export function TeamOverviewIsland({ onSelectMember }: TeamOverviewIslandProps) {
   const user = useCurrentUser()
   const [members, setMembers] = useState<Member[]>([])
   const [roles, setRoles] = useState<Record<string, Roles>>({})
@@ -116,6 +120,7 @@ export function TeamOverviewIsland() {
             missing={Number(missing[m.id] ?? 0)}
             canManageSkills={canManageSkills}
             canEditAvatar={canEditAvatar(user, m.id)}
+            onSelect={() => onSelectMember(m.id)}
           />
         )
       })}

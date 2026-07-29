@@ -1,7 +1,7 @@
 // One team-overview card. A quiet dark-ink card that mirrors the staff identity
 // card (.mwl-staff); members with no project use the muted variant. Clicking the
-// card selects that member (sets #member-select + window.onMemberChange, which
-// updates core.js's currentMemberId and swaps the shell to the individual view).
+// card calls onSelect, which the parent wires to useShellState's setMemberId to
+// swap the shell to that member's individual dashboard view.
 // Avatar upload/remove reuses useAvatarActions (PDPA: own photo / super-admin
 // only); skills preview + edit reuse the shared SkillsBox.
 import { useState } from 'react'
@@ -10,22 +10,8 @@ import { t } from '../lib'
 import { SkillsBox } from './SkillsBox'
 import { useAvatarActions } from './useAvatarActions'
 
-declare global {
-  interface Window {
-    onMemberChange?: () => void
-  }
-}
-
 function initial(name: string): string {
   return (name || '?').trim().charAt(0).toUpperCase() || '?'
-}
-
-function openMember(id: string): void {
-  const sel = document.getElementById('member-select') as HTMLSelectElement | null
-  if (sel) sel.value = id
-  // onMemberChange reads #member-select, updates the vanilla currentMemberId
-  // (a module-scoped let React cannot set) and drives onContextChange.
-  window.onMemberChange?.()
 }
 
 interface TeamCardProps {
@@ -36,6 +22,7 @@ interface TeamCardProps {
   missing: number
   canManageSkills: boolean
   canEditAvatar: boolean
+  onSelect: () => void
 }
 
 export function TeamCard({
@@ -46,6 +33,7 @@ export function TeamCard({
   missing,
   canManageSkills,
   canEditAvatar,
+  onSelect,
 }: TeamCardProps) {
   const [imgOk, setImgOk] = useState(true)
   const hasProject = main.length > 0 || support.length > 0
@@ -58,11 +46,11 @@ export function TeamCard({
       className={`mwl-tcard ${hasProject ? '' : 'mwl-tcard--muted'}`}
       role="button"
       tabIndex={0}
-      onClick={() => openMember(member.id)}
+      onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
-          openMember(member.id)
+          onSelect()
         }
       }}
     >

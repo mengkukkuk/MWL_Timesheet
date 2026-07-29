@@ -9,7 +9,7 @@
 // single source of truth (backed by ?member=&y= URL search params) and pushes
 // into those DOM elements/events on every change so those islands keep working
 // unmodified — see the migration plan's "cross-bundle DOM/window contract".
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { api, isElevated, toast, useCurrentUser, type Member, type MeResp } from '../lib'
 
@@ -134,10 +134,15 @@ export function useShellState(): ShellState {
 
   const selectOverall = useCallback(() => setMemberId(''), [setMemberId])
 
-  // Non-elevated users are pinned to their own member_id on first load,
-  // mirroring core.js's initializeApp(): `if (!isElevated() && currentUser.member_id) ...`
+  // Non-elevated users are pinned to their own member_id on first load only,
+  // mirroring core.js's initializeApp(): `if (!isElevated() && currentUser.member_id) ...`.
+  // Gated by a ref (not just the `!memberId` check) so this doesn't re-fire and
+  // fight a deliberate "Overall" click, which also clears memberId to ''.
+  const didAutoSelectRef = useRef(false)
   useEffect(() => {
-    if (!user || isElevated(user.role) || memberId || !user.member_id) return
+    if (didAutoSelectRef.current || !user) return
+    didAutoSelectRef.current = true
+    if (isElevated(user.role) || memberId || !user.member_id) return
     setMemberId(user.member_id)
   }, [user, memberId, setMemberId])
 

@@ -104,7 +104,13 @@ export function AppShell() {
     }
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardTab canViewOthers={canViewOthers} memberId={memberId} />
+        return (
+          <DashboardTab
+            canViewOthers={canViewOthers}
+            memberId={memberId}
+            onSelectMember={setMemberId}
+          />
+        )
       case 'worklog':
         return (
           <WorklogIsland memberId={memberId} year={year} month={month} onMonthChange={setMonth} />
@@ -120,7 +126,7 @@ export function AppShell() {
       default:
         return null
     }
-  }, [activeTab, elevated, canViewOthers, memberId, year, month, setMonth])
+  }, [activeTab, elevated, canViewOthers, memberId, year, month, setMonth, setMemberId])
 
   return (
     <>

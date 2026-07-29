@@ -33,7 +33,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/app-BdrjvAVL.js",
+    "file": "assets/app-Cd7vlL9H.js",
     "name": "app",
     "src": "index.html",
     "isEntry": true,
@@ -85,7 +85,7 @@
     ]
   },
   "src/settings/SettingsIsland.tsx": {
-    "file": "assets/SettingsIsland-DKpzej0O.js",
+    "file": "assets/SettingsIsland-BZbQfW4G.js",
     "name": "SettingsIsland",
     "src": "src/settings/SettingsIsland.tsx",
     "isDynamicEntry": true,
@@ -97,7 +97,7 @@
     ]
   },
   "src/shell/DashboardTab.tsx": {
-    "file": "assets/DashboardTab-DUQ-FCu1.js",
+    "file": "assets/DashboardTab-lUe2CzLl.js",
     "name": "DashboardTab",
     "src": "src/shell/DashboardTab.tsx",
     "isDynamicEntry": true,
@@ -109,7 +109,7 @@
     ]
   },
   "src/worklog/WorklogIsland.tsx": {
-    "file": "assets/WorklogIsland-CbBDyQqK.js",
+    "file": "assets/WorklogIsland-B6dQwpxv.js",
     "name": "WorklogIsland",
     "src": "src/worklog/WorklogIsland.tsx",
     "isDynamicEntry": true,

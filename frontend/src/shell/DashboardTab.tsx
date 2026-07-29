@@ -19,9 +19,10 @@ import { TeamOverviewIsland } from '../dashboard/TeamOverviewIsland'
 interface DashboardTabProps {
   canViewOthers: boolean
   memberId: string
+  onSelectMember: (id: string) => void
 }
 
-export function DashboardTab({ canViewOthers, memberId }: DashboardTabProps) {
+export function DashboardTab({ canViewOthers, memberId, onSelectMember }: DashboardTabProps) {
   if (canViewOthers && !memberId) {
     return (
       <div className="mwl-fadein">
@@ -29,7 +30,7 @@ export function DashboardTab({ canViewOthers, memberId }: DashboardTabProps) {
           <p className="mwl-eyebrow">{t('dash.overall_title') || 'Team Overview'}</p>
           <span id="overall-member-count" className="text-sm text-gray-500" />
         </div>
-        <TeamOverviewIsland />
+        <TeamOverviewIsland onSelectMember={onSelectMember} />
       </div>
     )
   }
