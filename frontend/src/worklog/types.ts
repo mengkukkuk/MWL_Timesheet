@@ -42,9 +42,6 @@ declare global {
     // rows back into vanilla core.js `worklogData` via this setter so the
     // shared add/edit modal's renderExistingRanges() stays correct on every tab.
     __mwlSetWorklogData?: (rows: Worklog[]) => void
-    // Month hand-off: MonthlyLedger stashes a clicked month here before
-    // navigating to /worklog; WorklogIsland applies it once #month-select mounts.
-    __mwlPendingMonth?: number | null
     openAddWorklog?: () => void
     openAddWorklogMulti?: () => void
     editWorklog?: (w: Worklog) => void

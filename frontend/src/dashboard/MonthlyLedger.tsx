@@ -1,11 +1,12 @@
 // Monthly breakdown — the dashboard's signature element. Rendered from the
 // months[] already returned by /api/dashboard, so no extra request. Each row is
-// a keyboard-focusable button: activating it sets the vanilla #month-select and
-// navigates to /worklog via window.mwlNavigate (router-driven hand-off to the
-// rest of the app — see frontend/src/main.tsx + router.tsx).
+// a keyboard-focusable button: activating it navigates to /worklog with the
+// clicked month in the shared ?m= search param, which the Work Log island reads
+// as a prop (see frontend/src/shell/useShellState.ts).
 // The design spend: a proportional hours bar behind each Hours figure,
 // normalized to the busiest month, turning the column into a year sparkline —
 // echoing the login's workday-timeline motif. Figures are set in DM Mono.
+import { useNavigate, useSearchParams } from 'react-router'
 import { monthName, t } from '../lib'
 
 export interface MonthRow {
@@ -17,12 +18,6 @@ export interface MonthRow {
   man_day: number | string
 }
 
-declare global {
-  interface Window {
-    mwlNavigate?: (tab: string, opts?: { replace?: boolean }) => void
-  }
-}
-
 function toNum(v: number | string | undefined): number {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? 0))
   return Number.isFinite(n) ? n : 0
@@ -32,17 +27,16 @@ function fmt(v: number | string | undefined): string {
   return String(Math.round(toNum(v) * 100) / 100)
 }
 
-function openMonth(month: number): void {
-  const sel = document.getElementById('month-select') as HTMLSelectElement | null
-  if (sel) sel.value = String(month)
-  // #month-select is not mounted until WorklogIsland renders, so stash the
-  // clicked month; WorklogIsland applies it on mount (see worklog/types.ts).
-  window.__mwlPendingMonth = month
-  window.mwlNavigate?.('worklog')
-}
-
 export function MonthlyLedger({ months }: { months: MonthRow[] }) {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const maxHours = months.reduce((m, r) => Math.max(m, toNum(r.total_hours)), 0) || 1
+
+  const openMonth = (month: number) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('m', String(month))
+    navigate({ pathname: '/worklog', search: next.toString() })
+  }
 
   return (
     <div className="mwl-ledger-wrap">

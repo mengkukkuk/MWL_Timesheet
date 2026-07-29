@@ -1,13 +1,13 @@
-// PR3 data layer: the Work Log island is now the single fetcher for the
-// worklog tab, replacing static/app/worklogs.js#loadWorklogs()'s fetch +
-// window.__mwlWorklogs / 'mwl:worklogs' stash with TanStack Query.
+// Data layer for the Work Log tab: the single fetcher for /api/worklogs +
+// /api/holidays, via TanStack Query.
 //
-// Cross-tab context (which member/year/month) still lives in the vanilla
-// #member-select / #year-select / #month-select DOM elements, so this hook
-// tracks them via `change` events and a synthetic 'mwl:reload' event that
-// worklogs.js dispatches after any vanilla mutation.
-import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+// The context (member/year/month) is passed in by the caller — AppShell owns it
+// as URL search params (?member=&y=&m=) in useShellState and threads it down as
+// props. It is deliberately NOT read back off the #member-select/#month-select
+// DOM nodes: those are React-controlled, so their .value lags behind state
+// (empty until /api/members resolves) and React never fires a `change` event
+// when it updates them, which left the island permanently blank.
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api } from '../lib'
 import type { Holiday, Worklog, WorklogsPayload } from './types'
 
@@ -23,38 +23,6 @@ export interface ProjectDescription {
   Description: string
   ProjectDepartment: string
   Status: string
-}
-
-function readSelect(id: string): string {
-  const el = document.getElementById(id) as HTMLSelectElement | null
-  return el?.value || ''
-}
-
-function readContext(): WorklogContext {
-  const now = new Date()
-  const y = parseInt(readSelect('year-select'), 10)
-  const m = parseInt(readSelect('month-select'), 10)
-  return {
-    member: readSelect('member-select'),
-    year: Number.isFinite(y) ? y : now.getFullYear(),
-    month: Number.isFinite(m) ? m : now.getMonth() + 1,
-  }
-}
-
-export function useWorklogContext(): WorklogContext {
-  const [ctx, setCtx] = useState<WorklogContext>(readContext)
-  useEffect(() => {
-    const update = () => setCtx(readContext())
-    const ids = ['member-select', 'year-select', 'month-select']
-    const els = ids.map((id) => document.getElementById(id))
-    els.forEach((el) => el?.addEventListener('change', update))
-    window.addEventListener('mwl:reload', update)
-    return () => {
-      els.forEach((el) => el?.removeEventListener('change', update))
-      window.removeEventListener('mwl:reload', update)
-    }
-  }, [])
-  return ctx
 }
 
 export function worklogsQueryKey(ctx: WorklogContext): [string, string, number, number] {
@@ -75,15 +43,16 @@ async function fetchWorklogs(ctx: WorklogContext): Promise<WorklogsPayload> {
   }
 }
 
-export function useWorklogsData() {
-  const ctx = useWorklogContext()
-  const query = useQuery({
+export function useWorklogsData(ctx: WorklogContext) {
+  return useQuery({
     queryKey: worklogsQueryKey(ctx),
     queryFn: () => fetchWorklogs(ctx),
     enabled: !!ctx.member,
     staleTime: 30_000,
+    // Keep the previous month's rows on screen while the next month loads,
+    // instead of flashing an empty table on every month change.
+    placeholderData: keepPreviousData,
   })
-  return { ctx, query }
 }
 
 export function useDescriptions() {

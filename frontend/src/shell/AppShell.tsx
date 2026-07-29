@@ -72,9 +72,11 @@ export function AppShell() {
     members,
     memberId,
     year,
+    month,
     yearDisabled,
     setMemberId,
     setYear,
+    setMonth,
     selectOverall,
     retryMembers,
   } = shell
@@ -103,7 +105,9 @@ export function AppShell() {
       case 'dashboard':
         return <DashboardTab elevated={elevated} memberId={memberId} />
       case 'worklog':
-        return <WorklogIsland />
+        return (
+          <WorklogIsland memberId={memberId} year={year} month={month} onMonthChange={setMonth} />
+        )
       case 'allowance':
         return <AllowanceTab />
       case 'files':
@@ -115,7 +119,7 @@ export function AppShell() {
       default:
         return null
     }
-  }, [activeTab, elevated, memberId])
+  }, [activeTab, elevated, memberId, year, month, setMonth])
 
   return (
     <>

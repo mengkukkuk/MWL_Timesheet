@@ -1,39 +1,46 @@
 {
-  "_lib-BCcPhnKd.js": {
-    "file": "assets/lib-BCcPhnKd.js",
-    "name": "lib",
+  "_createLucideIcon-BqaLIzWj.js": {
+    "file": "assets/createLucideIcon-BqaLIzWj.js",
+    "name": "createLucideIcon",
     "imports": [
-      "_query-DfXOXAmB.js",
-      "_react-vendor-BA5_97fH.js"
-    ],
-    "css": [
-      "assets/lib-CWVEtecH.css"
+      "_query-BRvUYMs_.js"
     ]
   },
   "_lib-CWVEtecH.css": {
     "file": "assets/lib-CWVEtecH.css",
     "src": "_lib-CWVEtecH.css"
   },
-  "_query-DfXOXAmB.js": {
-    "file": "assets/query-DfXOXAmB.js",
+  "_lib-DdtJKEEk.js": {
+    "file": "assets/lib-DdtJKEEk.js",
+    "name": "lib",
+    "imports": [
+      "_query-BRvUYMs_.js",
+      "_react-vendor-BPGI9SGU.js"
+    ],
+    "css": [
+      "assets/lib-CWVEtecH.css"
+    ]
+  },
+  "_query-BRvUYMs_.js": {
+    "file": "assets/query-BRvUYMs_.js",
     "name": "query"
   },
-  "_react-vendor-BA5_97fH.js": {
-    "file": "assets/react-vendor-BA5_97fH.js",
+  "_react-vendor-BPGI9SGU.js": {
+    "file": "assets/react-vendor-BPGI9SGU.js",
     "name": "react-vendor",
     "imports": [
-      "_query-DfXOXAmB.js"
+      "_query-BRvUYMs_.js"
     ]
   },
   "index.html": {
-    "file": "assets/app-DiFZu-8F.js",
+    "file": "assets/app-DeV3abLg.js",
     "name": "app",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_lib-BCcPhnKd.js",
-      "_query-DfXOXAmB.js",
-      "_react-vendor-BA5_97fH.js"
+      "_lib-DdtJKEEk.js",
+      "_query-BRvUYMs_.js",
+      "_react-vendor-BPGI9SGU.js"
     ],
     "dynamicImports": [
       "src/shell/DashboardTab.tsx",
@@ -44,71 +51,74 @@
     ]
   },
   "login.html": {
-    "file": "assets/login-C6RcZi_p.js",
+    "file": "assets/login-D7S2BGLb.js",
     "name": "login",
     "src": "login.html",
     "isEntry": true,
     "imports": [
-      "_lib-BCcPhnKd.js",
-      "_query-DfXOXAmB.js",
-      "_react-vendor-BA5_97fH.js"
+      "_lib-DdtJKEEk.js",
+      "_query-BRvUYMs_.js",
+      "_createLucideIcon-BqaLIzWj.js",
+      "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/files/FilesIsland.tsx": {
-    "file": "assets/FilesIsland-BuG-zmJM.js",
+    "file": "assets/FilesIsland-WgXoEf25.js",
     "name": "FilesIsland",
     "src": "src/files/FilesIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_query-DfXOXAmB.js",
-      "_lib-BCcPhnKd.js",
-      "_react-vendor-BA5_97fH.js"
+      "_query-BRvUYMs_.js",
+      "_lib-DdtJKEEk.js",
+      "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/projects-summary/ProjectsSummaryIsland.tsx": {
-    "file": "assets/ProjectsSummaryIsland-D-XAFxrH.js",
+    "file": "assets/ProjectsSummaryIsland-CpnJxX4O.js",
     "name": "ProjectsSummaryIsland",
     "src": "src/projects-summary/ProjectsSummaryIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_query-DfXOXAmB.js",
-      "_lib-BCcPhnKd.js",
-      "_react-vendor-BA5_97fH.js"
+      "_query-BRvUYMs_.js",
+      "_lib-DdtJKEEk.js",
+      "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/settings/SettingsIsland.tsx": {
-    "file": "assets/SettingsIsland-9TLjHUn8.js",
+    "file": "assets/SettingsIsland-CtfvGEem.js",
     "name": "SettingsIsland",
     "src": "src/settings/SettingsIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_query-DfXOXAmB.js",
-      "_lib-BCcPhnKd.js",
+      "_query-BRvUYMs_.js",
+      "_lib-DdtJKEEk.js",
       "index.html",
-      "_react-vendor-BA5_97fH.js"
+      "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/shell/DashboardTab.tsx": {
-    "file": "assets/DashboardTab-B7-YaXH5.js",
+    "file": "assets/DashboardTab-B3CWN9aF.js",
     "name": "DashboardTab",
     "src": "src/shell/DashboardTab.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_query-DfXOXAmB.js",
-      "_lib-BCcPhnKd.js",
-      "_react-vendor-BA5_97fH.js"
+      "_query-BRvUYMs_.js",
+      "_lib-DdtJKEEk.js",
+      "index.html",
+      "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/worklog/WorklogIsland.tsx": {
-    "file": "assets/WorklogIsland-C5oYQBCn.js",
+    "file": "assets/WorklogIsland-CSrsxaVI.js",
     "name": "WorklogIsland",
     "src": "src/worklog/WorklogIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_query-DfXOXAmB.js",
-      "_lib-BCcPhnKd.js",
+      "_query-BRvUYMs_.js",
+      "_lib-DdtJKEEk.js",
       "index.html",
-      "_react-vendor-BA5_97fH.js"
+      "_createLucideIcon-BqaLIzWj.js",
+      "_react-vendor-BPGI9SGU.js"
     ]
   }
 }

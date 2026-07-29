@@ -26,11 +26,21 @@ export interface ShellState {
   members: Member[]
   memberId: string
   year: number
+  month: number
   yearDisabled: boolean
   setMemberId: (id: string) => void
   setYear: (y: number) => void
+  setMonth: (m: number) => void
   selectOverall: () => void
   retryMembers: () => void
+}
+
+// The Work Log month lives in `?m=` alongside `?member=`/`?y=` so it survives a
+// reload and the Dashboard's Monthly Breakdown hand-off is a plain navigation.
+function clampMonth(raw: string | null): number {
+  const m = raw ? parseInt(raw, 10) : NaN
+  if (!Number.isFinite(m) || m < 1 || m > 12) return new Date().getMonth() + 1
+  return m
 }
 
 export function useShellState(): ShellState {
@@ -42,6 +52,7 @@ export function useShellState(): ShellState {
   const memberId = searchParams.get('member') ?? ''
   const yearParam = searchParams.get('y')
   const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear()
+  const month = clampMonth(searchParams.get('m'))
 
   const [membersReloadKey, setMembersReloadKey] = useState(0)
   const retryMembers = useCallback(() => setMembersReloadKey((k) => k + 1), [])
@@ -90,6 +101,20 @@ export function useShellState(): ShellState {
     [setSearchParams],
   )
 
+  const setMonth = useCallback(
+    (m: number) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('m', String(m))
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
   const selectOverall = useCallback(() => setMemberId(''), [setMemberId])
 
   // Non-elevated users are pinned to their own member_id on first load,
@@ -128,9 +153,11 @@ export function useShellState(): ShellState {
     members,
     memberId,
     year,
+    month,
     yearDisabled: !memberId,
     setMemberId,
     setYear,
+    setMonth,
     selectOverall,
     retryMembers,
   }

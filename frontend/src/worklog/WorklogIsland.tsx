@@ -1,15 +1,14 @@
-// Work Log React island. Mounts inside the existing SPA shell's
-// #worklog-view-root and owns the *display* (filters, table/calendar toggle,
-// row selection + bulk bar, missing-entry bar) AND — as of PR3 — the *data
-// layer*: it is now the single fetcher via TanStack Query (useWorklogsData),
-// replacing static/app/worklogs.js#loadWorklogs()'s fetch + the
-// window.__mwlWorklogs / 'mwl:worklogs' stash. Bulk edit/delete are React
-// mutations with optimistic updates; bulk edit hits PATCH /api/worklogs/bulk
-// (BE-1, server-side partial patch). Single add/edit/delete still delegate to
-// the vanilla shared modal (window.editWorklog / deleteWorklog / openAddWorklog)
-// until PR5 ports it. The fetched rows are mirrored back into vanilla
-// `worklogData` via window.__mwlSetWorklogData so that shared modal's
-// renderExistingRanges() stays correct on every tab.
+// Work Log React island, rendered by AppShell. Owns the *display* (month
+// picker, filters, table/calendar toggle, row selection + bulk bar,
+// missing-entry bar) and the *data layer* via TanStack Query
+// (useWorklogsData). The member/year/month context is passed in as props —
+// AppShell holds it in the URL (?member=&y=&m=) — so a month change is a plain
+// state update rather than a DOM `change` event on #month-select. Bulk
+// edit/delete are React mutations with optimistic updates; bulk edit hits
+// PATCH /api/worklogs/bulk. Single add/edit/delete delegate to the shared
+// modal (window.editWorklog / deleteWorklog / openAddWorklog), and the fetched
+// rows are mirrored into `worklogData` via window.__mwlSetWorklogData so that
+// modal's renderExistingRanges() stays correct on every tab.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, canManageMember, monthName, t, toast, useCurrentUser } from '../lib'
@@ -19,6 +18,7 @@ import { useWorklogsData, worklogsQueryKey } from './useWorklogsData'
 import { BulkEditModal, type BulkFields } from './BulkEditModal'
 import { WorklogCalendar } from './WorklogCalendar'
 import { WorklogTable } from './WorklogTable'
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type ViewMode = 'table' | 'calendar'
 const VIEW_STORAGE_KEY = 'mwl.worklog.view'
@@ -42,10 +42,18 @@ function applyBulkFields(w: Worklog, fields: BulkFields): Worklog {
   return next
 }
 
-export function WorklogIsland() {
+export interface WorklogIslandProps {
+  memberId: string
+  year: number
+  month: number
+  onMonthChange: (month: number) => void
+}
+
+export function WorklogIsland({ memberId, year, month, onMonthChange }: WorklogIslandProps) {
   const user = useCurrentUser()
   const queryClient = useQueryClient()
-  const { ctx, query } = useWorklogsData()
+  const ctx = useMemo(() => ({ member: memberId, year, month }), [memberId, year, month])
+  const query = useWorklogsData(ctx)
   const queryKey = worklogsQueryKey(ctx)
 
   const [view, setView] = useState<ViewMode>(readSavedView)
@@ -56,13 +64,19 @@ export function WorklogIsland() {
   const [showBulkEdit, setShowBulkEdit] = useState(false)
   const [, bumpLang] = useState(0)
 
-  const memberId = ctx.member
   const payload = query.data ?? null
   const worklogs = useMemo(() => payload?.worklogs ?? [], [payload])
   const holidays = payload?.holidays ?? []
-  const year = payload?.year ?? ctx.year
-  const month = payload?.month ?? ctx.month
   const canEdit = canManageMember(user, memberId)
+  // While the next month is in flight the query still serves the previous
+  // month's payload (keepPreviousData), so derived views must not treat it as
+  // belonging to the newly selected month.
+  const showingStaleMonth = query.isPlaceholderData
+
+  const changeMonth = (direction: -1 | 1) => {
+    const next = month + direction
+    onMonthChange(next < 1 ? 12 : next > 12 ? 1 : next)
+  }
 
   // Re-render on language toggle (vanilla i18n fires this global event).
   useEffect(() => {
@@ -85,22 +99,6 @@ export function WorklogIsland() {
   useEffect(() => {
     window.__mwlSetWorklogData?.(worklogs)
   }, [worklogs])
-
-  // Month hand-off from the dashboard's MonthlyLedger: it stashes the clicked
-  // month on window.__mwlPendingMonth then navigates here. #month-select does
-  // not exist until this island mounts, so apply it after mount and fire a
-  // change so useWorklogContext re-reads.
-  useEffect(() => {
-    const pending = window.__mwlPendingMonth
-    if (pending != null) {
-      const sel = document.getElementById('month-select') as HTMLSelectElement | null
-      if (sel) {
-        sel.value = String(pending)
-        sel.dispatchEvent(new Event('change'))
-      }
-      window.__mwlPendingMonth = null
-    }
-  }, [])
 
   useEffect(() => {
     try {
@@ -223,7 +221,7 @@ export function WorklogIsland() {
   const filtersActive = !!(search || status || project)
 
   const missingCount = useMemo(() => {
-    if (!payload) return 0
+    if (!payload || showingStaleMonth) return 0
     const daysInMonth = new Date(year, month, 0).getDate()
     const daysWithEntry = new Set<number>()
     worklogs.forEach((w) => {
@@ -243,7 +241,7 @@ export function WorklogIsland() {
       if (!daysWithEntry.has(d)) missing++
     }
     return missing
-  }, [worklogs, holidays, year, month, payload])
+  }, [worklogs, holidays, year, month, payload, showingStaleMonth])
 
   const toggleRow = (id: number) => {
     setSelected((prev) => {
@@ -269,27 +267,49 @@ export function WorklogIsland() {
     bulkDelete.mutate(ids)
   }, [selected, bulkDelete])
 
-  if (!memberId) return null // vanilla #worklog-no-member already handles this state
-
   return (
     <div className="wl-root mwl-fadein">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="flex items-center gap-2 flex-none">
-          <label htmlFor="month-select" className="text-sm font-medium text-gray-600">
-            {t('wl.month_label') || 'Month:'}
+          <label
+              htmlFor="month-select"
+              className="text-sm font-medium text-gray-600"
+          >
+            {t("wl.month_label") || "Month:"}
           </label>
+
+          <button
+              type="button"
+              aria-label={t('wl.prev_month')}
+              onClick={() => changeMonth(-1)}
+              className="p-2 rounded hover:bg-gray-100"
+          >
+            <ChevronLeft size={18} />
+          </button>
+
           <select
-            id="month-select"
-            defaultValue={String(new Date().getMonth() + 1)}
-            className="input-field w-36"
+              id="month-select"
+              value={month}
+              onChange={(e) => onMonthChange(parseInt(e.target.value, 10))}
+              className="input-field w-36"
           >
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                {monthName(m)}
-              </option>
+                <option key={m} value={m}>
+                  {monthName(m)}
+                </option>
             ))}
           </select>
+
+          <button
+              type="button"
+              aria-label={t('wl.next_month')}
+              onClick={() => changeMonth(1)}
+              className="p-2 rounded hover:bg-gray-100"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
+
         <div className="flex-1" />
         {canEdit && (
           <button
@@ -412,7 +432,17 @@ export function WorklogIsland() {
         </div>
       ) : null}
 
-      {view === 'table' ? (
+      {query.isPending ? (
+        <div className="py-16 text-center text-gray-400">{t('wl.loading')}</div>
+      ) : query.isError ? (
+        <div className="wl-missing-bar">
+          <WarnIcon />
+          <span>{t('wl.load_failed')}</span>
+          <button type="button" className="wl-btn-secondary" onClick={() => query.refetch()}>
+            {t('sel.retry') || 'Retry'}
+          </button>
+        </div>
+      ) : view === 'table' ? (
         <WorklogTable
           worklogs={filtered}
           canEdit={canEdit}

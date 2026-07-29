@@ -100,8 +100,12 @@ export const dict = {
 
         // Worklog toolbar
         'wl.month_label': 'Month:',
+        'wl.prev_month': 'Previous month',
+        'wl.next_month': 'Next month',
         'wl.add_entry': 'Add Entry',
         'wl.add_multi': '+ Add Entry for Multiple',
+        'wl.loading': 'Loading work log…',
+        'wl.load_failed': 'Could not load work log entries.',
 
         // Filters
         'wl.search_ph': '       Search by project, task, or note...',
@@ -407,8 +411,12 @@ export const dict = {
 
         // Worklog toolbar
         'wl.month_label': 'เดือน:',
+        'wl.prev_month': 'เดือนก่อนหน้า',
+        'wl.next_month': 'เดือนถัดไป',
         'wl.add_entry': 'เพิ่มรายการ',
         'wl.add_multi': '+ เพิ่มรายการสำหรับหลายคน',
+        'wl.loading': 'กำลังโหลดบันทึกงาน…',
+        'wl.load_failed': 'ไม่สามารถโหลดบันทึกงานได้',
 
         // Filters
         'wl.search_ph': '   ค้นหาโปรเจกต์ งาน หมายเหตุ...',
