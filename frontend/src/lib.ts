@@ -4,7 +4,7 @@
 // sites (`import { t, toggleLang, ... } from '../lib'`) don't all need
 // touching.
 
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { t as i18nT, toggleLang as i18nToggleLang, currentLang as i18nCurrentLang , tRaw} from './i18n'
 
 export { useLang } from './i18n'
@@ -88,21 +88,21 @@ export function isElevated(role: string | undefined): boolean {
   return !!role && ELEVATED_ROLES.includes(role)
 }
 
-// Independent /api/me fetch for React islands — does NOT read core.js's
-// `currentUser` global, since that is populated asynchronously on
-// DOMContentLoaded (after this module's top-level code has already run).
+// /api/me for React islands, via TanStack Query (see queryClient.ts's
+// per-query staleTime tiers) so the ~11 call sites across tabs share one
+// request per session instead of each island re-fetching on every mount
+// (every tab switch mounts a fresh island component).
 export function useCurrentUser(): MeResp | null {
-  const [user, setUser] = useState<MeResp | null>(null)
-  useEffect(() => {
-    let alive = true
-    api<MeResp>('/api/me').then((r) => {
-      if (alive && r.ok) setUser(r.data)
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-  return user
+  const { data } = useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const r = await api<MeResp>('/api/me')
+      if (!r.ok || !r.data) throw new Error(r.error || 'failed to load /api/me')
+      return r.data
+    },
+    staleTime: 10 * 60_000,
+  })
+  return data ?? null
 }
 
 export function canManageMember(user: MeResp | null, memberId: string): boolean {

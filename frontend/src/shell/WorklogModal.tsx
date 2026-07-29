@@ -11,6 +11,7 @@ import { api, canManageMember, isElevated, t, toast, useCurrentUser } from '../l
 import type { Member } from '../lib'
 import { useDescriptions } from '../worklog/useWorklogsData'
 import type { Worklog } from '../worklog/types'
+import { Spinner } from './Spinner'
 
 type ModalMode = 'add' | 'multi' | 'edit'
 
@@ -630,7 +631,8 @@ export function WorklogModal() {
             <button type="button" onClick={closeIfIdle} disabled={saving} className="btn-secondary">
               {t('modal.cancel')}
             </button>
-            <button type="submit" className="btn-primary" disabled={saving}>
+            <button type="submit" className="btn-primary inline-flex items-center gap-2" disabled={saving}>
+              {saving && <Spinner size="sm" tone="on-dark" />}
               {saving ? t('modal.saving') : mode === 'multi' ? t('modal.save_selected') : t('modal.save')}
             </button>
           </div>

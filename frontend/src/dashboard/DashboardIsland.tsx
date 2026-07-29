@@ -15,6 +15,7 @@ import { api, canManageMember, useCurrentUser } from '../lib'
 import { MonthlyLedger } from './MonthlyLedger'
 import { ProjectRoles } from './ProjectRoles'
 import { SkillsBox } from './SkillsBox'
+import { Spinner } from '../shell/Spinner'
 
 const EMPTY_ROLES: ProjectRolesResp = { main: [], support: [] }
 
@@ -146,13 +147,24 @@ export function DashboardIsland() {
     )
   }
 
+  // Checked before `!data` (not just alongside it) so a member switch — which
+  // sets loading=true but leaves the *previous* member's data in place until
+  // the new payload arrives — shows this instead of silently continuing to
+  // render stale content with no visible feedback.
+  if (loading) {
+    return (
+      <div className="mwl-dash flex flex-col items-center gap-3 py-16 text-center">
+        <Spinner />
+        <p style={{ color: 'var(--ink-50)' }}>Loading…</p>
+      </div>
+    )
+  }
+
   if (!data) {
     return (
       <div className="mwl-dash">
-        <p style={{ color: error ? '#dc2626' : 'var(--ink-50)' }}>
-          {loading ? 'Loading…' : error || 'No data available.'}
-        </p>
-        {!loading && error && (
+        <p style={{ color: error ? '#dc2626' : 'var(--ink-50)' }}>{error || 'No data available.'}</p>
+        {error && (
           <button type="button" className="btn-secondary" onClick={() => load()}>
             Retry
           </button>
@@ -164,7 +176,7 @@ export function DashboardIsland() {
   const canManage = canManageMember(user, memberId)
 
   return (
-    <div className={`mwl-dash ${loading ? '' : 'mwl-fadein'}`}>
+    <div className="mwl-dash mwl-fadein">
       <StaffIdentityCard member={data.member} memberId={memberId} />
       <StatCards data={data} />
       <ProjectRoles memberId={memberId} roles={roles} canManage={canManage} />

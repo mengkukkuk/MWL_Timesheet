@@ -41,6 +41,34 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   SPINNER (circular loading indicator — see shell/Spinner.tsx)
+   ───────────────────────────────────────────────────────────────────────── */
+.mwl-spinner {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(79, 70, 229, 0.25);
+  border-top-color: var(--indigo);
+  animation: mwl-spin 0.7s linear infinite;
+}
+.mwl-spinner--sm {
+  width: 1rem;
+  height: 1rem;
+}
+/* For use on a solid --indigo button background, where the default ring
+   would be invisible against it. */
+.mwl-spinner--on-dark {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+}
+@keyframes mwl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    LOGIN
    ───────────────────────────────────────────────────────────────────────── */
 /* templates/login.html loads no Tailwind, so nothing supplies a preflight
@@ -1467,6 +1495,12 @@
   .mwl-btn {
     animation: none;
     transition: none;
+  }
+  .mwl-spinner {
+    animation: none;
+    /* Keep a static ring visible instead of nothing, so the loading state
+       is still communicated without motion. */
+    opacity: 0.6;
   }
 }
 

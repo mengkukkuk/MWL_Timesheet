@@ -23,7 +23,7 @@ exposed externally via **ngrok** and/or **Tailscale Serve**.
 | ------------ | -------------------------------------------------------- |
 | Web server   | Flask 3.1 (dev) + Waitress 3.0 (prod, via NSSM)          |
 | Database     | Microsoft SQL Server (Express) via pyodbc + ODBC 17      |
-| Frontend     | React 19 + TypeScript SPA (Tailwind CDN) built with Vite, routed by react-router; Flask serves one shell (`app.html`) + JSON — see §6 |
+| Frontend     | React 19 + TypeScript SPA (Tailwind, built locally + purged — see §6) built with Vite, routed by react-router; Flask serves one shell (`app.html`) + JSON — see §6 |
 | Auth         | Server-side sessions (Flask `session`, signed cookie)    |
 | Excel export | `openpyxl` against template workbooks in `templates/`    |
 | Service host | NSSM (`nssm.exe`) — registers the Python + ngrok procs   |
@@ -84,7 +84,12 @@ mwl deploy/
 │       └── settings/             # elevated Settings island (members/projects/users/approvals/presets)
 │
 ├── static/
-│   ├── style.css           # Custom CSS (extends Tailwind CDN)
+│   ├── style.css           # Custom CSS (extends static/tailwind.css)
+│   ├── tailwind.css        # Vite build OUTPUT (git-ignored) — tailwindcss@2.2.19, purged to
+│   │                       #   only the classes actually used in frontend/src (~16 KB, was a
+│   │                       #   2.93 MB / 255 KB-compressed unpurged CDN link). Run
+│   │                       #   `npm run build:css` (frontend/) to (re)generate; `npm run build`
+│   │                       #   already does this before the Vite bundle step.
 │   ├── mwllogo.png
 │   └── react/              # Vite build OUTPUT (git-ignored) — hashed js/css + .vite/manifest.json,
 │                           #   read by app/__init__.py's vite_asset() Jinja global. Run `npm run build`
@@ -255,8 +260,9 @@ and no per-tab `view-*` DOM markup. Flask serves one bare shell
   renders for in-app navigation. [app/core.py](app/core.py)'s `spa()`
   catch-all route serves it for any path that isn't `/api/*`, `/static/*`,
   or an explicit route (e.g. `/login`) — see §5. It is a bare shell:
-  Tailwind CDN, fonts, `style.css`, the `.ps-*` inline styles for the
-  projects-summary island, `<div id="root"></div>`, and the `app` bundle.
+  the locally-built `static/tailwind.css` (see below), fonts, `style.css`,
+  the `.ps-*` inline styles for the projects-summary island,
+  `<div id="root"></div>`, and the `app` bundle.
 - The `app` Vite bundle ([frontend/src/main.tsx](frontend/src/main.tsx))
   mounts into `#root`: `QueryClientProvider` + `RouterProvider` running
   [router.tsx](frontend/src/router.tsx)'s `createBrowserRouter`. **Every**
@@ -312,6 +318,10 @@ and no per-tab `view-*` DOM markup. Flask serves one bare shell
   requests made from the Vite dev origin. **Build for real verification**
   with `npm run build` — the Flask app at :5123 only ever serves the
   built `static/react/` output, not Vite's own dev-server root files.
+  `static/tailwind.css` (unlike the old CDN link) is a static purged file,
+  not live-compiled — run `npm run build:css` at least once before first
+  local dev, and again whenever a component starts using a Tailwind class
+  the purge hasn't seen yet (`npm run build` always does this first).
 
 ### Shared conventions
 

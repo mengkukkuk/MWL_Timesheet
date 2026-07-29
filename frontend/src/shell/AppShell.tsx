@@ -37,6 +37,33 @@ const SettingsIsland = lazy(() =>
   import('../settings/SettingsIsland').then((m) => ({ default: m.SettingsIsland })),
 )
 
+// Warms a tab's lazy chunk ahead of the click (Nav calls this on
+// hover/focus) so the actual tab switch just swaps in an already-downloaded
+// module instead of waiting on a fresh network round-trip. Safe to call
+// redundantly — dynamic import() is cached per specifier by the module
+// system, so this and the lazy() import above resolve to the same fetch.
+function prefetchTab(tab: TabName): void {
+  switch (tab) {
+    case 'dashboard':
+      void import('./DashboardTab')
+      break
+    case 'worklog':
+      void import('../worklog/WorklogIsland')
+      break
+    case 'files':
+      void import('../files/FilesIsland')
+      break
+    case 'projects-summary':
+      void import('../projects-summary/ProjectsSummaryIsland')
+      break
+    case 'settings':
+      void import('../settings/SettingsIsland')
+      break
+    default:
+      break
+  }
+}
+
 const TAB_NAMES: readonly TabName[] = [
   'dashboard',
   'worklog',
@@ -136,6 +163,7 @@ export function AppShell() {
         pendingCount={pendingCount}
         activeTab={activeTab}
         onNavigate={onNavigate}
+        onPrefetch={prefetchTab}
       />
       <Selector
         canViewOthers={canViewOthers}

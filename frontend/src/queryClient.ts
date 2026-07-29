@@ -3,6 +3,7 @@
 // 'mwl:worklogs' CustomEvent stash (see plan: Data layer decision).
 //
 // Per-query staleTime is set at the useQuery call site; the tiers are:
+//   ['me']                         10m  — current user identity, shared across ~11 call sites
 //   ['employees']                  10m  — near-static HR directory
 //   ['projects']                   10m  — near-static
 //   ['worklogs', member, y, m]     30s

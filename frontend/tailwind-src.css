@@ -1,0 +1,6 @@
+/* Input for the local Tailwind build (see tailwind.config.cjs + package.json's
+ * "build:css" script). Compiles to ../static/tailwind.css, replacing the old
+ * unpurged CDN <link> in templates/app.html. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

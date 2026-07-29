@@ -138,15 +138,23 @@ app.jinja_env.globals['vite_asset'] = _vite_asset
 def _add_static_cache_headers(response):
     """Cache-Control for static assets and read-mostly API endpoints.
 
-    /static/* — long-cache (1y, immutable), busted by ?v=<mtime> in templates.
+    /static/react/* and any /static/* URL carrying a ?v= cache-busting query
+    (style.css, tailwind.css via static_v()) — long-cache (1y, immutable);
+    the URL changes whenever the content does, so a year-long cache is safe.
+    Other /static/* files (e.g. mwllogo.png, referenced bare with no ?v=) get
+    a much shorter cache instead — marking an unversioned URL "immutable" for
+    a year would strand a stale copy in every browser if that file is ever
+    replaced, since nothing ever busts its URL.
     /api/avatars/* — private 1-day cache; URLs already carry ?v=<ts>.
     /api/members, /api/projects (GET) — short 60s private cache to absorb
     repeat hits from the SPA during a single page session. Server-side
     in-process TTL cache (app.cache) provides the deeper invalidatable
     layer; this header just trims repeat round-trips."""
     path = request.path
-    if path.startswith('/static/'):
+    if path.startswith('/static/react/') or (path.startswith('/static/') and 'v' in request.args):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=86400, stale-while-revalidate=604800'
     elif path.startswith('/api/avatars/'):
         response.headers['Cache-Control'] = 'private, max-age=86400'
     elif path in ('/api/members', '/api/projects') and request.method == 'GET':

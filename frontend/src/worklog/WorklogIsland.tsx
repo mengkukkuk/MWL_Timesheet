@@ -19,6 +19,7 @@ import { BulkEditModal, type BulkFields } from './BulkEditModal'
 import { WorklogCalendar } from './WorklogCalendar'
 import { WorklogTable } from './WorklogTable'
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Spinner } from '../shell/Spinner'
 
 type ViewMode = 'table' | 'calendar'
 const VIEW_STORAGE_KEY = 'mwl.worklog.view'
@@ -308,6 +309,7 @@ export function WorklogIsland({ memberId, year, month, onMonthChange }: WorklogI
           >
             <ChevronRight size={18} />
           </button>
+          {query.isFetching && !query.isPending && <Spinner size="sm" />}
         </div>
 
         <div className="flex-1" />
@@ -433,7 +435,10 @@ export function WorklogIsland({ memberId, year, month, onMonthChange }: WorklogI
       ) : null}
 
       {query.isPending ? (
-        <div className="py-16 text-center text-gray-400">{t('wl.loading')}</div>
+        <div className="flex flex-col items-center gap-3 py-16 text-center text-gray-400">
+          <Spinner />
+          <span>{t('wl.loading')}</span>
+        </div>
       ) : query.isError ? (
         <div className="wl-missing-bar">
           <WarnIcon />

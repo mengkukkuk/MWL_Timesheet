@@ -6,20 +6,20 @@
       "_query-BRvUYMs_.js"
     ]
   },
-  "_lib-CWVEtecH.css": {
-    "file": "assets/lib-CWVEtecH.css",
-    "src": "_lib-CWVEtecH.css"
-  },
-  "_lib-DdtJKEEk.js": {
-    "file": "assets/lib-DdtJKEEk.js",
+  "_lib-B8EGM2pL.js": {
+    "file": "assets/lib-B8EGM2pL.js",
     "name": "lib",
     "imports": [
       "_query-BRvUYMs_.js",
       "_react-vendor-BPGI9SGU.js"
     ],
     "css": [
-      "assets/lib-CWVEtecH.css"
+      "assets/lib-BiOQTu3K.css"
     ]
+  },
+  "_lib-BiOQTu3K.css": {
+    "file": "assets/lib-BiOQTu3K.css",
+    "src": "_lib-BiOQTu3K.css"
   },
   "_query-BRvUYMs_.js": {
     "file": "assets/query-BRvUYMs_.js",
@@ -33,12 +33,12 @@
     ]
   },
   "index.html": {
-    "file": "assets/app-Cd7vlL9H.js",
+    "file": "assets/app-DhFnSuZn.js",
     "name": "app",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_lib-DdtJKEEk.js",
+      "_lib-B8EGM2pL.js",
       "_query-BRvUYMs_.js",
       "_react-vendor-BPGI9SGU.js"
     ],
@@ -47,75 +47,80 @@
       "src/worklog/WorklogIsland.tsx",
       "src/files/FilesIsland.tsx",
       "src/projects-summary/ProjectsSummaryIsland.tsx",
+      "src/settings/SettingsIsland.tsx",
+      "src/shell/DashboardTab.tsx",
+      "src/worklog/WorklogIsland.tsx",
+      "src/files/FilesIsland.tsx",
+      "src/projects-summary/ProjectsSummaryIsland.tsx",
       "src/settings/SettingsIsland.tsx"
     ]
   },
   "login.html": {
-    "file": "assets/login-D7S2BGLb.js",
+    "file": "assets/login-CBuMfEBC.js",
     "name": "login",
     "src": "login.html",
     "isEntry": true,
     "imports": [
-      "_lib-DdtJKEEk.js",
+      "_lib-B8EGM2pL.js",
       "_query-BRvUYMs_.js",
       "_createLucideIcon-BqaLIzWj.js",
       "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/files/FilesIsland.tsx": {
-    "file": "assets/FilesIsland-WgXoEf25.js",
+    "file": "assets/FilesIsland-CqnfCsTD.js",
     "name": "FilesIsland",
     "src": "src/files/FilesIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-BRvUYMs_.js",
-      "_lib-DdtJKEEk.js",
+      "_lib-B8EGM2pL.js",
       "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/projects-summary/ProjectsSummaryIsland.tsx": {
-    "file": "assets/ProjectsSummaryIsland-CpnJxX4O.js",
+    "file": "assets/ProjectsSummaryIsland-DXSaF0qJ.js",
     "name": "ProjectsSummaryIsland",
     "src": "src/projects-summary/ProjectsSummaryIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-BRvUYMs_.js",
-      "_lib-DdtJKEEk.js",
+      "_lib-B8EGM2pL.js",
       "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/settings/SettingsIsland.tsx": {
-    "file": "assets/SettingsIsland-BZbQfW4G.js",
+    "file": "assets/SettingsIsland-DCywfP1y.js",
     "name": "SettingsIsland",
     "src": "src/settings/SettingsIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-BRvUYMs_.js",
-      "_lib-DdtJKEEk.js",
+      "_lib-B8EGM2pL.js",
       "index.html",
       "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/shell/DashboardTab.tsx": {
-    "file": "assets/DashboardTab-lUe2CzLl.js",
+    "file": "assets/DashboardTab-TgC46Dix.js",
     "name": "DashboardTab",
     "src": "src/shell/DashboardTab.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-BRvUYMs_.js",
-      "_lib-DdtJKEEk.js",
+      "_lib-B8EGM2pL.js",
       "index.html",
       "_react-vendor-BPGI9SGU.js"
     ]
   },
   "src/worklog/WorklogIsland.tsx": {
-    "file": "assets/WorklogIsland-B6dQwpxv.js",
+    "file": "assets/WorklogIsland-DHp3iDU4.js",
     "name": "WorklogIsland",
     "src": "src/worklog/WorklogIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-BRvUYMs_.js",
-      "_lib-DdtJKEEk.js",
+      "_lib-B8EGM2pL.js",
       "index.html",
       "_createLucideIcon-BqaLIzWj.js",
       "_react-vendor-BPGI9SGU.js"

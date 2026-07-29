@@ -4,9 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MWL Timesheet</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" integrity="sha384-HtMZLkYo+pR5/u7zCzXxMJP6QoNnQJt1qkHM0EaOPvGDIzaVZbmYr/TlvUZ/sKAg" crossorigin="anonymous">
-    <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Locally built + purged replacement for the old unpurged Tailwind CDN
+         link (was 2.93 MB / 255 KB compressed; this is ~16 KB / ~4 KB gzip).
+         Same tailwindcss@2.2.19 version and default theme, so no utility's
+         definition changed — only unused selectors were removed. Kept first
+         in <head>, same position the CDN link had, since static/style.css
+         is written to load after and override it (see style.css's header
+         comment: "extends Tailwind CDN"). Rebuild with `npm run build:css`
+         (frontend/) whenever a component starts using a new Tailwind class. -->
+    <link rel="stylesheet" href="/static/tailwind.css?v={{ static_v('tailwind.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit&family=Syne:wght@700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
     <!-- Single React SPA bundle (Vite `app` entry -> src/main.tsx -> AppShell).
          AppShell owns the whole UI: nav, selector, tab switching, all islands,

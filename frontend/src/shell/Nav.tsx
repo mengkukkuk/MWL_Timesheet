@@ -9,6 +9,7 @@ interface NavProps {
   pendingCount: number
   activeTab: TabName
   onNavigate: (tab: TabName) => void
+  onPrefetch: (tab: TabName) => void
 }
 
 interface TabDef {
@@ -26,7 +27,7 @@ const TABS: readonly TabDef[] = [
   { name: 'settings', labelKey: 'nav.settings', elevatedOnly: true },
 ]
 
-export function Nav({ elevated, user, pendingCount, activeTab, onNavigate }: NavProps) {
+export function Nav({ elevated, user, pendingCount, activeTab, onNavigate, onPrefetch }: NavProps) {
   const lang = useLang()
   const otherLang = lang === 'th' ? 'EN' : 'TH'
 
@@ -42,6 +43,8 @@ export function Nav({ elevated, user, pendingCount, activeTab, onNavigate }: Nav
                   key={tab.name}
                   type="button"
                   onClick={() => onNavigate(tab.name)}
+                  onMouseEnter={() => onPrefetch(tab.name)}
+                  onFocus={() => onPrefetch(tab.name)}
                   className={
                     'relative px-3 py-2 rounded-md text-sm font-medium transition-colors ' +
                     (activeTab === tab.name
@@ -87,6 +90,8 @@ export function Nav({ elevated, user, pendingCount, activeTab, onNavigate }: Nav
               key={tab.name}
               type="button"
               onClick={() => onNavigate(tab.name)}
+              onTouchStart={() => onPrefetch(tab.name)}
+              onFocus={() => onPrefetch(tab.name)}
               className={
                 'relative whitespace-nowrap px-3 py-2 rounded-md text-sm font-medium ' +
                 (activeTab === tab.name
