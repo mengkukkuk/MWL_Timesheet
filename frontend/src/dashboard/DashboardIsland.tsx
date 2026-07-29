@@ -9,7 +9,7 @@
 // The one bold spend here is the enriched StaffIdentityCard; stat numbers are
 // set in DM Mono. Clicking a month row hands control back to the vanilla shell
 // (#month-select + showTab('worklog')) so the rest of the app is unchanged.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectRolesResp, Skill } from '../lib'
 import { api, canManageMember, useCurrentUser } from '../lib'
 import { MonthlyLedger } from './MonthlyLedger'
@@ -75,18 +75,27 @@ export function DashboardIsland() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [roles, setRoles] = useState<ProjectRolesResp>(EMPTY_ROLES)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [memberId, setMemberId] = useState<string>(currentMemberId())
   const [, bumpLang] = useState(0)
+  // Guards against out-of-order responses: a slower, stale request (e.g. from
+  // a superseded load() call caused by rapid member switching, or React
+  // StrictMode's dev-only double-invoke of mount effects) must not overwrite
+  // state set by a request that was started later.
+  const requestIdRef = useRef(0)
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current
     const id = currentMemberId()
     setMemberId(id)
     if (!id) {
       setData(null)
+      setError(null)
       return
     }
     const year = readSelect('year-select') || String(new Date().getFullYear())
     setLoading(true)
+    setError(null)
     const [dash, employees, sk, pr] = await Promise.all([
       api<DashboardData>(
         `/api/dashboard?member_id=${encodeURIComponent(id)}&year=${encodeURIComponent(year)}`,
@@ -95,11 +104,13 @@ export function DashboardIsland() {
       api<Skill[]>(`/api/members/${encodeURIComponent(id)}/skills`),
       api<ProjectRolesResp>(`/api/members/${encodeURIComponent(id)}/project-roles`),
     ])
+    if (requestId !== requestIdRef.current) return
     setLoading(false)
     setSkills(sk.data ?? [])
     setRoles(pr.data ?? EMPTY_ROLES)
     if (!dash.ok || !dash.data) {
       setData(null)
+      setError(dash.error || `Failed to load dashboard (${dash.status || 'network error'})`)
       return
     }
     const jg = employees.data?.find((e) => String(e.id) === String(id))?.jg
@@ -138,9 +149,14 @@ export function DashboardIsland() {
   if (!data) {
     return (
       <div className="mwl-dash">
-        <p style={{ color: 'var(--ink-50)' }}>
-          {loading ? 'Loading…' : 'No data available.'}
+        <p style={{ color: error ? '#dc2626' : 'var(--ink-50)' }}>
+          {loading ? 'Loading…' : error || 'No data available.'}
         </p>
+        {!loading && error && (
+          <button type="button" className="btn-secondary" onClick={() => load()}>
+            Retry
+          </button>
+        )}
       </div>
     )
   }

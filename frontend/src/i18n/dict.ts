@@ -56,6 +56,7 @@ export const dict = {
         // Selector bar
         'sel.member': 'Team Member:',
         'sel.select_ph': 'Select a member...',
+        'sel.retry': 'Retry',
         'sel.year': 'Year:',
         'sel.overall': 'Overall',
 
@@ -217,6 +218,7 @@ export const dict = {
         'modal.none': 'None',
         'modal.cancel': 'Cancel',
         'modal.save': 'Save',
+        'modal.saving': 'Saving…',
         'modal.save_selected': 'Save for Selected',
 
         // Modal — bulk export
@@ -361,6 +363,7 @@ export const dict = {
         // Selector bar
         'sel.member': 'สมาชิกทีม:',
         'sel.select_ph': 'เลือกสมาชิก...',
+        'sel.retry': 'ลองใหม่',
         'sel.year': 'ปี:',
         'sel.overall': 'ภาพรวม',
 
@@ -522,6 +525,7 @@ export const dict = {
         'modal.none': 'ยกเลิกทั้งหมด',
         'modal.cancel': 'ยกเลิก',
         'modal.save': 'บันทึก',
+        'modal.saving': 'กำลังบันทึก…',
         'modal.save_selected': 'บันทึกสำหรับที่เลือก',
 
         // Modal — bulk export

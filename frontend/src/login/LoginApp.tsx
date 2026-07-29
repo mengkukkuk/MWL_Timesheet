@@ -222,8 +222,11 @@ function LoginForm({ onMsg, msg, onSwitch }: FormProps) {
         <MessageBox msg={msg} />
       )}
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.username')}</label>
+        <label className="mwl-label" htmlFor="login-username">
+          {t('login.username')}
+        </label>
         <input
+          id="login-username"
           className="mwl-input"
           autoComplete="username"
           value={username}
@@ -232,8 +235,11 @@ function LoginForm({ onMsg, msg, onSwitch }: FormProps) {
         />
       </div>
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.password')}</label>
+        <label className="mwl-label" htmlFor="login-password">
+          {t('login.password')}
+        </label>
         <input
+          id="login-password"
           className="mwl-input"
           type="password"
           autoComplete="current-password"
@@ -319,8 +325,11 @@ function RegisterForm({ onMsg, msg, onSwitch }: FormProps) {
       </div>
       <MessageBox msg={msg} />
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.username')}</label>
+        <label className="mwl-label" htmlFor="register-username">
+          {t('login.username')}
+        </label>
         <input
+          id="register-username"
           className="mwl-input"
           autoComplete="username"
           value={username}
@@ -329,8 +338,11 @@ function RegisterForm({ onMsg, msg, onSwitch }: FormProps) {
         />
       </div>
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.password')}</label>
+        <label className="mwl-label" htmlFor="register-password">
+          {t('login.password')}
+        </label>
         <input
+          id="register-password"
           className="mwl-input"
           type="password"
           autoComplete="new-password"
@@ -342,8 +354,11 @@ function RegisterForm({ onMsg, msg, onSwitch }: FormProps) {
         />
       </div>
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.confirm_password')}</label>
+        <label className="mwl-label" htmlFor="register-password2">
+          {t('login.confirm_password')}
+        </label>
         <input
+          id="register-password2"
           className="mwl-input"
           type="password"
           autoComplete="new-password"
@@ -353,8 +368,11 @@ function RegisterForm({ onMsg, msg, onSwitch }: FormProps) {
         />
       </div>
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.employee_id')}</label>
+        <label className="mwl-label" htmlFor="register-empid">
+          {t('login.employee_id')}
+        </label>
         <input
+          id="register-empid"
           className="mwl-input mwl-input--mono"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -467,8 +485,11 @@ function ResetForm({ onMsg, msg, onSwitch }: FormProps) {
       </div>
       <MessageBox msg={msg} />
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.username')}</label>
+        <label className="mwl-label" htmlFor="reset-username">
+          {t('login.username')}
+        </label>
         <input
+          id="reset-username"
           className="mwl-input"
           autoComplete="username"
           value={username}
@@ -477,8 +498,11 @@ function ResetForm({ onMsg, msg, onSwitch }: FormProps) {
         />
       </div>
       <div className="mwl-field">
-        <label className="mwl-label">Staff ID</label>
+        <label className="mwl-label" htmlFor="reset-staffid">
+          Staff ID
+        </label>
         <input
+          id="reset-staffid"
           className="mwl-input mwl-input--mono"
           placeholder="e.g. EMP-001"
           value={staffId}
@@ -487,8 +511,11 @@ function ResetForm({ onMsg, msg, onSwitch }: FormProps) {
         />
       </div>
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.password')}</label>
+        <label className="mwl-label" htmlFor="reset-password">
+          {t('login.password')}
+        </label>
         <input
+          id="reset-password"
           className="mwl-input"
           type="password"
           autoComplete="new-password"
@@ -500,8 +527,11 @@ function ResetForm({ onMsg, msg, onSwitch }: FormProps) {
         />
       </div>
       <div className="mwl-field">
-        <label className="mwl-label">{t('login.confirm_password')}</label>
+        <label className="mwl-label" htmlFor="reset-password2">
+          {t('login.confirm_password')}
+        </label>
         <input
+          id="reset-password2"
           className="mwl-input"
           type="password"
           autoComplete="new-password"

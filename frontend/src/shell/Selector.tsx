@@ -12,6 +12,7 @@ interface SelectorProps {
   setMemberId: (id: string) => void
   setYear: (y: number) => void
   selectOverall: () => void
+  retryMembers: () => void
 }
 
 function yearOptions(current: number): number[] {
@@ -32,6 +33,7 @@ export function Selector({
   setMemberId,
   setYear,
   selectOverall,
+  retryMembers,
 }: SelectorProps) {
   const [overallMonth, setOverallMonth] = useState<number>(new Date().getMonth() + 1)
 
@@ -55,6 +57,15 @@ export function Selector({
             </option>
           ))}
         </select>
+        {members.length === 0 && (
+          <button
+            type="button"
+            onClick={() => retryMembers()}
+            className="px-2 py-1 text-xs font-medium text-gray-500 border border-gray-300 rounded-md hover:bg-gray-100"
+          >
+            {t('sel.retry')}
+          </button>
+        )}
 
         {elevated && (
           <button

@@ -11,7 +11,7 @@
 // unmodified — see the migration plan's "cross-bundle DOM/window contract".
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { api, isElevated, useCurrentUser, type Member, type MeResp } from '../lib'
+import { api, isElevated, toast, useCurrentUser, type Member, type MeResp } from '../lib'
 
 declare global {
   interface Window {
@@ -30,6 +30,7 @@ export interface ShellState {
   setMemberId: (id: string) => void
   setYear: (y: number) => void
   selectOverall: () => void
+  retryMembers: () => void
 }
 
 export function useShellState(): ShellState {
@@ -42,15 +43,23 @@ export function useShellState(): ShellState {
   const yearParam = searchParams.get('y')
   const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear()
 
+  const [membersReloadKey, setMembersReloadKey] = useState(0)
+  const retryMembers = useCallback(() => setMembersReloadKey((k) => k + 1), [])
+
   useEffect(() => {
     let alive = true
     api<Member[]>('/api/members').then((r) => {
-      if (alive && r.ok && r.data) setMembers(r.data)
+      if (!alive) return
+      if (r.ok && r.data) {
+        setMembers(r.data)
+      } else {
+        toast('Failed to load team members — retrying may help', 'error')
+      }
     })
     return () => {
       alive = false
     }
-  }, [])
+  }, [membersReloadKey])
 
   const setMemberId = useCallback(
     (id: string) => {
@@ -123,5 +132,6 @@ export function useShellState(): ShellState {
     setMemberId,
     setYear,
     selectOverall,
+    retryMembers,
   }
 }

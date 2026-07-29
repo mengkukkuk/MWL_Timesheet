@@ -1,6 +1,10 @@
 {
-  "_lib-CGCZtswz.js": {
-    "file": "assets/lib-CGCZtswz.js",
+  "_lib-CWVEtecH.css": {
+    "file": "assets/lib-CWVEtecH.css",
+    "src": "_lib-CWVEtecH.css"
+  },
+  "_lib-gE6O8flh.js": {
+    "file": "assets/lib-gE6O8flh.js",
     "name": "lib",
     "imports": [
       "_query-DfXOXAmB.js",
@@ -9,10 +13,6 @@
     "css": [
       "assets/lib-CWVEtecH.css"
     ]
-  },
-  "_lib-CWVEtecH.css": {
-    "file": "assets/lib-CWVEtecH.css",
-    "src": "_lib-CWVEtecH.css"
   },
   "_query-DfXOXAmB.js": {
     "file": "assets/query-DfXOXAmB.js",
@@ -26,12 +26,12 @@
     ]
   },
   "index.html": {
-    "file": "assets/app-DHHo8wZN.js",
+    "file": "assets/app-B6LPE0BU.js",
     "name": "app",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_lib-CGCZtswz.js",
+      "_lib-gE6O8flh.js",
       "_query-DfXOXAmB.js",
       "_react-vendor-BA5_97fH.js"
     ],
@@ -44,69 +44,69 @@
     ]
   },
   "login.html": {
-    "file": "assets/login-gWgsrOO0.js",
+    "file": "assets/login-0JAPkNcl.js",
     "name": "login",
     "src": "login.html",
     "isEntry": true,
     "imports": [
-      "_lib-CGCZtswz.js",
+      "_lib-gE6O8flh.js",
       "_query-DfXOXAmB.js",
       "_react-vendor-BA5_97fH.js"
     ]
   },
   "src/files/FilesIsland.tsx": {
-    "file": "assets/FilesIsland-C-ShMAmp.js",
+    "file": "assets/FilesIsland-Cwt4z58h.js",
     "name": "FilesIsland",
     "src": "src/files/FilesIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-DfXOXAmB.js",
-      "_lib-CGCZtswz.js",
+      "_lib-gE6O8flh.js",
       "_react-vendor-BA5_97fH.js"
     ]
   },
   "src/projects-summary/ProjectsSummaryIsland.tsx": {
-    "file": "assets/ProjectsSummaryIsland-CxIOMgy9.js",
+    "file": "assets/ProjectsSummaryIsland-C-xKjpcx.js",
     "name": "ProjectsSummaryIsland",
     "src": "src/projects-summary/ProjectsSummaryIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-DfXOXAmB.js",
-      "_lib-CGCZtswz.js",
+      "_lib-gE6O8flh.js",
       "_react-vendor-BA5_97fH.js"
     ]
   },
   "src/settings/SettingsIsland.tsx": {
-    "file": "assets/SettingsIsland-C4OEXm0y.js",
+    "file": "assets/SettingsIsland-B5XmRZJ1.js",
     "name": "SettingsIsland",
     "src": "src/settings/SettingsIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-DfXOXAmB.js",
-      "_lib-CGCZtswz.js",
+      "_lib-gE6O8flh.js",
       "index.html",
       "_react-vendor-BA5_97fH.js"
     ]
   },
   "src/shell/DashboardTab.tsx": {
-    "file": "assets/DashboardTab-DjRz9NIc.js",
+    "file": "assets/DashboardTab-BWuytk1F.js",
     "name": "DashboardTab",
     "src": "src/shell/DashboardTab.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-DfXOXAmB.js",
-      "_lib-CGCZtswz.js",
+      "_lib-gE6O8flh.js",
       "_react-vendor-BA5_97fH.js"
     ]
   },
   "src/worklog/WorklogIsland.tsx": {
-    "file": "assets/WorklogIsland-Bx94bw4w.js",
+    "file": "assets/WorklogIsland-BYN-F7CC.js",
     "name": "WorklogIsland",
     "src": "src/worklog/WorklogIsland.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_query-DfXOXAmB.js",
-      "_lib-CGCZtswz.js",
+      "_lib-gE6O8flh.js",
       "index.html",
       "_react-vendor-BA5_97fH.js"
     ]

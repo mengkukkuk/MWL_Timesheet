@@ -61,6 +61,7 @@ export function AllowanceTab() {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add')
   const [draft, setDraft] = useState<AllowanceDraft>({ id: '', log_date: today(), project: '' })
+  const [deletingId, setDeletingId] = useState<number | null>(null)
   const [, bumpLang] = useState(0)
 
   useEffect(() => {
@@ -119,6 +120,7 @@ export function AllowanceTab() {
       queryClient.invalidateQueries({ queryKey: ['allowance'] })
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Delete failed', 'error'),
+    onSettled: () => setDeletingId(null),
   })
 
   const openAdd = useCallback(() => {
@@ -142,7 +144,9 @@ export function AllowanceTab() {
   }
 
   const onDelete = (id: number) => {
+    if (deletingId != null) return // a delete is already in flight
     if (!window.confirm(t('al.confirm_delete'))) return
+    setDeletingId(id)
     remove.mutate(id)
   }
 
@@ -207,15 +211,21 @@ export function AllowanceTab() {
                     <td className="py-2 px-3 text-right whitespace-nowrap">
                       {canEdit && isEditable && (
                         <>
-                          <button className="btn-icon" title="Edit" onClick={() => openEdit(a)}>
+                          <button
+                            className="btn-icon"
+                            title="Edit"
+                            disabled={deletingId != null}
+                            onClick={() => openEdit(a)}
+                          >
                             ✎
                           </button>
                           <button
                             className="btn-icon danger"
                             title="Delete"
+                            disabled={deletingId != null}
                             onClick={() => onDelete(a.ID)}
                           >
-                            🗑
+                            {deletingId === a.ID ? '…' : '🗑'}
                           </button>
                         </>
                       )}

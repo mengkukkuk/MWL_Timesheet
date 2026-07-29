@@ -187,6 +187,14 @@ export function WorklogModal() {
     setMultiChecked(new Set())
   }, [])
 
+  // Guards against closing (overlay click / X / Cancel) while a submit is in
+  // flight — previously any of these could hide the modal mid-save, letting a
+  // user reopen it and double-submit before the first request settled.
+  const closeIfIdle = useCallback(() => {
+    if (saving) return
+    close()
+  }, [saving, close])
+
   // ── window.* global registration (same contract as vanilla) ──
   useEffect(() => {
     const openAdd = () => {
@@ -396,11 +404,16 @@ export function WorklogModal() {
         : t('modal.add_entry')
 
   return (
-    <div className="modal-overlay" onClick={close}>
+    <div className="modal-overlay" onClick={closeIfIdle}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-          <button type="button" onClick={close} className="text-gray-400 hover:text-gray-600">
+          <button
+            type="button"
+            onClick={closeIfIdle}
+            disabled={saving}
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-40"
+          >
             ✕
           </button>
         </div>
@@ -614,11 +627,11 @@ export function WorklogModal() {
           )}
 
           <div className="flex justify-end gap-2 mt-5">
-            <button type="button" onClick={close} className="btn-secondary">
+            <button type="button" onClick={closeIfIdle} disabled={saving} className="btn-secondary">
               {t('modal.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {mode === 'multi' ? t('modal.save_selected') : t('modal.save')}
+              {saving ? t('modal.saving') : mode === 'multi' ? t('modal.save_selected') : t('modal.save')}
             </button>
           </div>
         </form>

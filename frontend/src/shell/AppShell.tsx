@@ -66,8 +66,18 @@ function SelectMemberPlaceholder() {
 
 export function AppShell() {
   const shell = useShellState()
-  const { user, elevated, members, memberId, year, yearDisabled, setMemberId, setYear, selectOverall } =
-    shell
+  const {
+    user,
+    elevated,
+    members,
+    memberId,
+    year,
+    yearDisabled,
+    setMemberId,
+    setYear,
+    selectOverall,
+    retryMembers,
+  } = shell
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -126,6 +136,7 @@ export function AppShell() {
         setMemberId={setMemberId}
         setYear={setYear}
         selectOverall={selectOverall}
+        retryMembers={retryMembers}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
