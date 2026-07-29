@@ -10,7 +10,7 @@
 // into those DOM elements/events on every change so those islands keep working
 // unmodified — see the migration plan's "cross-bundle DOM/window contract".
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { api, isElevated, toast, useCurrentUser, type Member, type MeResp } from '../lib'
 
 declare global {
@@ -50,6 +50,7 @@ export function useShellState(): ShellState {
   const [worklogOpen, setWorklogOpen] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   // The admin-controlled "Worklog Visibility" toggle (Settings tab) lets
   // non-elevated (Staff) users browse the Team Overview and other members'
@@ -132,7 +133,16 @@ export function useShellState(): ShellState {
     [setSearchParams],
   )
 
-  const selectOverall = useCallback(() => setMemberId(''), [setMemberId])
+  // "Overall" is a page, not just a query-param clear: the button lives in the
+  // shared Selector bar visible on every tab, so clicking it must always land
+  // on the Team Overview view (dashboard, no member selected) regardless of
+  // which tab is currently active — previously this only cleared `member` in
+  // place, which did nothing visible unless you were already on /dashboard.
+  const selectOverall = useCallback(() => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('member')
+    navigate({ pathname: '/dashboard', search: next.toString() })
+  }, [navigate, searchParams])
 
   // Non-elevated users are pinned to their own member_id on first load only,
   // mirroring core.js's initializeApp(): `if (!isElevated() && currentUser.member_id) ...`.

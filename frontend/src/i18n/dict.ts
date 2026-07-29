@@ -61,6 +61,7 @@ export const dict = {
         'sel.overall': 'Overall',
 
         // Team overview
+        'dash.overall_title': 'Overall',
         'dash.team_overview': 'Team Overview',
         'dash.has_project': 'Has project',
         'dash.no_project': 'No project',
@@ -372,6 +373,7 @@ export const dict = {
         'sel.overall': 'ภาพรวม',
 
         // Team overview
+        'dash.overall_title': 'ภาพรวม',
         'dash.team_overview': 'ภาพรวมทีม',
         'dash.has_project': 'มีโปรเจกต์',
         'dash.no_project': 'ไม่มีโปรเจกต์',

@@ -11,7 +11,7 @@
 // The islands themselves are unchanged: they read member/year/month from the
 // shared #member-select / #year-select / #overall-month-select controls (which
 // AppShell's Selector renders) via the DOM-event bus.
-import { t } from '../lib'
+import { t, useLang } from '../lib'
 import { DashboardIsland } from '../dashboard/DashboardIsland'
 import { ExportControls } from '../dashboard/ExportControls'
 import { TeamOverviewIsland } from '../dashboard/TeamOverviewIsland'
@@ -23,6 +23,11 @@ interface DashboardTabProps {
 }
 
 export function DashboardTab({ canViewOthers, memberId, onSelectMember }: DashboardTabProps) {
+  // Subscribes this component to language changes (mirrors Nav.tsx) so the
+  // "Team Overview" title re-renders immediately on toggle instead of only
+  // updating on the next unrelated re-render (previously: only on F5).
+  useLang()
+
   if (canViewOthers && !memberId) {
     return (
       <div className="mwl-fadein">
