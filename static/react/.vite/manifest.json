@@ -1,17 +1,10 @@
 {
-  "_client-C3iWYkwz.js": {
-    "file": "assets/client-C3iWYkwz.js",
-    "name": "client",
-    "imports": [
-      "_query-DkV7qeyu.js",
-      "_react-vendor-KaNUfFDW.js"
-    ]
-  },
-  "_lib-Br4F0JqH.js": {
-    "file": "assets/lib-Br4F0JqH.js",
+  "_lib-CGCZtswz.js": {
+    "file": "assets/lib-CGCZtswz.js",
     "name": "lib",
     "imports": [
-      "_query-DkV7qeyu.js"
+      "_query-DfXOXAmB.js",
+      "_react-vendor-BA5_97fH.js"
     ],
     "css": [
       "assets/lib-CWVEtecH.css"
@@ -21,62 +14,101 @@
     "file": "assets/lib-CWVEtecH.css",
     "src": "_lib-CWVEtecH.css"
   },
-  "_query-DkV7qeyu.js": {
-    "file": "assets/query-DkV7qeyu.js",
+  "_query-DfXOXAmB.js": {
+    "file": "assets/query-DfXOXAmB.js",
     "name": "query"
   },
-  "_react-vendor-KaNUfFDW.js": {
-    "file": "assets/react-vendor-KaNUfFDW.js",
+  "_react-vendor-BA5_97fH.js": {
+    "file": "assets/react-vendor-BA5_97fH.js",
     "name": "react-vendor",
     "imports": [
-      "_query-DkV7qeyu.js"
-    ]
-  },
-  "dashboard.html": {
-    "file": "assets/dashboard-CoFpJ1q3.js",
-    "name": "dashboard",
-    "src": "dashboard.html",
-    "isEntry": true,
-    "imports": [
-      "_client-C3iWYkwz.js",
-      "_query-DkV7qeyu.js",
-      "_lib-Br4F0JqH.js",
-      "_react-vendor-KaNUfFDW.js"
+      "_query-DfXOXAmB.js"
     ]
   },
   "index.html": {
-    "file": "assets/app-DLSVLaaa.js",
+    "file": "assets/app-DHHo8wZN.js",
     "name": "app",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_client-C3iWYkwz.js",
-      "_query-DkV7qeyu.js",
-      "_react-vendor-KaNUfFDW.js"
+      "_lib-CGCZtswz.js",
+      "_query-DfXOXAmB.js",
+      "_react-vendor-BA5_97fH.js"
+    ],
+    "dynamicImports": [
+      "src/shell/DashboardTab.tsx",
+      "src/worklog/WorklogIsland.tsx",
+      "src/files/FilesIsland.tsx",
+      "src/projects-summary/ProjectsSummaryIsland.tsx",
+      "src/settings/SettingsIsland.tsx"
     ]
   },
   "login.html": {
-    "file": "assets/login-BS1tN1rG.js",
+    "file": "assets/login-gWgsrOO0.js",
     "name": "login",
     "src": "login.html",
     "isEntry": true,
     "imports": [
-      "_client-C3iWYkwz.js",
-      "_query-DkV7qeyu.js",
-      "_lib-Br4F0JqH.js",
-      "_react-vendor-KaNUfFDW.js"
+      "_lib-CGCZtswz.js",
+      "_query-DfXOXAmB.js",
+      "_react-vendor-BA5_97fH.js"
     ]
   },
-  "worklog.html": {
-    "file": "assets/worklog-iv5XqdwI.js",
-    "name": "worklog",
-    "src": "worklog.html",
-    "isEntry": true,
+  "src/files/FilesIsland.tsx": {
+    "file": "assets/FilesIsland-C-ShMAmp.js",
+    "name": "FilesIsland",
+    "src": "src/files/FilesIsland.tsx",
+    "isDynamicEntry": true,
     "imports": [
-      "_client-C3iWYkwz.js",
-      "_query-DkV7qeyu.js",
-      "_lib-Br4F0JqH.js",
-      "_react-vendor-KaNUfFDW.js"
+      "_query-DfXOXAmB.js",
+      "_lib-CGCZtswz.js",
+      "_react-vendor-BA5_97fH.js"
+    ]
+  },
+  "src/projects-summary/ProjectsSummaryIsland.tsx": {
+    "file": "assets/ProjectsSummaryIsland-CxIOMgy9.js",
+    "name": "ProjectsSummaryIsland",
+    "src": "src/projects-summary/ProjectsSummaryIsland.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_query-DfXOXAmB.js",
+      "_lib-CGCZtswz.js",
+      "_react-vendor-BA5_97fH.js"
+    ]
+  },
+  "src/settings/SettingsIsland.tsx": {
+    "file": "assets/SettingsIsland-C4OEXm0y.js",
+    "name": "SettingsIsland",
+    "src": "src/settings/SettingsIsland.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_query-DfXOXAmB.js",
+      "_lib-CGCZtswz.js",
+      "index.html",
+      "_react-vendor-BA5_97fH.js"
+    ]
+  },
+  "src/shell/DashboardTab.tsx": {
+    "file": "assets/DashboardTab-DjRz9NIc.js",
+    "name": "DashboardTab",
+    "src": "src/shell/DashboardTab.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_query-DfXOXAmB.js",
+      "_lib-CGCZtswz.js",
+      "_react-vendor-BA5_97fH.js"
+    ]
+  },
+  "src/worklog/WorklogIsland.tsx": {
+    "file": "assets/WorklogIsland-Bx94bw4w.js",
+    "name": "WorklogIsland",
+    "src": "src/worklog/WorklogIsland.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_query-DfXOXAmB.js",
+      "_lib-CGCZtswz.js",
+      "index.html",
+      "_react-vendor-BA5_97fH.js"
     ]
   }
 }

@@ -35,6 +35,9 @@ function fmt(v: number | string | undefined): string {
 function openMonth(month: number): void {
   const sel = document.getElementById('month-select') as HTMLSelectElement | null
   if (sel) sel.value = String(month)
+  // #month-select is not mounted until WorklogIsland renders, so stash the
+  // clicked month; WorklogIsland applies it on mount (see worklog/types.ts).
+  window.__mwlPendingMonth = month
   window.mwlNavigate?.('worklog')
 }
 

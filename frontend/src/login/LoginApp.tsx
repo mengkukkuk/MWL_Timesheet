@@ -16,6 +16,14 @@ import type { LoginResp } from '../lib'
 import { useEmployeeLookup } from './useEmployeeLookup'
 import {ClockTimerWidget} from "../components/ClockTimerWidget.tsx";
 
+declare global {
+  interface Window {
+    // Optional vanilla-i18n helper injected by static/app/i18n.js when the
+    // login page loads it; guarded with ?. so it is a no-op when absent.
+    applyTranslations?: () => void
+  }
+}
+
 type Mode = 'login' | 'register' | 'reset'
 type Msg = { text: string; kind: 'err' | 'ok' } | null
 

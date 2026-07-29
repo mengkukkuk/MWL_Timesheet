@@ -786,24 +786,29 @@ def folder_stats(fid=None):
             "SELECT COUNT(*) AS cnt FROM file_folders", fetchone=True,
         ) or {}).get('cnt') or 0
     else:
-        # Walk the subtree (small trees expected; iterative)
-        ids = [fid]
-        stack = [fid]
-        while stack:
-            cur = stack.pop()
-            kids = app_pkg.db.query(
-                "SELECT id FROM file_folders WHERE parent_id=?", (cur,)
-            ) or []
-            for k in kids:
-                ids.append(k['id'])
-                stack.append(k['id'])
-        placeholders = ','.join('?' for _ in ids)
+        # Collect the subtree folder ids in a single recursive CTE (one
+        # round-trip) instead of one query per level, then aggregate files
+        # against them. MAXRECURSION 100 guards malformed parent chains.
         row = app_pkg.db.query(
-            f"SELECT COUNT(*) AS cnt, COALESCE(SUM(size_bytes), 0) AS total "
-            f"FROM files WHERE folder_id IN ({placeholders})",
-            tuple(ids), fetchone=True,
+            """
+            WITH subtree AS (
+                SELECT id FROM file_folders WHERE id = ?
+                UNION ALL
+                SELECT f.id
+                FROM file_folders f
+                JOIN subtree s ON f.parent_id = s.id
+            )
+            SELECT
+                (SELECT COUNT(*) FROM subtree) AS folder_cnt,
+                COUNT(fl.id) AS cnt,
+                COALESCE(SUM(fl.size_bytes), 0) AS total
+            FROM subtree st
+            LEFT JOIN files fl ON fl.folder_id = st.id
+            OPTION (MAXRECURSION 100)
+            """,
+            (fid,), fetchone=True,
         ) or {}
-        folder_count = len(ids) - 1  # exclude self
+        folder_count = int(row.get('folder_cnt') or 1) - 1  # exclude self
 
     return jsonify({
         'folder_id': fid,

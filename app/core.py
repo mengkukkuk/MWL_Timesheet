@@ -19,9 +19,9 @@ core_bp = Blueprint('core', __name__)
 @core_bp.route('/<path:path>')
 @login_required
 def spa(path):
-    # SPA catch-all (plan: purring-weaving-pillow.md PR1). templates/app.html
-    # is currently a byte-for-byte copy of templates/index.html — this swap
-    # is a zero-diff staging step before per-tab React-Router extraction.
+    # SPA catch-all. templates/app.html is the bare React shell: it loads the
+    # `app` Vite bundle (src/main.tsx -> RouterProvider -> AppShell), which owns
+    # the entire UI (nav, selector, every tab island, modals, toast, draft).
     # api/* and static/* (or anything with a file extension) 404 here so
     # blueprint routes and Flask's static handler keep working; Flask/werkzeug
     # already prefers explicit rules (e.g. /login in auth.py) over this

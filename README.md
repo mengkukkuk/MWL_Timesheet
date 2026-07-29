@@ -10,7 +10,7 @@ For full architecture, conventions, and operational details, see:
 - [CLAUDE.md](CLAUDE.md) — project guide for Claude Code (architecture, DB
   schema, frontend structure, conventions)
 - [AGENTS.md](AGENTS.md) — equivalent guide for Codex
-- [SKILL.md](SKILL.md) — deployment/operations playbook (install, restart,
+- [SKILL.md](DEPLOY.md) — deployment/operations playbook (install, restart,
   rebuild, troubleshooting)
 
 ## Tech stack
@@ -19,7 +19,7 @@ For full architecture, conventions, and operational details, see:
 | ---------- | ---------------------------------------------------------------- |
 | Web server | Flask 3.1 (dev) + Waitress 3.0 (prod, via NSSM)                  |
 | Database   | Microsoft SQL Server (Express) via pyodbc + ODBC 17              |
-| Frontend   | Hybrid: vanilla JS SPA (Tailwind CDN) migrating to React 19 + TypeScript islands built with Vite, glued together by react-router |
+| Frontend   | React 19 + TypeScript SPA (Tailwind CDN) built with Vite, routed by react-router; Flask serves one shell + JSON |
 | Auth       | Server-side sessions (Flask `session`, signed cookie)            |
 | Excel export | `openpyxl` against template workbooks in `templates/`          |
 | Service host | NSSM (`nssm.exe`)                                               |
@@ -29,11 +29,11 @@ For full architecture, conventions, and operational details, see:
 
 ```
 app/            Flask blueprints (auth, worklogs, employees, projects, files, ...)
-frontend/       React/TypeScript source, built by Vite into static/react/
+frontend/       React/TypeScript source (shell + tab islands), built by Vite into static/react/
 static/
-  app/          Remaining vanilla JS modules (per-tab logic)
   react/        Vite build output (git-ignored, generated)
-templates/      app.html (SPA shell), login.html, Excel export templates
+  style.css     Custom CSS extending the Tailwind CDN
+templates/      app.html (bare React shell), login.html, Excel export templates
 db.py           pyodbc connection wrapper
 init_db.sql     Full schema, auto-applied on first request
 ```
@@ -75,4 +75,4 @@ npm run build
 ## Deployment
 
 Production install/uninstall, environment variables, storage/backup strategy,
-and troubleshooting live in [SKILL.md](SKILL.md).
+and troubleshooting live in [SKILL.md](DEPLOY.md).

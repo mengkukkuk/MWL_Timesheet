@@ -105,8 +105,10 @@ def get_holiday():
             else:
                 hol['date'] = str(hol['date'])
 
-    if not holidays_rows:
-        return jsonify({'error': 'no holiday'}), 400
+    # BE-6: an empty month is a valid, non-error result. Returning 400 here
+    # pins a TanStack Query in a permanent error state (the React calendar/
+    # worklog islands consume this endpoint); vanilla masked it with
+    # `Array.isArray(h) ? h : []`. Return an empty list with 200 instead.
     return jsonify(holidays_rows)
 
 #Check if the input time range is overlap with existed time range
@@ -516,6 +518,111 @@ def delete_worklog(wid):
         d_str = d.strftime('%Y-%m-%d') if isinstance(d, (date, datetime)) else str(d)
         _rebalance_day_allowance_ot(target['EmployeeID'], d_str)
     return jsonify({'ok': True})
+
+
+@worklogs_bp.route('/api/worklogs/bulk', methods=['PATCH'])
+@login_required
+def bulk_patch_worklogs():
+    """Partial bulk update: only keys present in `fields` are written to each row.
+
+    Body: {"ids": [1, 2, 3],
+           "fields": {"status": "...", "note": "...", "task": "...",
+                      "project": "<Description>"}}
+
+    Unlike N sequential PUTs, keys absent from `fields` are never touched — so
+    an unedited column can't be blanked (the class of bug the old vanilla bulk
+    edit hit by reading the wrong field name). Non-elevated users may only
+    patch their own rows; other rows are reported in `failed`, not applied.
+
+    Only project/status/note/task are patchable in bulk (matching the bulk-edit
+    UI); none of those affect OT, so no OT recompute / day rebalance is needed.
+    """
+    data = request.json or {}
+    ids = data.get('ids')
+    fields = data.get('fields')
+
+    if not isinstance(ids, list) or not ids:
+        return jsonify({'error': 'ids must be a non-empty list'}), 400
+    try:
+        ids = [int(i) for i in ids]
+    except (TypeError, ValueError):
+        return jsonify({'error': 'ids must be integers'}), 400
+    if not isinstance(fields, dict) or not fields:
+        return jsonify({'error': 'fields must be a non-empty object'}), 400
+
+    # Build the SET clause from recognized keys ONLY. Column fragments below are
+    # hardcoded string literals (never user input); every value is bound via ?.
+    set_parts = []
+    set_params = []
+
+    if 'status' in fields:
+        status = fields['status']
+        if status not in VALID_STATUSES:
+            return jsonify({'error': 'Invalid status'}), 400
+        set_parts.append('status=?')
+        set_params.append(status)
+
+    if 'task' in fields:
+        task = fields['task'] or ''
+        if len(task) > 500:
+            return jsonify({'error': 'Task must be 500 characters or fewer'}), 400
+        set_parts.append('task=?')
+        set_params.append(task)
+
+    if 'note' in fields:
+        note = fields['note'] or ''
+        if len(note) > 1000:
+            return jsonify({'error': 'Note must be 1000 characters or fewer'}), 400
+        set_parts.append('note=?')
+        set_params.append(note)
+
+    if 'project' in fields:
+        project_des = (fields['project'] or '').strip()
+        if not project_des:
+            return jsonify({'error': 'Project cannot be empty'}), 400
+        if len(project_des) > 500:
+            return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
+        mapp = app_pkg.db.query(
+            "SELECT ProjectCode, ProjectDepartment FROM dbo.ProjectAndBudget WHERE Description=?",
+            (project_des,), fetchone=True,
+        )
+        if not mapp:
+            return jsonify({'error': 'Unknown project'}), 400
+        set_parts.append('project=?')
+        set_params.append(mapp.get('ProjectCode'))
+        set_parts.append('Description=?')
+        set_params.append(project_des)
+        set_parts.append('ProjectDepartment=?')
+        set_params.append(mapp.get('ProjectDepartment'))
+
+    if not set_parts:
+        return jsonify({'error': 'No recognized fields to update'}), 400
+
+    set_parts.append('updated_at=GETDATE()')
+    set_clause = ', '.join(set_parts)
+
+    is_elevated = session['role'] in ELEVATED_ROLES
+    my_emp = str(session['member_id'])
+
+    updated = []
+    failed = []
+    for wid in ids:
+        row = app_pkg.db.query(
+            "SELECT EmployeeID FROM worklogs WHERE id=?", (wid,), fetchone=True,
+        )
+        if not row:
+            failed.append({'id': wid, 'error': 'not found'})
+            continue
+        if not is_elevated and row['EmployeeID'] != my_emp:
+            failed.append({'id': wid, 'error': 'forbidden'})
+            continue
+        app_pkg.db.execute(
+            f"UPDATE worklogs SET {set_clause} WHERE id=?",
+            (*set_params, wid),
+        )
+        updated.append(wid)
+
+    return jsonify({'updated': updated, 'failed': failed})
 
 
 @worklogs_bp.route('/api/dashboard', methods=['GET'])

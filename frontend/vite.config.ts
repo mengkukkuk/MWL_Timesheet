@@ -3,15 +3,13 @@
 // (app/__init__.py) reads static/react/.vite/manifest.json and injects the
 // hashed <script>/<link> tags into the Jinja templates.
 //
-// Entries during the SPA migration (see C:\Users\mengk\.claude\plans\purring-weaving-pillow.md):
-//   - `app`       — the new react-router SPA shell (index.html -> src/main.tsx).
-//                   Not yet wired into Flask; app/core.py still serves
-//                   templates/index.html via the legacy index() route.
-//   - `login`     — existing standalone login island, unchanged.
-//   - `dashboard` — existing island mounted inside templates/index.html at
-//                   #dashboard-root. Removed once PR2 ports it into `app`.
-//   - `worklog`   — existing island mounted inside templates/index.html at
-//                   #worklog-view-root. Removed once PR3 ports it into `app`.
+// Entries after the full-teardown cutover:
+//   - `app`   — the React SPA (index.html -> src/main.tsx -> AppShell). Flask's
+//               core.spa() serves templates/app.html, which loads this bundle.
+//               Every tab (dashboard, worklog, allowance, files,
+//               projects-summary, settings) is a React.lazy code-split chunk of
+//               this bundle — they are no longer separate Vite entries.
+//   - `login` — standalone server-rendered login island (templates/login.html).
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -27,8 +25,6 @@ export default defineConfig(({ command }) => ({
       input: {
         app: 'index.html',
         login: 'login.html',
-        dashboard: 'dashboard.html',
-        worklog: 'worklog.html',
       },
       output: {
         // Stable-hash vendor chunks so a code change doesn't bust the

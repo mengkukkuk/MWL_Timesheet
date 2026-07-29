@@ -1,12 +1,12 @@
-// Entry point for the SPA shell, mounted into #root in templates/app.html
-// (PR1 cutover — see purring-weaving-pillow.md). Renders nothing visible
-// itself: router.tsx's <LegacyRoute> hands tab selection off to the vanilla
-// showTab(name) in static/app/core.js, which still owns every tab's actual
-// DOM/content until each tab's internals migrate (PR2-PR9).
+// Entry point for the SPA, mounted into #root in templates/app.html.
+// Full-teardown cutover: router.tsx renders <AppShell>, the single React tree
+// that owns the nav, selector bar, tab switching, and every tab island. There
+// is no more vanilla showTab/LegacyRoute bridge.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router'
+import './styles.css'
 import { queryClient } from './queryClient'
 import { router } from './router'
 

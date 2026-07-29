@@ -1,27 +1,27 @@
 // Work Log React island. Mounts inside the existing SPA shell's
-// #worklog-view-root and owns the *display*: filters, table/calendar toggle,
-// row selection + bulk bar, missing-entry bar, and the active view. It never
-// fetches or mutates data itself — static/app/worklogs.js#loadWorklogs()
-// remains the single fetcher (member/year/month selects already trigger it
-// via the existing core.js wiring) and stashes the result on
-// window.__mwlWorklogs before dispatching `mwl:worklogs`, which this island
-// listens for. Every mutation (add/edit/delete/bulk) delegates to the
-// existing vanilla globals so the modal, overlap detection, and CRUD
-// endpoints stay completely untouched.
+// #worklog-view-root and owns the *display* (filters, table/calendar toggle,
+// row selection + bulk bar, missing-entry bar) AND — as of PR3 — the *data
+// layer*: it is now the single fetcher via TanStack Query (useWorklogsData),
+// replacing static/app/worklogs.js#loadWorklogs()'s fetch + the
+// window.__mwlWorklogs / 'mwl:worklogs' stash. Bulk edit/delete are React
+// mutations with optimistic updates; bulk edit hits PATCH /api/worklogs/bulk
+// (BE-1, server-side partial patch). Single add/edit/delete still delegate to
+// the vanilla shared modal (window.editWorklog / deleteWorklog / openAddWorklog)
+// until PR5 ports it. The fetched rows are mirrored back into vanilla
+// `worklogData` via window.__mwlSetWorklogData so that shared modal's
+// renderExistingRanges() stays correct on every tab.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { canManageMember, t, useCurrentUser } from '../lib'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { api, canManageMember, monthName, t, toast, useCurrentUser } from '../lib'
 import { CalendarIcon, SearchIcon, TableIcon, WarnIcon } from './icons'
-import type { WorklogsPayload } from './types'
+import type { Worklog, WorklogsPayload } from './types'
+import { useWorklogsData, worklogsQueryKey } from './useWorklogsData'
+import { BulkEditModal, type BulkFields } from './BulkEditModal'
 import { WorklogCalendar } from './WorklogCalendar'
 import { WorklogTable } from './WorklogTable'
 
 type ViewMode = 'table' | 'calendar'
 const VIEW_STORAGE_KEY = 'mwl.worklog.view'
-
-function readSelect(id: string): string {
-  const el = document.getElementById(id) as HTMLSelectElement | null
-  return el?.value || ''
-}
 
 function readSavedView(): ViewMode {
   try {
@@ -31,36 +31,76 @@ function readSavedView(): ViewMode {
   }
 }
 
+// Optimistic projection of a bulk patch onto a single row. Mirrors what BE-1
+// writes server-side: project sets project_description (the display field);
+// onSettled invalidation reconciles project code + department with server truth.
+function applyBulkFields(w: Worklog, fields: BulkFields): Worklog {
+  const next = { ...w }
+  if (fields.project !== undefined) next.project_description = fields.project
+  if (fields.status !== undefined) next.status = fields.status
+  if (fields.note !== undefined) next.note = fields.note
+  return next
+}
+
 export function WorklogIsland() {
   const user = useCurrentUser()
-  const [payload, setPayload] = useState<WorklogsPayload | null>(null)
-  const [memberId, setMemberId] = useState<string>(() => readSelect('member-select'))
+  const queryClient = useQueryClient()
+  const { ctx, query } = useWorklogsData()
+  const queryKey = worklogsQueryKey(ctx)
+
   const [view, setView] = useState<ViewMode>(readSavedView)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [project, setProject] = useState('')
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [showBulkEdit, setShowBulkEdit] = useState(false)
   const [, bumpLang] = useState(0)
 
-  const sync = useCallback(() => {
-    setMemberId(readSelect('member-select'))
-    setPayload(window.__mwlWorklogs ?? null)
+  const memberId = ctx.member
+  const payload = query.data ?? null
+  const worklogs = useMemo(() => payload?.worklogs ?? [], [payload])
+  const holidays = payload?.holidays ?? []
+  const year = payload?.year ?? ctx.year
+  const month = payload?.month ?? ctx.month
+  const canEdit = canManageMember(user, memberId)
+
+  // Re-render on language toggle (vanilla i18n fires this global event).
+  useEffect(() => {
+    const onLang = () => bumpLang((n) => n + 1)
+    window.addEventListener('mwl:langchange', onLang)
+    return () => window.removeEventListener('mwl:langchange', onLang)
   }, [])
 
+  // A vanilla mutation (single add/edit/delete via the shared modal) dispatches
+  // 'mwl:reload' — treat it as a cache invalidation so this island refetches.
   useEffect(() => {
-    sync()
-    const onEvent = () => sync()
-    const onLang = () => bumpLang((n) => n + 1)
-    const memberSel = document.getElementById('member-select')
-    window.addEventListener('mwl:worklogs', onEvent)
-    memberSel?.addEventListener('change', onEvent)
-    window.addEventListener('mwl:langchange', onLang)
-    return () => {
-      window.removeEventListener('mwl:worklogs', onEvent)
-      memberSel?.removeEventListener('change', onEvent)
-      window.removeEventListener('mwl:langchange', onLang)
+    const onReload = () => queryClient.invalidateQueries({ queryKey: ['worklogs'] })
+    window.addEventListener('mwl:reload', onReload)
+    return () => window.removeEventListener('mwl:reload', onReload)
+  }, [queryClient])
+
+  // Mirror fetched rows into vanilla core.js `worklogData` (kept alive for the
+  // shared add/edit modal) and toggle the vanilla "Add" button, which
+  // loadWorklogs() used to own before PR3 moved the fetch here.
+  useEffect(() => {
+    window.__mwlSetWorklogData?.(worklogs)
+  }, [worklogs])
+
+  // Month hand-off from the dashboard's MonthlyLedger: it stashes the clicked
+  // month on window.__mwlPendingMonth then navigates here. #month-select does
+  // not exist until this island mounts, so apply it after mount and fire a
+  // change so useWorklogContext re-reads.
+  useEffect(() => {
+    const pending = window.__mwlPendingMonth
+    if (pending != null) {
+      const sel = document.getElementById('month-select') as HTMLSelectElement | null
+      if (sel) {
+        sel.value = String(pending)
+        sel.dispatchEvent(new Event('change'))
+      }
+      window.__mwlPendingMonth = null
     }
-  }, [sync])
+  }, [])
 
   useEffect(() => {
     try {
@@ -69,12 +109,6 @@ export function WorklogIsland() {
       /* storage unavailable — view choice just won't persist */
     }
   }, [view])
-
-  const worklogs = payload?.worklogs ?? []
-  const holidays = payload?.holidays ?? []
-  const year = payload?.year ?? new Date().getFullYear()
-  const month = payload?.month ?? new Date().getMonth() + 1
-  const canEdit = canManageMember(user, memberId)
 
   // Prune selection to ids still present in the current data (mirrors the
   // vanilla renderWorklogs()'s "drop selections no longer visible" step).
@@ -90,6 +124,76 @@ export function WorklogIsland() {
       return changed ? next : prev
     })
   }, [worklogs])
+
+  const bulkEdit = useMutation({
+    mutationFn: async (fields: BulkFields) => {
+      const ids = Array.from(selected)
+      const r = await api<{ updated: number[]; failed: unknown[] }>('/api/worklogs/bulk', {
+        method: 'PATCH',
+        json: { ids, fields },
+      })
+      if (!r.ok) throw new Error(r.error || 'Bulk edit failed')
+      return r.data
+    },
+    onMutate: async (fields: BulkFields) => {
+      await queryClient.cancelQueries({ queryKey })
+      const prev = queryClient.getQueryData<WorklogsPayload>(queryKey)
+      if (prev) {
+        const ids = new Set(selected)
+        queryClient.setQueryData<WorklogsPayload>(queryKey, {
+          ...prev,
+          worklogs: prev.worklogs.map((w) => (ids.has(w.id) ? applyBulkFields(w, fields) : w)),
+        })
+      }
+      return { prev }
+    },
+    onError: (err, _fields, context) => {
+      if (context?.prev) queryClient.setQueryData(queryKey, context.prev)
+      toast(err instanceof Error ? err.message : 'Bulk edit failed', 'error')
+    },
+    onSuccess: (data) => {
+      const n = data?.updated?.length ?? 0
+      if (n) toast(`Updated ${n} entr${n === 1 ? 'y' : 'ies'}`)
+      setShowBulkEdit(false)
+      setSelected(new Set())
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+  })
+
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: number[]) => {
+      let ok = 0
+      let fail = 0
+      for (const id of ids) {
+        const r = await api(`/api/worklogs/${id}`, { method: 'DELETE' })
+        if (r.ok) ok++
+        else fail++
+      }
+      return { ok, fail }
+    },
+    onMutate: async (ids: number[]) => {
+      await queryClient.cancelQueries({ queryKey })
+      const prev = queryClient.getQueryData<WorklogsPayload>(queryKey)
+      if (prev) {
+        const remove = new Set(ids)
+        queryClient.setQueryData<WorklogsPayload>(queryKey, {
+          ...prev,
+          worklogs: prev.worklogs.filter((w) => !remove.has(w.id)),
+        })
+      }
+      return { prev }
+    },
+    onError: (_err, _ids, context) => {
+      if (context?.prev) queryClient.setQueryData(queryKey, context.prev)
+      toast('Delete failed', 'error')
+    },
+    onSuccess: ({ ok, fail }) => {
+      if (ok) toast(`Deleted ${ok} entr${ok === 1 ? 'y' : 'ies'}`)
+      if (fail) toast(`${fail} delete${fail === 1 ? '' : 's'} failed`, 'error')
+      setSelected(new Set())
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+  })
 
   const projectOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -158,15 +262,57 @@ export function WorklogIsland() {
     })
   }
 
-  const bulkDelete = async () => {
-    await window.bulkDeleteWorklogs?.(Array.from(selected))
-    setSelected(new Set())
-  }
+  const onBulkDelete = useCallback(() => {
+    const ids = Array.from(selected)
+    if (!ids.length) return
+    if (!window.confirm(`Delete ${ids.length} selected entr${ids.length === 1 ? 'y' : 'ies'}?`)) return
+    bulkDelete.mutate(ids)
+  }, [selected, bulkDelete])
 
   if (!memberId) return null // vanilla #worklog-no-member already handles this state
 
   return (
     <div className="wl-root mwl-fadein">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 flex-none">
+          <label htmlFor="month-select" className="text-sm font-medium text-gray-600">
+            {t('wl.month_label') || 'Month:'}
+          </label>
+          <select
+            id="month-select"
+            defaultValue={String(new Date().getMonth() + 1)}
+            className="input-field w-36"
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>
+                {monthName(m)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1" />
+        {canEdit && (
+          <button
+            type="button"
+            id="btn-add-worklog-multi"
+            onClick={() => window.openAddWorklogMulti?.()}
+            className="btn-secondary flex-none"
+          >
+            <span className="hidden sm:inline">{t('wl.add_multi') || '+ Add Entry for Multiple'}</span>
+            <span className="sm:hidden">+ Multi</span>
+          </button>
+        )}
+        {canEdit && (
+          <button
+            type="button"
+            id="btn-add-worklog"
+            onClick={() => window.openAddWorklog?.()}
+            className="btn-primary flex-none"
+          >
+            {t('wl.add_entry') || 'Add Entry'}
+          </button>
+        )}
+      </div>
       <div className="wl-toolbar">
         <div className="wl-view-toggle" role="tablist" aria-label="Worklog view">
           <button
@@ -249,14 +395,15 @@ export function WorklogIsland() {
             {selected.size} {t('wl.bulk_selected') || 'selected'}
           </span>
           <div className="wl-bulk-bar__spacer" />
-          <button
-            type="button"
-            className="wl-btn-secondary"
-            onClick={() => window.openBulkEditModal?.(Array.from(selected))}
-          >
+          <button type="button" className="wl-btn-secondary" onClick={() => setShowBulkEdit(true)}>
             {t('wl.bulk_edit') || 'Bulk Edit'}
           </button>
-          <button type="button" className="wl-btn-secondary wl-btn-danger" onClick={bulkDelete}>
+          <button
+            type="button"
+            className="wl-btn-secondary wl-btn-danger"
+            onClick={onBulkDelete}
+            disabled={bulkDelete.isPending}
+          >
             {t('wl.bulk_delete') || 'Bulk Delete'}
           </button>
           <button type="button" className="wl-btn-secondary" onClick={() => setSelected(new Set())}>
@@ -276,6 +423,15 @@ export function WorklogIsland() {
       ) : (
         <WorklogCalendar worklogs={filtered} holidays={holidays} year={year} month={month} canEdit={canEdit} />
       )}
+
+      {showBulkEdit ? (
+        <BulkEditModal
+          count={selected.size}
+          submitting={bulkEdit.isPending}
+          onClose={() => setShowBulkEdit(false)}
+          onSubmit={(fields) => bulkEdit.mutate(fields)}
+        />
+      ) : null}
     </div>
   )
 }

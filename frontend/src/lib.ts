@@ -1,59 +1,36 @@
 // Shared library for the React islands: typed fetch wrapper, endpoint types,
-// and a thin i18n bridge that reuses the existing global t()/toggleLang() from
-// static/app/i18n.js (loaded by the Flask template before this bundle), so we
-// do NOT duplicate the TH/EN dictionaries.
+// and i18n re-exports. i18n is now owned by frontend/src/i18n/index.ts (see
+// plan PR10 teardown) — this file just re-exports so the 34 existing call
+// sites (`import { t, toggleLang, ... } from '../lib'`) don't all need
+// touching.
 
 import { useEffect, useState } from 'react'
+import { t as i18nT, toggleLang as i18nToggleLang, currentLang as i18nCurrentLang } from './i18n'
 
-// ── i18n bridge ───────────────────────────────────────────────────────────
-type TFn = (key: string, ...args: unknown[]) => string
-declare global {
-  interface Window {
-    t?: TFn
-    toggleLang?: () => void
-    applyTranslations?: () => void
-    toast?: (msg: string, type?: 'success' | 'error') => void
-  }
-}
+export { useLang } from './i18n'
 
-// ── toast bridge (reuses core.js's global toast() host) ─────────────────────
+// ── toast (event-based; ToastHost, mounted by AppShell, renders it) ─────────
 export function toast(msg: string, type: 'success' | 'error' = 'success'): void {
-  if (typeof window.toast === 'function') window.toast(msg, type)
+  window.dispatchEvent(new CustomEvent('mwl:toast', { detail: { msg, type } }))
 }
 
-// Reads the month names array from the existing i18n table (`months.full`).
+// Reads the month names array from the i18n dict (`months.full`).
 export function monthName(month: number): string {
-  const arr = typeof window.t === 'function' ? (window.t('months.full') as unknown) : null
+  const arr = i18nT('months.full' as never) as unknown
   if (Array.isArray(arr) && typeof arr[month] === 'string') return arr[month] as string
   return String(month)
 }
 
 export function t(key: string, ...args: unknown[]): string {
-  if (typeof window.t === 'function') return window.t(key, ...args)
-  return key
+  return i18nT(key as never, ...args)
 }
 
 export function currentLang(): 'en' | 'th' {
-  try {
-    const s = localStorage.getItem('appLang')
-    return s === 'th' ? 'th' : 'en'
-  } catch {
-    return 'en'
-  }
+  return i18nCurrentLang()
 }
 
 export function toggleLang(): void {
-  if (typeof window.toggleLang === 'function') {
-    window.toggleLang()
-  } else {
-    const next = currentLang() === 'en' ? 'th' : 'en'
-    try {
-      localStorage.setItem('appLang', next)
-    } catch {
-      /* ignore */
-    }
-  }
-  window.dispatchEvent(new Event('mwl:langchange'))
+  i18nToggleLang()
 }
 
 // ── typed fetch ─────────────────────────────────────────────────────────────

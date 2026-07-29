@@ -1,7 +1,9 @@
 // Shapes mirrored from GET /api/worklogs and GET /api/holidays (app/worklogs.py).
-// static/app/worklogs.js#loadWorklogs() remains the sole fetcher/mutator — this
-// file only types the payload it stashes on window.__mwlWorklogs and the
-// vanilla globals React delegates every mutation to.
+// As of PR3, useWorklogsData.ts is the sole fetcher (TanStack Query) and bulk
+// edit/delete are React mutations (WorklogIsland.tsx) — this file types that
+// payload plus the vanilla globals still used for single add/edit/delete,
+// which delegate to the shared modal (static/app/worklogs.js) until it's
+// ported to React.
 
 export type WorklogStatus = 'Done' | 'In Progress' | 'Pending' | 'Man day'
 
@@ -36,12 +38,17 @@ export interface WorklogsPayload {
 declare global {
   interface Window {
     __mwlWorklogs?: WorklogsPayload
+    // PR3: the React island now owns the worklog fetch; it mirrors the fetched
+    // rows back into vanilla core.js `worklogData` via this setter so the
+    // shared add/edit modal's renderExistingRanges() stays correct on every tab.
+    __mwlSetWorklogData?: (rows: Worklog[]) => void
+    // Month hand-off: MonthlyLedger stashes a clicked month here before
+    // navigating to /worklog; WorklogIsland applies it once #month-select mounts.
+    __mwlPendingMonth?: number | null
     openAddWorklog?: () => void
     openAddWorklogMulti?: () => void
     editWorklog?: (w: Worklog) => void
     deleteWorklog?: (id: number) => void
     openAddWorklogForDate?: (year: number, month: number, day: number) => void
-    bulkDeleteWorklogs?: (ids: number[]) => void | Promise<void>
-    openBulkEditModal?: (ids: number[]) => void
   }
 }

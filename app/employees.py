@@ -5,7 +5,8 @@ the Settings → Team Members panel. The rest of the app still uses the
 `members` table during the phased migration (see MIGRATION_PLAN.md).
 
 API contract: the JSON shape mimics the legacy /api/members shape so the
-existing settings.js render code works with minimal changes:
+Settings > Team Members panel (frontend/src/settings/MembersPanel.tsx)
+renders it with minimal changes:
     {id, name, department, staff_id, position, level, jg}
 
 `id` is populated with the business key `EmployeeID` (NOT the surrogate
@@ -45,7 +46,7 @@ def _avatar_url(r):
 
 def _row_to_dto(r):
     """Shape an Employee row for the frontend. Stays compatible with the
-    existing settings.js renderer (which expects id/name/department/staff_id/position)."""
+    MembersPanel.tsx renderer (which expects id/name/department/staff_id/position)."""
     return {
         'id':         r['EmployeeID'],          # business key surfaces as `id`
         'name':       r['EmployeeName'],
