@@ -144,15 +144,18 @@ export function useShellState(): ShellState {
     navigate({ pathname: '/dashboard', search: next.toString() })
   }, [navigate, searchParams])
 
-  // Non-elevated users are pinned to their own member_id on first load only,
-  // mirroring core.js's initializeApp(): `if (!isElevated() && currentUser.member_id) ...`.
+  // Pinned to their own member_id on first load only — Staff (mirroring
+  // core.js's initializeApp(): `if (!isElevated() && currentUser.member_id) ...`),
+  // and, per product decision, Admin/Leader too (they usually have their own
+  // worklog entries and land on themselves rather than "None"). Only
+  // Super_Ultimate_ADMIN is excluded and still lands on the "Overall" team view.
   // Gated by a ref (not just the `!memberId` check) so this doesn't re-fire and
   // fight a deliberate "Overall" click, which also clears memberId to ''.
   const didAutoSelectRef = useRef(false)
   useEffect(() => {
     if (didAutoSelectRef.current || !user) return
     didAutoSelectRef.current = true
-    if (isElevated(user.role) || memberId || !user.member_id) return
+    if (user.role === 'Super_Ultimate_ADMIN' || memberId || !user.member_id) return
     setMemberId(user.member_id)
   }, [user, memberId, setMemberId])
 
