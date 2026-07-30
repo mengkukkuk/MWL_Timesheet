@@ -1286,6 +1286,31 @@
         </div>
     </div>
 
+    <!-- Edit Email Modal (elevated roles) -->
+    <div id="edit-email-overlay" class="modal-overlay hidden" onclick="closeEditEmailModal()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:380px">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" data-i18n="modal.edit_email">Edit Email</h3>
+                <button onclick="closeEditEmailModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <p id="edit-email-label" class="text-sm text-gray-500 mb-4"></p>
+            <input type="hidden" id="edit-email-uid">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1" data-i18n="login.email">Email</label>
+                <input id="edit-email-input" type="email" maxlength="255" placeholder="you@example.com" class="input-field w-full">
+                <p class="mt-1.5 text-xs text-gray-400" data-i18n="modal.edit_email_hint">Leave blank to remove the email.</p>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button type="button" onclick="closeEditEmailModal()" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
+                <button type="button" onclick="saveUserEmail()" class="btn-primary" data-i18n="modal.save">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Change Role Modal (Super_Ultimate_ADMIN only) -->
     <div id="change-role-overlay" class="modal-overlay hidden" onclick="closeChangeRoleModal()">
         <div class="modal-content" onclick="event.stopPropagation()" style="max-width:360px">

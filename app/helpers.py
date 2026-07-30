@@ -1,6 +1,10 @@
 import json
+import re
 
 from datetime import time
+
+# Pragmatic email shape check — real validation is the delivery attempt itself.
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 
 def parse_member_ids(col_value):

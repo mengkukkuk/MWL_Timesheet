@@ -195,10 +195,13 @@ CREATE TABLE users (
                            CONSTRAINT CK_users_status CHECK (status IN ('Pending','Active','Declined')),
                        reviewed_by INT NULL FOREIGN KEY REFERENCES users(id),
                        reviewed_at DATETIME2 DEFAULT GETDATE(),
-                       created_at DATETIME2 DEFAULT GETDATE()
+                       created_at DATETIME2 DEFAULT GETDATE(),
+                       email NVARCHAR(255) NULL
 );
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'EmployeeID')
     ALTER TABLE users ADD EmployeeID NVARCHAR(5) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'email')
+    ALTER TABLE users ADD email NVARCHAR(255) NULL;
 GO
 
 /* =========================
@@ -213,8 +216,17 @@ CREATE TABLE user_security_state (
                                      unlock_token_hash NVARCHAR(256) NULL,
                                      unlock_token_expires_at DATETIME2 NULL,
                                      last_unlock_email_sent_at DATETIME2 NULL,
-                                     updated_at DATETIME2 NOT NULL DEFAULT GETDATE()
+                                     updated_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+                                     reset_token_hash NVARCHAR(64) NULL,
+                                     reset_token_expires_at DATETIME2 NULL,
+                                     last_reset_email_sent_at DATETIME2 NULL
 );
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('user_security_state') AND name = 'reset_token_hash')
+    ALTER TABLE user_security_state ADD reset_token_hash NVARCHAR(64) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('user_security_state') AND name = 'reset_token_expires_at')
+    ALTER TABLE user_security_state ADD reset_token_expires_at DATETIME2 NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('user_security_state') AND name = 'last_reset_email_sent_at')
+    ALTER TABLE user_security_state ADD last_reset_email_sent_at DATETIME2 NULL;
 GO
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'security_events')
 CREATE TABLE security_events (

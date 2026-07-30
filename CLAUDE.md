@@ -68,7 +68,8 @@ mwl deploy/
 │   ├── avatars.py          # Profile photo upload/serve
 │   ├── files.py            # File-share tree, upload/download
 │   ├── exports.py          # Excel export from openpyxl templates
-│   └── helpers.py          # parse_time, parse_members, format_members
+│   ├── mail.py             # Brevo email sending (API + SMTP fallback) — password reset
+│   └── helpers.py          # parse_time, parse_members, format_members, EMAIL_RE
 │
 ├── static/
 │   ├── app.js              # Bootstrap shim — fires `modulesLoaded` event after defer scripts run
@@ -97,7 +98,8 @@ mwl deploy/
 │
 ├── templates/
 │   ├── index.html          # Single-page app shell (all tabs + modals)
-│   ├── login.html          # Login + register + password reset
+│   ├── login.html          # Login + register + "Forgot password?" (sends reset email)
+│   ├── reset_password.html # Standalone page opened from the emailed reset link
 │   ├── Monthly_Worklog_Template.xlsx       # openpyxl source for single export
 │   └── Monthly_Worklog_Template_All.xlsx   # openpyxl source for bulk export
 │
@@ -167,7 +169,14 @@ Single point of contact: [db.py](db.py).
 - `users` — login accounts. Roles ∈ {`Staff`, `Leader`, `Admin`,
   `Super_Ultimate_ADMIN`}. `EmployeeID` links to `dbo.Employee`.
   `status` ∈ {`Pending`, `Active`, `Declined`} (self-registered accounts
-  start as `Pending` and need admin approval).
+  start as `Pending` and need admin approval). `email NVARCHAR(255) NULL` —
+  optional, set at registration or by an elevated user via Settings → Users
+  (`PUT /api/users/<id>/email`); used only as the password-reset destination.
+- `user_security_state` — one row per user, `user_id` PK. Holds login-lockout
+  state (`failed_login_count`, `locked_until`) and password-reset token state:
+  `reset_token_hash` (sha256 of the token — the raw token is never stored),
+  `reset_token_expires_at`, `last_reset_email_sent_at` (resend cooldown). See
+  `_upsert_security_state()` in [app/auth.py](app/auth.py).
 - `members` — **legacy** table kept for migration only; new code uses
   `EmployeeID` directly.
 - `settings`, `skills`, `files`, `folders`, etc.
@@ -320,6 +329,44 @@ download. Two flavours: single employee
 
 ---
 
+## 7a. Password reset (email link, via Brevo)
+
+Replaces the old hidden username+StaffID reset form. Flow:
+
+1. Login page → "Forgot password?" → user types their **username** →
+   `POST /api/forgot-password`. This endpoint **always returns the same
+   generic 200 response**, regardless of whether the account exists, has
+   an email on file, is `Active`, is `Super_Ultimate_ADMIN` (excluded from
+   self-service reset), or is within the resend cooldown — this is
+   deliberate anti-enumeration, don't add branches that leak which case
+   fired.
+2. If eligible, a `secrets.token_urlsafe(32)` token is generated; only its
+   sha256 hash + expiry are stored (`user_security_state.reset_token_hash` /
+   `reset_token_expires_at`) — the raw token is never persisted or logged.
+   An email is sent via [app/mail.py](app/mail.py) with a link to
+   `{APP_BASE_URL}/reset-password?token=<token>`.
+3. `GET /reset-password` ([templates/reset_password.html](templates/reset_password.html))
+   is a standalone page (no Google Fonts, `<meta name="referrer" content="no-referrer">`,
+   scrubs the token from the URL via `history.replaceState`) so the token
+   never leaks via Referer. It calls `POST /api/reset-password/verify` to
+   check validity, then `POST /api/reset-password/confirm` with the new
+   password to complete the reset. The token is single-use — consumed
+   (nulled) on success — and a successful reset also clears any login
+   lockout for that username.
+4. Emails are populated two ways: optional field on the registration form
+   (`POST /api/register` body gains `email`), or an elevated user (Admin/
+   Leader) editing it via Settings → Users → the email icon
+   (`PUT /api/users/<id>/email`, [app/users.py](app/users.py)) — same
+   Leader-cannot-touch-Admin / nobody-but-self-touches-Super-admin rules as
+   `DELETE /api/users/<id>`.
+
+Requires the Brevo env vars in §10. If neither `BREVO_API_KEY` nor
+`SMTP_HOST` credentials are configured, `/api/forgot-password` still
+returns its generic 200 but the send fails silently server-side (logged
+via `app.logger.warning`, never surfaced to the client).
+
+---
+
 ## 8. Windows service installation
 
 ### Install — [install-service.bat](install-service.bat) (Run as Admin)
@@ -434,14 +481,22 @@ SUPER_ADMIN_LOCKOUT_MINUTES=30
 SUPER_ADMIN_UNLOCK_TOKEN_MINUTES=30
 SUPER_ADMIN_UNLOCK_EMAIL_COOLDOWN_SECONDS=300
 
-# ── SMTP (required only if you want Super_Ultimate_ADMIN unlock emails) ─
-SMTP_HOST=smtp.gmail.com
+# ── Email — Brevo (required for the "Forgot password?" reset-link flow) ─
+# Preferred transport: Brevo HTTPS API. Falls back to SMTP STARTTLS
+# (smtp-relay.brevo.com:587) when BREVO_API_KEY is empty. Both env-name
+# generations are accepted (SMTP_USER/SMTP_PASS/SMTP_FROM win over the
+# older SMTP_USERNAME/SMTP_PASSWORD/MAIL_FROM if both are set).
+BREVO_API_KEY=...
+SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
-SMTP_USERNAME=...
-SMTP_PASSWORD=...
-MAIL_FROM=...
-SUPER_ADMIN_UNLOCK_EMAIL=...         # destination for unlock-link emails
-APP_BASE_URL=https://<your-subdomain>.ngrok-free.dev   # used to build unlock URLs
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_FROM='"MML Password Reset" <you@example.com>'
+SMTP_SECURITY=starttls               # starttls | ssl
+RESET_TOKEN_TTL_MINUTES=60           # optional, default shown
+RESET_EMAIL_COOLDOWN_SECONDS=300     # optional, default shown
+SUPER_ADMIN_UNLOCK_EMAIL=...         # destination for unlock-link emails (unlock flow itself is unimplemented — see §13)
+APP_BASE_URL=https://<your-subdomain>.ngrok-free.dev   # used to build reset URLs; blank = derived from the request
 ```
 
 > Storage-path drift to watch for: `install-service.bat:37-38` ships

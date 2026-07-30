@@ -51,33 +51,21 @@
                     <span data-i18n="login.no_account">Don't have an account?</span>
                     <button type="button" onclick="toggleForm('register')" class="text-indigo-600 hover:underline font-medium" data-i18n="login.create_link">Create Account</button>
                 </p>
-                <button type="button" onclick="toggleForm('reset')" class="text-sm text-gray-400 hover:text-indigo-600 hover:underline" data-i18n="login.forgot_pw" hidden="hidden">Forgot password?</button>
+                <button type="button" onclick="toggleForm('forgot')" class="text-sm text-gray-400 hover:text-indigo-600 hover:underline" data-i18n="login.forgot_pw">Forgot password?</button>
             </div>
         </form>
 
-        <!-- Reset Password Form -->
-        <form id="reset-form" class="hidden" onsubmit="handleResetPassword(event)">
-            <h2 class="text-lg font-semibold text-gray-700 mb-2" data-i18n="login.reset_title">Reset Password</h2>
-            <p class="text-xs text-gray-500 mb-4" data-i18n="login.reset_desc">Enter your username and Staff ID to verify your identity.</p>
+        <!-- Forgot Password Form (emails a reset link) -->
+        <form id="forgot-form" class="hidden" onsubmit="handleForgotPassword(event)">
+            <h2 class="text-lg font-semibold text-gray-700 mb-2" data-i18n="login.forgot_title">Forgot Password</h2>
+            <p class="text-xs text-gray-500 mb-4" data-i18n="login.forgot_desc">Enter your username and we'll email a reset link to the address on file.</p>
             <div class="space-y-3">
                 <div>
                     <label class="label" data-i18n="login.username">Username</label>
-                    <input type="text" id="reset-username" class="input-field w-full" required autocomplete="username">
-                </div>
-                <div>
-                    <label class="label" data-i18n="login.staff_id">Staff ID</label>
-                    <input type="text" id="reset-staffid" class="input-field w-full" required placeholder="e.g. EMP-001">
-                </div>
-                <div>
-                    <label class="label" data-i18n="login.password">New Password</label>
-                    <input type="password" id="reset-password" class="input-field w-full" required autocomplete="new-password" minlength="8" placeholder="Min. 8 characters">
-                </div>
-                <div>
-                    <label class="label" data-i18n="login.confirm_password">Confirm Password</label>
-                    <input type="password" id="reset-password2" class="input-field w-full" required autocomplete="new-password">
+                    <input type="text" id="forgot-username" class="input-field w-full" required autocomplete="username">
                 </div>
             </div>
-            <button type="submit" class="btn-primary w-full mt-4" id="reset-btn" data-i18n="login.reset_btn">Reset Password</button>
+            <button type="submit" class="btn-primary w-full mt-4" id="forgot-btn" data-i18n="login.forgot_btn">Send reset link</button>
             <p class="text-center text-sm text-gray-500 mt-4">
                 <button type="button" onclick="toggleForm('login')" class="text-indigo-600 hover:underline font-medium" data-i18n="login.sign_in_link">Sign In</button>
             </p>
@@ -98,6 +86,11 @@
                 <div>
                     <label class="label" data-i18n="login.confirm_password">Confirm Password</label>
                     <input type="password" id="reg-password2" class="input-field w-full" required autocomplete="new-password">
+                </div>
+                <div>
+                    <label class="label" data-i18n="login.email">Email</label>
+                    <input type="email" id="reg-email" class="input-field w-full" maxlength="255" autocomplete="email" placeholder="you@example.com">
+                    <p class="mt-1.5 text-xs text-gray-400" data-i18n="login.email_hint">Used for password reset (optional but recommended)</p>
                 </div>
                 <hr class="my-2">
                 <p class="text-xs text-gray-500" data-i18n="login.employee_lookup_hint">Link to your HR record:</p>
@@ -177,48 +170,35 @@
         function toggleForm(form) {
             document.getElementById('login-form').classList.toggle('hidden', form !== 'login');
             document.getElementById('register-form').classList.toggle('hidden', form !== 'register');
-            document.getElementById('reset-form').classList.toggle('hidden', form !== 'reset');
+            document.getElementById('forgot-form').classList.toggle('hidden', form !== 'forgot');
             document.getElementById('login-error').classList.add('hidden');
         }
 
-        async function handleResetPassword(e) {
+        async function handleForgotPassword(e) {
             e.preventDefault();
-            const pw  = document.getElementById('reset-password').value;
-            const pw2 = document.getElementById('reset-password2').value;
-            if (pw !== pw2) { showError(t('login.pw_mismatch')); return; }
-            const btn = document.getElementById('reset-btn');
-            btn.disabled = true; btn.textContent = t('login.resetting');
+            const btn = document.getElementById('forgot-btn');
+            btn.disabled = true; btn.textContent = t('login.sending');
             document.getElementById('login-error').classList.add('hidden');
             try {
-                const res = await fetch('/api/reset-password', {
+                // The server always answers with the same generic message —
+                // never branch on whether the account/email exists.
+                await fetch('/api/forgot-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        username: document.getElementById('reset-username').value.trim(),
-                        staff_id: document.getElementById('reset-staffid').value.trim(),
-                        password: pw
+                        username: document.getElementById('forgot-username').value.trim()
                     })
                 });
-                const data = await res.json();
-                if (res.ok) {
-                    toggleForm('login');
-                    document.getElementById('reset-username').value = '';
-                    document.getElementById('reset-staffid').value = '';
-                    document.getElementById('reset-password').value = '';
-                    document.getElementById('reset-password2').value = '';
-                    const el = document.getElementById('login-error');
-                    el.textContent = t('login.reset_success');
-                    el.classList.remove('hidden');
-                    el.style.background = '#d1fae5'; el.style.color = '#065f46'; el.style.borderColor = '#6ee7b7';
-                } else if (data.error === 'no_staff_id') {
-                    showError(t('login.no_staff_id'));
-                } else {
-                    showError(data.error || 'Reset failed');
-                }
+                toggleForm('login');
+                document.getElementById('forgot-username').value = '';
+                const el = document.getElementById('login-error');
+                el.textContent = t('login.forgot_sent');
+                el.classList.remove('hidden');
+                el.style.background = '#d1fae5'; el.style.color = '#065f46'; el.style.borderColor = '#6ee7b7';
             } catch (err) {
                 showError(t('login.network_error'));
             }
-            btn.disabled = false; btn.textContent = t('login.reset_btn');
+            btn.disabled = false; btn.textContent = t('login.forgot_btn');
         }
 
         function showError(msg) {
@@ -392,6 +372,7 @@
                         username:    document.getElementById('reg-username').value.trim(),
                         password:    pw,
                         employee_id: empRaw,
+                        email:       document.getElementById('reg-email').value.trim(),
                     })
                 });
                 const data = await res.json();

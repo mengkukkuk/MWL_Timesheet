@@ -13,6 +13,7 @@ from .constants import ASSIGNABLE_ROLES
 from .constants import ROLE_ADMIN
 from .constants import ROLE_LEADER
 from .constants import ROLE_SUPER_ADMIN
+from .helpers import EMAIL_RE
 from .helpers import cascade_delete_employee
 
 users_bp = Blueprint('users', __name__)
@@ -39,6 +40,7 @@ def get_users():
         """SELECT u.id, u.username, u.role,
                   u.EmployeeID AS member_id,            -- alias for frontend compat
                   u.status,
+                  u.email,
                   e.EmployeeName AS member_name,
                   e.Department,
                   e.Position
@@ -159,6 +161,27 @@ def reset_user_password(uid):
         (generate_password_hash(password), uid),
     )
     return jsonify({'ok': True})
+
+
+@users_bp.route('/api/users/<int:uid>/email', methods=['PUT'])
+@elevated_required
+def set_user_email(uid):
+    """Set or clear a user's email (used for password-reset links)."""
+    data = request.json or {}
+    email = (data.get('email') or '').strip()
+    if email and (len(email) > 255 or not EMAIL_RE.match(email)):
+        return jsonify({'error': 'Invalid email address'}), 400
+
+    target = app_pkg.db.query("SELECT role FROM users WHERE id=?", (uid,), fetchone=True)
+    if not target:
+        return jsonify({'error': 'User not found'}), 404
+    if target['role'] == ROLE_SUPER_ADMIN and uid != session['user_id']:
+        return jsonify({'error': "Cannot edit a Super admin's email"}), 403
+    if session['role'] == ROLE_LEADER and target['role'] == ROLE_ADMIN:
+        return jsonify({'error': "Insufficient privileges to edit an Admin's email"}), 403
+
+    app_pkg.db.execute("UPDATE users SET email=? WHERE id=?", (email or None, uid))
+    return jsonify({'ok': True, 'email': email or None})
 
 
 @users_bp.route('/api/users/<int:uid>', methods=['DELETE'])

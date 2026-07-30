@@ -231,70 +231,64 @@ class TestRegister:
         })
         assert resp.status_code == 400
 
-
-# ---------------------------------------------------------------------------
-# POST /api/reset-password
-# ---------------------------------------------------------------------------
-
-class TestResetPassword:
     @patch('app.db.execute')
     @patch('app.db.query')
-    def test_success_with_correct_employee_id(self, mock_query, mock_execute, client):
-        mock_query.return_value = {'id': 1, 'role': 'Staff', 'member_staff_id': '33546'}
-        mock_execute.return_value = None
+    def test_valid_email_is_stored(self, mock_query, mock_execute, client):
+        mock_query.side_effect = [
+            {'EmployeeID': '33546', 'EmployeeName': 'Test User', 'Department': 'IT', 'Position': 'Dev'},
+            None,
+            None,
+        ]
+        resp = _post(client, '/api/register', {
+            'username': 'newuser',
+            'password': 'securepass',
+            'employee_id': '33546',
+            'email': 'newuser@example.com',
+        })
+        assert resp.status_code == 201
+        insert_args = mock_execute.call_args[0][1]
+        assert 'newuser@example.com' in insert_args
+
+    def test_invalid_email_returns_400(self, client):
+        resp = _post(client, '/api/register', {
+            'username': 'newuser',
+            'password': 'securepass',
+            'employee_id': '33546',
+            'email': 'not-an-email',
+        })
+        assert resp.status_code == 400
+
+    @patch('app.db.execute')
+    @patch('app.db.query')
+    def test_omitted_email_stores_none(self, mock_query, mock_execute, client):
+        mock_query.side_effect = [
+            {'EmployeeID': '33546', 'EmployeeName': 'Test User', 'Department': 'IT', 'Position': 'Dev'},
+            None,
+            None,
+        ]
+        resp = _post(client, '/api/register', {
+            'username': 'newuser',
+            'password': 'securepass',
+            'employee_id': '33546',
+        })
+        assert resp.status_code == 201
+        insert_args = mock_execute.call_args[0][1]
+        assert insert_args[-1] is None
+
+
+# ---------------------------------------------------------------------------
+# Old POST /api/reset-password (username+staff_id) — removed in favour of
+# the email-link flow in tests/test_password_reset.py.
+# ---------------------------------------------------------------------------
+
+class TestOldResetPasswordRemoved:
+    def test_old_endpoint_no_longer_exists(self, client):
         resp = _post(client, '/api/reset-password', {
             'username': 'testuser',
             'staff_id': '33546',
             'password': 'newpassword123',
         })
-        assert resp.status_code == 200
-        assert resp.get_json()['ok'] is True
-
-    @patch('app.db.query')
-    def test_wrong_employee_id_returns_400_generic_message(self, mock_query, client):
-        mock_query.return_value = {'id': 1, 'role': 'Staff', 'member_staff_id': '33546'}
-        resp = _post(client, '/api/reset-password', {
-            'username': 'testuser',
-            'staff_id': 'WRONG',
-            'password': 'newpassword123',
-        })
-        assert resp.status_code == 400
-        # Error must not reveal which field was wrong (anti-enumeration)
-        assert 'WRONG' not in resp.get_json()['error']
-
-    @patch('app.db.query')
-    def test_unknown_username_returns_400(self, mock_query, client):
-        mock_query.return_value = None
-        resp = _post(client, '/api/reset-password', {
-            'username': 'nobody',
-            'staff_id': '33546',
-            'password': 'newpassword123',
-        })
-        assert resp.status_code == 400
-
-    @patch('app.db.query')
-    def test_super_admin_cannot_self_reset(self, mock_query, client):
-        mock_query.return_value = {
-            'id': 1, 'role': 'Super_Ultimate_ADMIN', 'member_staff_id': '33548'
-        }
-        resp = _post(client, '/api/reset-password', {
-            'username': 'superadmin',
-            'staff_id': '33548',
-            'password': 'newpassword123',
-        })
-        assert resp.status_code == 403
-
-    def test_short_password_returns_400(self, client):
-        resp = _post(client, '/api/reset-password', {
-            'username': 'testuser',
-            'staff_id': '33546',
-            'password': 'short',
-        })
-        assert resp.status_code == 400
-
-    def test_missing_fields_returns_400(self, client):
-        resp = _post(client, '/api/reset-password', {'username': 'testuser'})
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------

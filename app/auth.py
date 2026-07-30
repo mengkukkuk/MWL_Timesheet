@@ -1,9 +1,13 @@
+import hashlib
 import json
+import secrets
 
 from datetime import datetime
+from datetime import timedelta
 from functools import wraps
 
 from flask import Blueprint
+from flask import current_app
 from flask import jsonify
 from flask import redirect
 from flask import render_template
@@ -17,6 +21,10 @@ import app as app_pkg
 from .constants import ELEVATED_ROLES
 from .constants import ROLE_STAFF
 from .constants import ROLE_SUPER_ADMIN
+from .helpers import EMAIL_RE
+from .mail import MailError
+from .mail import build_reset_email
+from .mail import send_email
 
 auth_bp = Blueprint('auth', __name__)
 FAILED_LOGINS_DB_KEY = 'failed_logins'
@@ -263,6 +271,7 @@ def api_register():
     data = request.json or {}
     username = data.get('username', '').strip()
     password = data.get('password', '')
+    email = (data.get('email') or '').strip()
 
     # New-style: EmployeeID is the source of truth
     raw_emp = data.get('employee_id', '')
@@ -282,6 +291,9 @@ def api_register():
         return jsonify({'error': 'Username must be 50 characters or fewer'}), 400
     if len(password) < 8:
         return jsonify({'error': 'Password must be at least 8 characters'}), 400
+    # Email is optional (used for password reset), but must look valid when given
+    if email and (len(email) > 255 or not EMAIL_RE.match(email)):
+        return jsonify({'error': 'Invalid email address'}), 400
 
     # Resolve member profile fields
     if employee_id is not None:
@@ -311,8 +323,8 @@ def api_register():
     # Post-migration: users.EmployeeID is authoritative. members.id is no longer
     # written for new accounts (members table is read-only legacy storage).
     app_pkg.db.execute(
-        "INSERT INTO users (username, password_hash, role, EmployeeID, status) VALUES (?, ?, ?, ?, ?)",
-        (username, generate_password_hash(password), ROLE_STAFF, employee_id, 'Pending'),
+        "INSERT INTO users (username, password_hash, role, EmployeeID, status, email) VALUES (?, ?, ?, ?, ?, ?)",
+        (username, generate_password_hash(password), ROLE_STAFF, employee_id, 'Pending', email or None),
     )
     return jsonify({
         'ok': True,
@@ -321,43 +333,166 @@ def api_register():
     }), 201
 
 
-@auth_bp.route('/api/reset-password', methods=['POST'])
-def api_reset_password():
+# ── Email-based password reset ──────────────────────────────────────────────
+# Flow: POST /api/forgot-password (username) → email a single-use link →
+# GET /reset-password (page) → POST /api/reset-password/verify (UX check) →
+# POST /api/reset-password/confirm (token + new password).
+# Only a sha256 of the token is stored (user_security_state.reset_token_hash).
+
+GENERIC_FORGOT_RESPONSE = {
+    'ok': True,
+    'message': 'If the account exists and has an email on file, a reset link has been sent.',
+}
+
+
+def _token_hash(token):
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+
+def _upsert_security_state(user_id, **cols):
+    """INSERT or UPDATE the user_security_state row for user_id with cols."""
+    assignments = ', '.join(f'{col}=?' for col in cols)
+    existing = app_pkg.db.query(
+        "SELECT user_id FROM user_security_state WHERE user_id=?",
+        (user_id,), fetchone=True,
+    )
+    if existing:
+        app_pkg.db.execute(
+            f"UPDATE user_security_state SET {assignments}, updated_at=GETDATE() WHERE user_id=?",
+            (*cols.values(), user_id),
+        )
+    else:
+        col_names = ', '.join(cols)
+        placeholders = ', '.join('?' for _ in cols)
+        app_pkg.db.execute(
+            f"INSERT INTO user_security_state (user_id, {col_names}) VALUES (?, {placeholders})",
+            (user_id, *cols.values()),
+        )
+
+
+def _base_url():
+    """Public base URL for links in emails — APP_BASE_URL, else derived like the CSRF hook."""
+    configured = current_app.config.get('APP_BASE_URL')
+    if configured:
+        return configured
+    scheme = request.headers.get('X-Forwarded-Proto', request.scheme)
+    host = request.headers.get('X-Forwarded-Host') or request.host
+    return f'{scheme}://{host}'
+
+
+def _log_security_event(user_id, username, event_type):
+    try:
+        ip = (request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+              or request.remote_addr)
+        app_pkg.db.execute(
+            """INSERT INTO security_events (user_id, username, event_type, ip_address, user_agent)
+               VALUES (?, ?, ?, ?, ?)""",
+            (user_id, username, event_type, ip, (request.user_agent.string or '')[:500]),
+        )
+    except Exception:
+        # Auditing must never break the user-facing flow.
+        current_app.logger.warning('failed to write security_events row', exc_info=True)
+
+
+@auth_bp.route('/api/forgot-password', methods=['POST'])
+def api_forgot_password():
     data = request.json or {}
     username = data.get('username', '').strip()
-    staff_id = data.get('staff_id', '').strip()
-    password = data.get('password', '')
+    if not username:
+        return jsonify({'error': 'Username is required'}), 400
 
-    if not username or not staff_id or not password:
-        return jsonify({'error': 'All fields are required'}), 400
+    # Everything below returns the same generic 200 — never reveal whether the
+    # account exists, has an email, is inactive, or is cooling down.
+    user = app_pkg.db.query(
+        """SELECT u.id, u.username, u.role, u.status, u.email,
+                  s.last_reset_email_sent_at
+           FROM users u
+           LEFT JOIN user_security_state s ON s.user_id = u.id
+           WHERE u.username = ?""",
+        (username,), fetchone=True,
+    )
+    if (not user or not user.get('email') or user.get('status') != 'Active'
+            or user.get('role') == ROLE_SUPER_ADMIN):
+        return jsonify(GENERIC_FORGOT_RESPONSE)
+
+    cooldown = current_app.config['RESET_EMAIL_COOLDOWN_SECONDS']
+    last_sent = user.get('last_reset_email_sent_at')
+    if last_sent and (datetime.now() - last_sent).total_seconds() < cooldown:
+        return jsonify(GENERIC_FORGOT_RESPONSE)
+
+    ttl_minutes = current_app.config['RESET_TOKEN_TTL_MINUTES']
+    token = secrets.token_urlsafe(32)
+    _upsert_security_state(
+        user['id'],
+        reset_token_hash=_token_hash(token),
+        reset_token_expires_at=datetime.now() + timedelta(minutes=ttl_minutes),
+        last_reset_email_sent_at=datetime.now(),
+    )
+    reset_url = f'{_base_url()}/reset-password?token={token}'
+    subject, html_body, text_body = build_reset_email(user['username'], reset_url, ttl_minutes)
+    try:
+        send_email(user['email'], subject, html_body, text_body)
+        _log_security_event(user['id'], user['username'], 'password_reset_requested')
+    except MailError as exc:
+        current_app.logger.warning('password-reset email send failed: %s', exc)
+    return jsonify(GENERIC_FORGOT_RESPONSE)
+
+
+@auth_bp.route('/reset-password')
+def reset_password_page():
+    return render_template('reset_password.html')
+
+
+def _find_user_by_reset_token(token):
+    return app_pkg.db.query(
+        """SELECT s.user_id, u.username
+           FROM user_security_state s
+           JOIN users u ON u.id = s.user_id
+           WHERE s.reset_token_hash = ?
+             AND s.reset_token_expires_at > GETDATE()
+             AND u.status = 'Active'
+             AND u.role <> ?""",
+        (_token_hash(token), ROLE_SUPER_ADMIN), fetchone=True,
+    )
+
+
+@auth_bp.route('/api/reset-password/verify', methods=['POST'])
+def api_reset_password_verify():
+    token = (request.json or {}).get('token', '')
+    if not token:
+        return jsonify({'valid': False})
+    return jsonify({'valid': bool(_find_user_by_reset_token(token))})
+
+
+@auth_bp.route('/api/reset-password/confirm', methods=['POST'])
+def api_reset_password_confirm():
+    data = request.json or {}
+    token = data.get('token', '')
+    password = data.get('password', '')
     if len(password) < 8:
         return jsonify({'error': 'Password must be at least 8 characters'}), 400
 
-    # Resolve user → employee. The user-supplied "staff_id" field carries the
-    # EmployeeID (post-migration). Compare against the linked EmployeeID directly.
-    user = app_pkg.db.query(
-        """SELECT u.id, u.role,
-                  CAST(u.EmployeeID AS NVARCHAR(20)) AS member_staff_id
-           FROM users u
-           WHERE u.username = ?""",
-        (username,),
-        fetchone=True,
-    )
-    # Use a generic error to avoid leaking which field is wrong
-    _invalid = 'Username or Employee ID is incorrect'
-    if not user:
-        return jsonify({'error': _invalid}), 400
-    if not user.get('member_staff_id'):
-        return jsonify({'error': 'no_staff_id'}), 400
-    if user['member_staff_id'].strip() != staff_id.strip():
-        return jsonify({'error': _invalid}), 400
-    if user['role'] == ROLE_SUPER_ADMIN:
-        return jsonify({'error': 'Super Admin accounts cannot use self-service reset'}), 403
+    match = _find_user_by_reset_token(token) if token else None
+    if not match:
+        return jsonify({'error': 'invalid_or_expired'}), 400
 
     app_pkg.db.execute(
         "UPDATE users SET password_hash=? WHERE id=?",
-        (generate_password_hash(password), user['id']),
+        (generate_password_hash(password), match['user_id']),
     )
+    # Single-use: burn the token.
+    app_pkg.db.execute(
+        """UPDATE user_security_state
+           SET reset_token_hash=NULL, reset_token_expires_at=NULL, updated_at=GETDATE()
+           WHERE user_id=?""",
+        (match['user_id'],),
+    )
+    # A successful reset also clears any login lockout for that username.
+    with app_pkg._login_lock:
+        app_pkg._failed_logins = _load_failed_logins_from_db()
+        if app_pkg._failed_logins.pop(match['username'].lower(), None) is not None:
+            _save_failed_logins_to_db()
+    _log_security_event(match['user_id'], match['username'], 'password_reset_completed')
     return jsonify({'ok': True})
 
 

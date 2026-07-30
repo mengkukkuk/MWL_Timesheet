@@ -183,6 +183,10 @@ async function loadUsersList() {
             <button class="btn-icon" onclick="openResetPasswordModal(${u.id}, '${esc(u.username)}')" title="Reset Password">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
             </button>` : '<span class="w-7"></span>';
+        const editEmailBtn = (!isSuperAdmin || isSelf) ? `
+            <button class="btn-icon" onclick="openEditEmailModal(${u.id}, '${esc(u.username)}', '${esc(u.email || '')}')" title="Edit Email">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </button>` : '<span class="w-7"></span>';
         const statusBadge =
             u.status === 'Pending'  ? '<span class="text-xs ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Pending</span>' :
             u.status === 'Declined' ? '<span class="text-xs ml-2 px-1.5 py-0.5 rounded bg-red-100 text-red-700">Declined</span>' : '';
@@ -191,9 +195,10 @@ async function loadUsersList() {
                 <span class="text-sm font-medium">${esc(u.username)}</span>
                 <span class="text-xs ${roleClass} ml-2">${u.role}</span>
                 ${u.member_name ? `<span class="text-xs text-gray-400 ml-2">(${esc(u.member_name)})</span>` : ''}
+                ${u.email ? `<span class="text-xs text-gray-400 ml-2">${esc(u.email)}</span>` : `<span class="text-xs text-gray-300 ml-2" data-i18n="settings.no_email">${t('settings.no_email')}</span>`}
                 ${statusBadge}
             </div>
-            <div class="flex items-center gap-1">${changeRoleBtn}${resetPwBtn}${deleteBtn}</div>
+            <div class="flex items-center gap-1">${changeRoleBtn}${editEmailBtn}${resetPwBtn}${deleteBtn}</div>
         `;
         ul.appendChild(li);
     });
@@ -375,6 +380,28 @@ async function saveResetPassword() {
     if (res && res.ok) {
         closeResetPasswordModal();
         toast(t('toast.pw_updated'));
+    }
+}
+
+function openEditEmailModal(uid, username, email) {
+    document.getElementById('edit-email-uid').value = uid;
+    document.getElementById('edit-email-label').textContent = `Email for: ${username}`;
+    document.getElementById('edit-email-input').value = email || '';
+    document.getElementById('edit-email-overlay').classList.remove('hidden');
+}
+
+function closeEditEmailModal() {
+    document.getElementById('edit-email-overlay').classList.add('hidden');
+}
+
+async function saveUserEmail() {
+    const uid = document.getElementById('edit-email-uid').value;
+    const email = document.getElementById('edit-email-input').value.trim();
+    const res = await api(`/api/users/${uid}/email`, { method: 'PUT', body: { email } });
+    if (res && res.ok) {
+        closeEditEmailModal();
+        toast(t('toast.email_updated'));
+        loadUsersList();
     }
 }
 

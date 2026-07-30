@@ -133,14 +133,21 @@ app.config['SUPER_ADMIN_LOCKOUT']           = timedelta(minutes=int(os.getenv('S
 app.config['SUPER_ADMIN_TOKEN_TTL']         = timedelta(minutes=int(os.getenv('SUPER_ADMIN_UNLOCK_TOKEN_MINUTES', '30')))
 app.config['SUPER_ADMIN_EMAIL_COOLDOWN']    = int(os.getenv('SUPER_ADMIN_UNLOCK_EMAIL_COOLDOWN_SECONDS', '300'))
 
-# SMTP / mail
-app.config['SMTP_HOST']                     = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+# SMTP / mail — Brevo HTTPS API preferred (BREVO_API_KEY), SMTP STARTTLS fallback.
+# Both env-name generations are accepted; the newer SMTP_USER/SMTP_PASS/SMTP_FROM win.
+app.config['BREVO_API_KEY']                 = os.getenv('BREVO_API_KEY', '')
+app.config['SMTP_HOST']                     = os.getenv('SMTP_HOST', 'smtp-relay.brevo.com')
 app.config['SMTP_PORT']                     = int(os.getenv('SMTP_PORT', '587'))
-app.config['SMTP_USERNAME']                 = os.getenv('SMTP_USERNAME', '')
-app.config['SMTP_PASSWORD']                 = os.getenv('SMTP_PASSWORD', '')
-app.config['MAIL_FROM']                     = os.getenv('MAIL_FROM', '')
+app.config['SMTP_USERNAME']                 = os.getenv('SMTP_USER') or os.getenv('SMTP_USERNAME', '')
+app.config['SMTP_PASSWORD']                 = os.getenv('SMTP_PASS') or os.getenv('SMTP_PASSWORD', '')
+app.config['MAIL_FROM']                     = os.getenv('SMTP_FROM') or os.getenv('MAIL_FROM', '')
+app.config['SMTP_SECURITY']                 = os.getenv('SMTP_SECURITY', 'starttls').strip().lower()
 app.config['SUPER_ADMIN_UNLOCK_EMAIL']      = os.getenv('SUPER_ADMIN_UNLOCK_EMAIL', '')
 app.config['APP_BASE_URL']                  = os.getenv('APP_BASE_URL', '').rstrip('/')
+
+# Password-reset tuning
+app.config['RESET_TOKEN_TTL_MINUTES']       = int(os.getenv('RESET_TOKEN_TTL_MINUTES', '60'))
+app.config['RESET_EMAIL_COOLDOWN_SECONDS']  = int(os.getenv('RESET_EMAIL_COOLDOWN_SECONDS', '300'))
 
 def _is_same_origin(source_url, target_url):
     try:
