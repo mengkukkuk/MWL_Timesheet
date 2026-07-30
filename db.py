@@ -1,4 +1,5 @@
 import os
+import re
 import threading
 
 import pyodbc
@@ -52,13 +53,20 @@ def init_db():
     else:
         conn_str = f"DRIVER={driver};SERVER={server};DATABASE=master;Trusted_Connection=yes;TrustServerCertificate={trust_cert}"
 
+    # init_db.sql is UTF-8 and contains box-drawing characters in its comment
+    # banners. Without an explicit encoding Python falls back to the locale
+    # codepage (cp1252 on Windows), which raises UnicodeDecodeError and — since
+    # the caller in app/__init__.py swallows it — silently skips every migration.
     sql_path = os.path.join(os.path.dirname(__file__), 'init_db.sql')
-    with open(sql_path, 'r') as f:
+    with open(sql_path, 'r', encoding='utf-8-sig') as f:
         sql = f.read()
 
     conn = pyodbc.connect(conn_str, autocommit=True)
     cursor = conn.cursor()
-    for i, batch in enumerate(sql.split('\nGO\n'), start=1):
+    # Batch separator: a line containing only GO. Matched case-insensitively and
+    # tolerant of surrounding whitespace — a plain split('\nGO\n') misses the
+    # lowercase/trailing-space variants and silently merges adjacent batches.
+    for i, batch in enumerate(re.split(r'(?im)^[ \t]*GO[ \t]*$', sql), start=1):
         batch = batch.strip()
         if not batch:
             continue

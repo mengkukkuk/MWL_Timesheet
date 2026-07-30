@@ -24,6 +24,9 @@ SET SECRET_KEY=Metercenter
 SET NGROK_AUTHTOKEN=3DinmxLPcvA70ZuiOHbXblahP75_3ENVxYkKeDjQajAbCLfod
 SET NGROK_DOMAIN=unpreventively-inconvertible-rolande.ngrok-free.dev
 SET TAILSCALE_DOMAIN=
+REM Public base URL used to build password-reset links in emails. Blank on purpose —
+REM derived from NGROK_DOMAIN after the .env block below unless .env overrides it.
+SET APP_BASE_URL=
 REM Waitress channel timeout (seconds). Default 3600 = 60 min — needed for multi-GB
 REM uploads over Tailscale, especially via DERP relays. Override in .env if needed.
 SET WAITRESS_CHANNEL_TIMEOUT=3600
@@ -55,7 +58,14 @@ if exist "%APP_DIR%\.env" (
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b FILE_UPLOAD_MAX_MB "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="FILE_UPLOAD_MAX_MB" set FILE_UPLOAD_MAX_MB=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b FILE_STORAGE_CAP_MB "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="FILE_STORAGE_CAP_MB" set FILE_STORAGE_CAP_MB=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b FILE_MIN_FREE_MB "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="FILE_MIN_FREE_MB" set FILE_MIN_FREE_MB=%%B
+    REM Quoted set: the value is a URL, and an unquoted set would break on any & in it.
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b APP_BASE_URL "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="APP_BASE_URL" set "APP_BASE_URL=%%B"
 )
+
+REM Default the reset-link base URL to the ngrok domain so the two can never drift.
+REM Without this, _base_url() in app\auth.py falls back to the client-supplied
+REM X-Forwarded-Host header, which lets a request forge the domain in reset emails.
+if not defined APP_BASE_URL if defined NGROK_DOMAIN set "APP_BASE_URL=https://%NGROK_DOMAIN%"
 
 net session >nul 2>&1
 if %errorlevel% neq 0 ( echo ERROR: Run as Administrator! & pause & exit /b 1 )
@@ -109,7 +119,8 @@ echo [2/4] Installing %SVC_APP% service...
     "AVATAR_STORAGE_DIR=%AVATAR_STORAGE_DIR%" ^
     "FILE_UPLOAD_MAX_MB=%FILE_UPLOAD_MAX_MB%" ^
     "FILE_STORAGE_CAP_MB=%FILE_STORAGE_CAP_MB%" ^
-    "FILE_MIN_FREE_MB=%FILE_MIN_FREE_MB%"
+    "FILE_MIN_FREE_MB=%FILE_MIN_FREE_MB%" ^
+    "APP_BASE_URL=%APP_BASE_URL%"
 
 echo [3/4] Installing %SVC_NGROK% service...
 %NSSM_EXE% install %SVC_NGROK% "%NGROK_EXE%"
