@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MWL Timesheet</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" integrity="sha384-HtMZLkYo+pR5/u7zCzXxMJP6QoNnQJt1qkHM0EaOPvGDIzaVZbmYr/TlvUZ/sKAg" crossorigin="anonymous">
+    <link rel="stylesheet" href="/static/tailwind.css?v={{ static_v('tailwind.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Syne + DM Mono are only used by the Project Summary tab (elevated-only);
+         lazy-injected by projects-summary.js on first load instead of loaded here. -->
     <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
     <!-- Chart.js is lazy-loaded on demand by dashboard/projects-summary modules to reduce initial payload. -->
     <!-- Eager frontend modules: load in parallel via `defer` (executes in document order, downloads concurrently). -->
@@ -749,7 +750,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <span class="ps-kpi-value" id="ps-kpi-hours">—</span>
-                    <span class="ps-kpi-label" data-i18n="ps.kpi_hours">Total Hours</span>
+                    <span class="ps-kpi-label" data-i18n="ps.kpi_hours">Man-Day Hours</span>
                 </div>
                 <div class="ps-kpi-card" style="--kpi-color:#8b5cf6;--kpi-color-bg:#f5f3ff">
                     <div class="ps-kpi-icon">

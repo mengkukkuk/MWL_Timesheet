@@ -11,6 +11,9 @@ triggers:
   - meterworklog deploy
   - dev.bat
   - bootstrap admin
+  - pull main
+  - build:css
+  - tailwind build
 ---
 
 # MeterWorklog Deployment Skill
@@ -39,7 +42,18 @@ Logs land in `<app>\logs\` (rotated at 5 MB):
 3. **NSSM** at `C:\Windows\System32\nssm.exe` (download from https://nssm.cc/download).
 4. **ngrok v3** unpacked to `<app>\ngrokv3\ngrok.exe`. Sign in at ngrok.com and reserve a domain.
 5. **Tailscale** (optional) — install from https://tailscale.com/download/windows and `tailscale up`. HTTPS must be enabled in the tailnet admin panel before `tailscale serve` will work.
-6. **`.env`** at repo root. The **full** key list is in
+6. **Node.js 18+ with npm** — **build-time only**, no Node process runs at
+   request time. Needed to generate `static/tailwind.css` (the CDN
+   Tailwind link was removed in favor of a local purged build — see
+   [CLAUDE.md §6a](CLAUDE.md)). From the repo root:
+   ```cmd
+   npm install
+   npm run build:css
+   ```
+   `static/tailwind.css` is gitignored (build output) — this must be run
+   once on every host before the first login, or the login/dashboard
+   pages render completely unstyled with no CDN fallback.
+7. **`.env`** at repo root. The **full** key list is in
    [CLAUDE.md §10](CLAUDE.md). Minimum required:
    ```env
    SECRET_KEY=<random-long-string>
@@ -93,6 +107,59 @@ If `init_db.sql` has migration batches that already ran, expect `[init_db] SQL b
 > sqlcmd -S localhost\SQLEXPRESS -d MeterWorklog -E -i init_db2.sql
 > ```
 
+## 3a. Pulling new code onto an existing deployment
+
+Routine update sequence for a host that's **already installed and running**
+(e.g. a second/backup deploy machine, or re-syncing after working on the
+primary one). This is the checklist for "I just did `git pull` on `main`,
+now what":
+
+```cmd
+git pull origin main
+```
+
+Then, depending on what changed in the pull (check `git log` / the diff if
+unsure — running all of these unconditionally is always safe, just slower):
+
+1. **`requirements.txt` changed:**
+   ```cmd
+   .venv\Scripts\pip install -r requirements.txt
+   ```
+
+2. **`package.json`, `tailwind.config.js`, any `templates/*.html`, or any
+   `static/app.js` / `static/app/*.js` file changed:**
+   ```cmd
+   npm install
+   npm run build:css
+   ```
+   `static/tailwind.css` is a **gitignored build artifact** — it does
+   **not** come down with `git pull`, and there is no CDN fallback anymore
+   (see [CLAUDE.md §6a](CLAUDE.md)). Skipping this step after such a pull
+   means the app keeps serving **stale or missing** CSS — it won't error,
+   it'll just look wrong (unstyled login page, misaligned dashboard, etc.).
+   Safe to run even when nothing CSS-related changed; it's a ~1-2 second
+   rebuild.
+
+3. **`init_db.sql` gained new migration batches:** no action needed —
+   `db.init_db()` re-applies it automatically (idempotent) on the next
+   request after the service restarts. **`init_db2.sql` changed:** apply
+   manually, it is never auto-run:
+   ```cmd
+   sqlcmd -S localhost\SQLEXPRESS -d MeterWorklog -E -i init_db2.sql
+   ```
+
+4. **Restart the app service** (always do this last, after the steps
+   above, so it picks up both the new code and the freshly-built CSS):
+   ```cmd
+   nssm restart MeterWorklog
+   ```
+   `MeterWorklog-ngrok` / Tailscale Serve do not need restarting for
+   code-only changes.
+
+5. **Smoke test:** open the login page and confirm it renders styled
+   (Tailwind loaded, not plain unstyled HTML) and that you can sign in.
+   If it looks unstyled, see the troubleshooting entry in §9.
+
 ## 4. Install the services
 
 From an **elevated** cmd prompt in the repo root:
@@ -128,12 +195,18 @@ icacls "D:\MeterWorklog_Storage" /inheritance:r
 REM 3. (If applicable) Apply init_db2.sql manually
 REM    sqlcmd -S <server> -d MeterWorklog -E -i init_db2.sql
 
-REM 4. Confirm both services are running
+REM 4. Build the CSS — static/tailwind.css is gitignored and won't exist
+REM    on a fresh clone; without it, the app starts fine but every page
+REM    renders unstyled (no CDN fallback). See CLAUDE.md §6a.
+npm install
+npm run build:css
+
+REM 5. Confirm both services are running
 nssm status MeterWorklog
 nssm status MeterWorklog-ngrok
 
-REM 5. Smoke test
-REM    open https://<NGROK_DOMAIN>/login — should render
+REM 6. Smoke test
+REM    open https://<NGROK_DOMAIN>/login — should render styled
 ```
 
 ## 5. Run in dev mode (no service)
@@ -173,6 +246,7 @@ Tailscale Serve inspection:
 - **`.env` change** → re-run `install-service.bat` (it re-applies `AppEnvironmentExtra`) **or** edit via `nssm edit MeterWorklog` → *Environment* tab, then restart.
 - **New ngrok domain** → update `NGROK_DOMAIN` in `.env`, then re-run installer (this rewrites `AppParameters` for the ngrok service).
 - **Bigger uploads** → bump both `FILE_UPLOAD_MAX_MB` (Flask's `MAX_CONTENT_LENGTH`) **and** `WAITRESS_MAX_REQUEST_BODY` (Waitress rejects requests before Flask sees them — the Waitress limit must be ≥ the Flask one).
+- **Any pull that touches `templates/*.html`, `static/app.js`, `static/app/*.js`, or `tailwind.config.js`** → `npm run build:css`, then `nssm restart MeterWorklog`. See §3a for the full routine-update checklist.
 
 ## 8. Uninstall
 
@@ -198,6 +272,8 @@ Stops + removes both NSSM services and runs `tailscale serve reset`. The `.venv`
 | Browser sees `403 CSRF` on POST | Origin not in allow-list | App enforces origin-based CSRF (see `app/__init__.py`); add the new domain there |
 | File upload fails immediately, nothing in `app.log` | `FILE_STORAGE_DIR` or `AVATAR_STORAGE_DIR` doesn't exist, or write-denied | `mkdir` the paths from `.env`; verify `icacls` grants SYSTEM `(OI)(CI)F` |
 | Random 500s after pulling new code | `init_db.sql` ran but `init_db2.sql` (or a hand-rolled migration) hasn't | Apply migration manually: `sqlcmd … -i init_db2.sql` |
+| Login/dashboard page loads as plain unstyled HTML (no Tailwind CDN fallback anymore) | `static/tailwind.css` missing (fresh clone, never built) or stale (pulled new code but didn't rebuild) | From repo root: `npm install` (first time only) `&& npm run build:css`, then reload — no service restart needed for CSS alone, but restart if the pull also changed Python/template code |
+| `'tailwindcss' is not recognized as an internal or external command` running `npm run build:css` | `npm install` was never run in this repo root, or Node/npm isn't installed | Install Node.js 18+, then `npm install` from the repo root (not inside a subfolder) |
 | All users logged out / "Invalid session" after redeploy | `SECRET_KEY` was rotated; signed cookies are no longer valid | Expected — users must log in again. Keep `SECRET_KEY` stable across restarts |
 | `nssm.exe not found` on uninstall | `uninstall-service.bat` looks in `C:\Windows\System32\` while install ships one at `ngrokv3\nssm.exe` | Copy nssm.exe to `C:\Windows\System32\` (one-time, per prereq §2) |
 
@@ -225,5 +301,6 @@ Then have that user log out / in to refresh their session role.
 | [init_db2.sql](init_db2.sql) | Alternate/older variant — **NOT auto-applied**; manual `sqlcmd -i` only |
 | [app/__init__.py](app/__init__.py) | Flask app factory, CSRF/origin check, blueprint registration |
 | [app/cache.py](app/cache.py) | In-process TTLCache for list endpoints (no Redis needed) |
+| [package.json](package.json) / [tailwind.config.js](tailwind.config.js) | Tailwind CLI build recipe (§3a) — `npm install && npm run build:css` generates `static/tailwind.css` |
 | [logintest/](logintest) | Out-of-scope: ad-hoc SQL login-setup helpers, not used by deploy |
 | [logs/](logs) | Service stdout/stderr (auto-rotated at 5 MB) |

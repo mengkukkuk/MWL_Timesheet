@@ -46,7 +46,20 @@ function populateProjectsSummarySelectors() {
 
 // ── Data load ────────────────────────────────────────────
 
+// Syne + DM Mono are only used by this tab's KPI/chart styling — inject once,
+// on first load, instead of loading them for every page (see index.html).
+let _psFontsLoaded = false;
+function _ensurePsFonts() {
+    if (_psFontsLoaded) return;
+    _psFontsLoaded = true;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500;600&display=swap';
+    document.head.appendChild(link);
+}
+
 async function loadProjectsSummary() {
+    _ensurePsFonts();
     populateProjectsSummarySelectors();
     const year  = document.getElementById('ps-year').value;
     const month = document.getElementById('ps-month').value;

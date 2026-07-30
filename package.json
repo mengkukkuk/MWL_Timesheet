@@ -1,0 +1,12 @@
+{
+  "name": "mwl-timesheet-css",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local Tailwind CSS build for the vanilla-JS SPA served by Flask (templates/index.html, templates/login.html). Replaces the jsdelivr CDN link with a purged, self-hosted static/tailwind.css.",
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/tailwind-src.css -o ./static/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "2.2.19"
+  }
+}

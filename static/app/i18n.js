@@ -19,7 +19,7 @@ const _i18n = {
         'ps.col_hours': 'Hours',
         'ps.col_share': 'Share',
         'ps.kpi_projects': 'Active Projects',
-        'ps.kpi_hours': 'Total Hours',
+        'ps.kpi_hours': 'Total Man-Day Hours',
         'ps.kpi_employees': 'Active Employees',
         'ps.kpi_avg': 'Avg hrs / Project',
         'ps.chart_hours_title': 'Hours by Project',
@@ -324,7 +324,7 @@ const _i18n = {
         'ps.col_hours': 'ชั่วโมง',
         'ps.col_share': 'สัดส่วน',
         'ps.kpi_projects': 'โปรเจกต์ที่ใช้งาน',
-        'ps.kpi_hours': 'ชั่วโมงรวม',
+        'ps.kpi_hours': 'ชั่วโมงรวม Man-Day',
         'ps.kpi_employees': 'พนักงานที่ใช้งาน',
         'ps.kpi_avg': 'ชม. เฉลี่ย / โปรเจกต์',
         'ps.chart_hours_title': 'ชั่วโมงตามโปรเจกต์',
@@ -550,7 +550,7 @@ const _i18n = {
         'modal.staff_desc': 'Staff',
 
         // Login page
-        'login.title': 'บันทึกงานทีม',
+        'login.title': 'Team Work Log',
         'login.sign_in': 'เข้าสู่ระบบ',
         'login.username': 'ชื่อผู้ใช้',
         'login.password': 'รหัสผ่าน',
