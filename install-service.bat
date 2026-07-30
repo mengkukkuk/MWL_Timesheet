@@ -69,7 +69,25 @@ if not exist "%NSSM_EXE%" (
 echo Installing MeterWorklog to: %APP_DIR%
 if not exist "%APP_DIR%\logs" mkdir "%APP_DIR%\logs"
 
-echo [1/2] Installing %SVC_APP% service...
+echo [1/4] Building frontend CSS (Tailwind - static/tailwind.css)...
+where npm >nul 2>&1
+if %errorlevel% neq 0 (
+    echo   WARNING: npm not found on PATH - skipping CSS build.
+    echo   Install Node.js 18+ from https://nodejs.org, then run manually:
+    echo     cd /d "%APP_DIR%" ^&^& npm install ^&^& npm run build:css
+    echo   Until then, pages will render UNSTYLED ^(no CDN fallback exists^).
+) else (
+    pushd "%APP_DIR%"
+    call npm install
+    call npm run build:css
+    if errorlevel 1 (
+        echo   WARNING: npm run build:css failed - see output above.
+        echo   Pages will render unstyled until this is fixed and re-run.
+    )
+    popd
+)
+
+echo [2/4] Installing %SVC_APP% service...
 %NSSM_EXE% install %SVC_APP% "%PYTHON_EXE%"
 %NSSM_EXE% set %SVC_APP% AppParameters "-m waitress --host=0.0.0.0 --port=%APP_PORT% --channel-timeout=%WAITRESS_CHANNEL_TIMEOUT% --max-request-body-size=%WAITRESS_MAX_REQUEST_BODY% app:app"
 %NSSM_EXE% set %SVC_APP% AppDirectory "%APP_DIR%"
@@ -93,7 +111,7 @@ echo [1/2] Installing %SVC_APP% service...
     "FILE_STORAGE_CAP_MB=%FILE_STORAGE_CAP_MB%" ^
     "FILE_MIN_FREE_MB=%FILE_MIN_FREE_MB%"
 
-echo [2/2] Installing %SVC_NGROK% service...
+echo [3/4] Installing %SVC_NGROK% service...
 %NSSM_EXE% install %SVC_NGROK% "%NGROK_EXE%"
 %NSSM_EXE% set %SVC_NGROK% AppParameters "http %APP_PORT% --url=%NGROK_DOMAIN% --authtoken=%NGROK_AUTHTOKEN%"
 %NSSM_EXE% set %SVC_NGROK% AppDirectory "%APP_DIR%"
@@ -110,7 +128,7 @@ echo Starting services...
 timeout /t 3 >nul
 %NSSM_EXE% start %SVC_NGROK%
 
-echo [3/3] Configuring Tailscale Serve (HTTPS reverse proxy)...
+echo [4/4] Configuring Tailscale Serve (HTTPS reverse proxy)...
 if exist "%TAILSCALE_EXE%" (
     REM tailscale serve --bg persists in the Tailscale daemon's config and survives reboots.
     REM Re-running it just refreshes the same mapping; safe to call on every install.
