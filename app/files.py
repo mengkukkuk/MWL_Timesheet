@@ -335,6 +335,66 @@ def rename_folder(fid):
     return jsonify({'ok': True, 'id': fid, 'name': name})
 
 
+def _folder_name_conflict(parent_id, name, exclude_id=None):
+    """True if another folder named `name` already sits under `parent_id`.
+
+    Mirrors the uniqueness check in create_folder/rename_folder (and the DB
+    UNIQUE constraint behind them) — note the NULL-parent split, since
+    `parent_id = NULL` never matches in SQL.
+    """
+    if parent_id is None:
+        sql = "SELECT id FROM file_folders WHERE parent_id IS NULL AND name=?"
+        params = (name,)
+    else:
+        sql = "SELECT id FROM file_folders WHERE parent_id=? AND name=?"
+        params = (parent_id, name)
+    if exclude_id is not None:
+        sql += " AND id<>?"
+        params = params + (exclude_id,)
+    return app_pkg.db.query(sql, params, fetchone=True) is not None
+
+
+@files_bp.route('/api/files/folder/<int:fid>/move', methods=['POST'])
+@elevated_required
+def move_folder(fid):
+    """Re-parent a folder. Body: {parent_id: int|null}.  null = move to root.
+
+    Elevated-only, matching the other folder mutations (rename/delete).
+    """
+    folder = app_pkg.db.query(
+        "SELECT id, name, parent_id FROM file_folders WHERE id=?", (fid,), fetchone=True
+    )
+    if not folder:
+        return jsonify({'error': 'folder not found'}), 404
+
+    data = request.json or {}
+    target = data.get('parent_id')
+    if target is not None:
+        try:
+            target = int(target)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'invalid parent_id'}), 400
+        if not _folder_exists(target):
+            return jsonify({'error': 'target folder not found'}), 404
+
+    if target == fid:
+        return jsonify({'error': 'A folder cannot contain itself'}), 400
+    # Cycle guard: walks UP from the proposed parent looking for fid, i.e. is
+    # the destination inside this folder's own subtree? Argument order matters —
+    # swapping these returns False for every real cycle.
+    if _is_descendant(target, fid):
+        return jsonify({'error': 'Cannot move a folder into one of its own subfolders'}), 400
+
+    if target == folder['parent_id']:
+        return jsonify({'ok': True, 'id': fid, 'parent_id': target})   # no-op
+
+    if _folder_name_conflict(target, folder['name'], exclude_id=fid):
+        return jsonify({'error': 'A folder with that name already exists here'}), 409
+
+    app_pkg.db.execute("UPDATE file_folders SET parent_id=? WHERE id=?", (target, fid))
+    return jsonify({'ok': True, 'id': fid, 'parent_id': target})
+
+
 def _storage_paths_for_new():
     """Return (absolute_dir, stored_name, relative_path_for_db)."""
     now = datetime.now()

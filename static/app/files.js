@@ -133,10 +133,10 @@ function renderTreeNodes(nodes, depth) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
                 </svg>
             </button>` : `<span class="inline-block w-4 h-4 flex-shrink-0"></span>`;
-        // float-right reverses DOM order: list X first → renders rightmost; rename second → appears to its left
         return `
         <div class="folder-tree-node ${isActive ? 'active' : ''}" style="padding-left:${pad}px"
-             data-folder-id="${n.id}" onclick="selectFolder(${n.id})">
+             data-folder-id="${n.id}" onclick="selectFolder(${n.id})"
+             ${canManage ? `draggable="true" ondragstart="onFolderDragStart(event, ${n.id})" ondragend="onFileDragEnd(event)"` : ''}>
             ${toggle}
             <svg class="w-4 h-4 inline-block -mt-0.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
@@ -144,12 +144,9 @@ function renderTreeNodes(nodes, depth) {
             <span class="ml-1">${esc(n.name)}</span>
             ${n.is_classified ? `<span class="ml-1 text-amber-500" title="${esc(t('files.classified'))}">&#128274;</span>` : ''}
             ${canManage ? `
-                <button type="button" data-del-folder="${n.id}"
-                        class="float-right text-gray-300 hover:text-red-500 text-xs px-1"
-                        title="Delete folder">&times;</button>
-                <button type="button" data-edit-folder="${n.id}"
-                        class="float-right text-gray-300 hover:text-indigo-500 text-xs px-1"
-                        title="${esc(t('files.edit'))}">&#9998;</button>
+                <button type="button" data-folder-menu="${n.id}"
+                        class="folder-tree-menu-btn float-right" title="More actions"
+                        aria-label="More actions" aria-haspopup="menu" aria-expanded="false">&#8943;</button>
             ` : ''}
         </div>
         ${collapsed ? '' : renderTreeNodes(n.children, depth + 1)}`;
@@ -232,13 +229,18 @@ function renderSubfolders(folders) {
     if (!host || !wrap) return;
     if (!folders.length) { wrap.classList.add('hidden'); host.innerHTML = ''; return; }
     wrap.classList.remove('hidden');
+    const canManage = isElevated();
     host.innerHTML = folders.map(f => `
         <div onclick="selectFolder(${f.id})" data-folder-id="${f.id}"
+             ${canManage ? `draggable="true" ondragstart="onFolderDragStart(event, ${f.id})" ondragend="onFileDragEnd(event)"` : ''}
              class="subfolder-card flex items-center gap-2 p-2 border border-gray-200 rounded-md cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-colors">
             <svg class="w-5 h-5 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z"/>
             </svg>
             <span class="text-sm text-gray-700 truncate">${esc(f.name)}</span>
+            ${canManage ? `<button type="button" class="subfolder-menu-btn ml-auto flex-shrink-0"
+                    data-folder-menu="${f.id}" title="More actions" aria-label="More actions"
+                    aria-haspopup="menu" aria-expanded="false">&#8943;</button>` : ''}
         </div>
     `).join('');
 }
@@ -333,12 +335,9 @@ function _renderFileList() {
                       ${canPreview ? `onclick="openFilePreview(${f.id})"` : `onclick="window.location='/api/files/${f.id}/download'"`}
                       >${esc(f.original_name)}</span>
                 ${f.is_classified ? `<span class="ml-1 text-amber-500 flex-shrink-0" title="${esc(t('files.classified'))}">&#128274;</span>` : ''}
-                <div class="file-row-actions">
-                    ${canPreview ? `<button type="button" onclick="openFilePreview(${f.id})">Preview</button>` : ''}
-                    <a href="/api/files/${f.id}/download">Download</a>
-                    ${canManage ? `<button type="button" data-edit-file="${f.id}" title="${esc(t('files.edit'))}">${esc(t('files.edit'))}</button>` : ''}
-                    ${canDelete ? `<button type="button" class="danger" data-del-file="${f.id}">Delete</button>` : ''}
-                </div>
+                <button type="button" class="file-row-menu-btn" data-file-menu="${f.id}"
+                        title="More actions" aria-label="More actions"
+                        aria-haspopup="menu" aria-expanded="false">&#8943;</button>
             </div>
             <div class="file-row-size">${fmtBytes(f.size_bytes)}</div>
             <div class="file-row-uploader">${esc(f.uploaded_by_name || '')}</div>
@@ -346,6 +345,142 @@ function _renderFileList() {
         </div>`;
     }).join('');
 }
+
+// ── Overflow action menu ──
+// One popover element, reused by every file row and subfolder card, mounted on
+// <body> so it escapes .file-row-name's overflow:hidden. Opens on click (not
+// hover) so it works on touch, where .file-row-actions used to be force-shown.
+let _openMenuBtn = null;
+
+const _MENU_ICONS = {
+    preview:  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>',
+    download: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>',
+    move:     '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>',
+    edit:     '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>',
+    open:     '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>',
+    trash:    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"/>',
+};
+
+function _menuIcon(key) {
+    return `<svg class="action-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">${_MENU_ICONS[key] || ''}</svg>`;
+}
+
+function _ensureActionMenu() {
+    let menu = document.getElementById('file-action-menu');
+    if (menu) return menu;
+    menu = document.createElement('div');
+    menu.id = 'file-action-menu';
+    menu.className = 'action-menu hidden';
+    menu.setAttribute('role', 'menu');
+    document.body.appendChild(menu);
+    return menu;
+}
+
+function closeActionMenu() {
+    const menu = document.getElementById('file-action-menu');
+    if (menu) { menu.classList.add('hidden'); menu.innerHTML = ''; menu._items = null; }
+    if (_openMenuBtn) {
+        _openMenuBtn.setAttribute('aria-expanded', 'false');
+        _openMenuBtn = null;
+    }
+}
+
+function _openActionMenu(btn, items) {
+    const menu = _ensureActionMenu();
+    menu.innerHTML = items.map((it, i) => it.sep
+        ? '<div class="action-menu-sep" role="separator"></div>'
+        : `<button type="button" role="menuitem" data-menu-idx="${i}"
+                   class="action-menu-item${it.danger ? ' danger' : ''}">
+               ${_menuIcon(it.icon)}<span>${esc(it.label)}</span>
+           </button>`).join('');
+    menu._items = items;
+    menu.classList.remove('hidden');
+
+    // Anchor below the button, right-aligned; flip above if it would overflow.
+    const r = btn.getBoundingClientRect();
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    let left = Math.min(r.right - mw, window.innerWidth - mw - 8);
+    let top = r.bottom + 4;
+    if (top + mh > window.innerHeight - 8) top = r.top - mh - 4;
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = Math.max(8, top) + 'px';
+
+    _openMenuBtn = btn;
+    btn.setAttribute('aria-expanded', 'true');
+    const first = menu.querySelector('.action-menu-item');
+    if (first) first.focus();
+}
+
+function _fileMenuItems(f) {
+    const canDelete = isElevated() || (currentUser && currentUser.id === f.uploaded_by);
+    const canMove   = canDelete;
+    const canManage = isElevated();
+    const isImg     = _isImageMime(f.mime_type);
+    const canPreview = isImg || _isPreviewableDoc(f.mime_type, f.original_name);
+    const items = [];
+    if (canPreview) items.push({ label: 'Preview', icon: 'preview', run: () => openFilePreview(f.id) });
+    items.push({ label: 'Download', icon: 'download', run: () => { window.location = `/api/files/${f.id}/download`; } });
+    if (canMove)   items.push({ label: 'Move to…', icon: 'move', run: () => openMoveModal('files', [f.id]) });
+    if (canManage) items.push({ label: t('files.edit') || 'Edit', icon: 'edit', run: () => openFileEditModal(f.id) });
+    if (canDelete) { items.push({ sep: true }); items.push({ label: 'Delete', icon: 'trash', danger: true, run: () => deleteFile(f.id) }); }
+    return items;
+}
+
+function _folderMenuItems(fid) {
+    return [
+        { label: 'Open', icon: 'open', run: () => selectFolder(fid) },
+        { label: 'Move to…', icon: 'move', run: () => openMoveModal('folder', fid) },
+        { label: t('files.edit') || 'Edit', icon: 'edit', run: () => openFolderEditModal(fid) },
+        { sep: true },
+        { label: 'Delete', icon: 'trash', danger: true, run: () => deleteFolder(fid) },
+    ];
+}
+
+// Open/toggle from either a file row or a subfolder card.
+document.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('[data-file-menu], [data-folder-menu]');
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();                     // don't trigger the row/card onclick
+    if (_openMenuBtn === btn) { closeActionMenu(); return; }
+    closeActionMenu();
+    const fileAttr = btn.getAttribute('data-file-menu');
+    if (fileAttr != null) {
+        const f = fileListCache.find(x => x.id === parseInt(fileAttr, 10));
+        if (f) _openActionMenu(btn, _fileMenuItems(f));
+    } else {
+        const fid = parseInt(btn.getAttribute('data-folder-menu'), 10);
+        if (!isNaN(fid)) _openActionMenu(btn, _folderMenuItems(fid));
+    }
+});
+
+// Run a chosen item.
+document.addEventListener('click', (ev) => {
+    const item = ev.target.closest('.action-menu-item');
+    if (!item) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const menu = document.getElementById('file-action-menu');
+    const entry = menu && menu._items && menu._items[parseInt(item.dataset.menuIdx, 10)];
+    closeActionMenu();
+    if (entry && typeof entry.run === 'function') entry.run();
+});
+
+// Dismiss on outside click, Escape, scroll or resize (the popover is fixed-
+// positioned, so it would otherwise detach from its anchor).
+document.addEventListener('click', (ev) => {
+    if (!_openMenuBtn) return;
+    if (ev.target.closest('#file-action-menu, [data-file-menu], [data-folder-menu]')) return;
+    closeActionMenu();
+});
+document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape' || !_openMenuBtn) return;
+    const btn = _openMenuBtn;
+    closeActionMenu();
+    btn.focus();
+});
+window.addEventListener('scroll', () => { if (_openMenuBtn) closeActionMenu(); }, true);
+window.addEventListener('resize', () => { if (_openMenuBtn) closeActionMenu(); });
 
 // ── Selection / bulk action bar ──
 function onFileCheckboxToggle(ev, id) {
@@ -618,6 +753,8 @@ function closeRecentUploads(ev) {
 // (including Root, which uses the "root" sentinel) and subfolder cards.
 let _fileDragIds = [];      // ids currently being dragged (already permission-filtered)
 let _fileDragSkipped = 0;   // selected-but-not-movable count, reported after the move
+let _folderDragId = null;   // folders move ONE at a time — deliberately a scalar
+let _folderDragBlocked = new Set();  // ids that can't receive _folderDragId (self + descendants)
 let _dragGhostEl = null;
 
 // Mirrors the `canMove` rule used at row-render time. Needed because checkboxes
@@ -634,10 +771,10 @@ function _movableFileIds(ids) {
 
 // setDragImage needs the element in the document, so it's parked offscreen
 // via .file-drag-ghost rather than hidden.
-function _setMultiDragImage(ev, n) {
+function _setDragGhost(ev, label) {
     const ghost = document.createElement('div');
     ghost.className = 'file-drag-ghost';
-    ghost.textContent = `${n} files`;
+    ghost.textContent = label;
     document.body.appendChild(ghost);
     _dragGhostEl = ghost;
     ev.dataTransfer.setDragImage(ghost, 12, 12);
@@ -653,7 +790,7 @@ function onFileDragStart(ev, id) {
     try {
         ev.dataTransfer.setData('text/plain', _fileDragIds.join(','));
         ev.dataTransfer.effectAllowed = 'move';
-        if (_fileDragIds.length > 1) _setMultiDragImage(ev, _fileDragIds.length);
+        if (_fileDragIds.length > 1) _setDragGhost(ev, `${_fileDragIds.length} files`);
     } catch (_) {}
     _fileDragIds.forEach(fid => {
         const row = document.querySelector(`.file-row[data-file-id="${fid}"]`);
@@ -661,15 +798,54 @@ function onFileDragStart(ev, id) {
     });
 }
 
+// ── Folder drag (one folder at a time) ──
+// Collects fid plus every descendant — none of them may receive the folder,
+// which mirrors the server's _is_descendant() cycle guard so the UI never
+// offers a drop the API would reject.
+function _folderSubtreeIds(fid) {
+    const out = new Set([fid]);
+    const node = findFolder(fid);
+    const walk = (nodes) => (nodes || []).forEach(n => { out.add(n.id); walk(n.children); });
+    if (node) walk(node.children);
+    return out;
+}
+
+function onFolderDragStart(ev, fid) {
+    ev.stopPropagation();               // don't let a nested row's handler also fire
+    if (!isElevated()) { ev.preventDefault(); return; }
+    _folderDragId = fid;
+    _folderDragBlocked = _folderSubtreeIds(fid);
+    try {
+        ev.dataTransfer.setData('text/plain', `folder:${fid}`);
+        ev.dataTransfer.effectAllowed = 'move';
+        _setDragGhost(ev, findFolderName(fid) || 'Folder');
+    } catch (_) {}
+    document.querySelectorAll(`[data-folder-id="${fid}"]`)
+        .forEach(el => el.classList.add('drag-source'));
+}
+
+// True when the node can legally receive whatever is currently in flight.
+function _canDropOn(node) {
+    const target = _dropTargetFolderId(node);
+    if (target === undefined) return false;
+    if (_folderDragId != null) {
+        if (target != null && _folderDragBlocked.has(target)) return false;   // self / descendant
+        return true;
+    }
+    return _fileDragIds.length > 0;
+}
+
 // Single place that unwinds every drag artefact: the in-flight id list, the
 // upload overlay + its depth counter, row/target highlights and the drag ghost.
 function _resetDragState() {
     _fileDragIds = [];
     _fileDragSkipped = 0;
+    _folderDragId = null;
+    _folderDragBlocked = new Set();
     fileDragDepth = 0;
     const ov = document.getElementById('file-drop-overlay');
     if (ov) ov.classList.add('hidden');
-    document.querySelectorAll('.file-row.drag-source').forEach(r => r.classList.remove('drag-source'));
+    document.querySelectorAll('.drag-source').forEach(r => r.classList.remove('drag-source'));
     document.querySelectorAll('.drop-target').forEach(n => n.classList.remove('drop-target'));
     if (_dragGhostEl) { _dragGhostEl.remove(); _dragGhostEl = null; }
 }
@@ -711,38 +887,9 @@ async function _moveFilesTo(ids, target) {
     return { ok, failures };
 }
 
-// Wire drop targets via event delegation — survives tree/subfolder re-renders.
-document.addEventListener('dragover', (ev) => {
-    if (!_fileDragIds.length) return;
-    const node = ev.target.closest('[data-folder-id]');
-    if (!node) return;
-    ev.preventDefault();
-    try { ev.dataTransfer.dropEffect = 'move'; } catch (_) {}
-    document.querySelectorAll('.drop-target').forEach(n => {
-        if (n !== node) n.classList.remove('drop-target');
-    });
-    node.classList.add('drop-target');
-});
-document.addEventListener('dragleave', (ev) => {
-    if (!_fileDragIds.length) return;
-    const node = ev.target.closest('[data-folder-id]');
-    // Moving between child elements inside the node isn't a real leave.
-    if (node && !node.contains(ev.relatedTarget)) node.classList.remove('drop-target');
-});
-document.addEventListener('drop', async (ev) => {
-    if (!_fileDragIds.length) return;
-    const node = ev.target.closest('[data-folder-id]');
-    if (!node) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    const target = _dropTargetFolderId(node);
-    if (target === undefined) { _resetDragState(); return; }
-    // Snapshot before resetting — the reset listener below also clears these.
-    const ids = _fileDragIds.slice();
-    const skipped = _fileDragSkipped;
-    _resetDragState();
-    if (target === fileCurrentFolderId) return;
-
+// Shared by drag-to-move and the "Move to…" picker so both report identically.
+async function moveFilesToFolder(ids, target, skipped = 0) {
+    if (!ids || !ids.length) return;
     const destName = target == null ? 'Root' : (findFolderName(target) || `Folder #${target}`);
     const { ok, failures } = await _moveFilesTo(ids, target);
     if (ok) toast(`Moved ${ok} file${ok === 1 ? '' : 's'} to ${destName}`);
@@ -755,6 +902,75 @@ document.addEventListener('drop', async (ev) => {
     clearFileSelection();
     await loadFolderContents(fileCurrentFolderId);
     loadFolderStats();
+}
+
+// Folders move one at a time. The server re-validates the cycle guard and the
+// destination name collision, so failures here surface its message verbatim.
+async function moveFolderTo(fid, parentId) {
+    const name = findFolderName(fid) || `#${fid}`;
+    const destName = parentId == null ? 'Root' : (findFolderName(parentId) || `Folder #${parentId}`);
+    let res;
+    try {
+        res = await fetch(`/api/files/folder/${fid}/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parent_id: parentId }),
+        });
+    } catch (e) {
+        toast(`Move error: ${e.message || e}`, 'error');
+        return;
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        toast(`Move failed: ${body.error || res.status}`, 'error');
+        return;
+    }
+    toast(`Moved "${name}" to ${destName}`);
+    await loadFileTree();   // re-fetches the tree, re-expands ancestors, reloads contents
+}
+
+// Wire drop targets via event delegation — survives tree/subfolder re-renders.
+document.addEventListener('dragover', (ev) => {
+    if (!_fileDragIds.length && _folderDragId == null) return;
+    const node = ev.target.closest('[data-folder-id]');
+    if (!node) return;
+    if (!_canDropOn(node)) {
+        // Invalid destination (e.g. a folder's own subtree): refuse the drop
+        // outright rather than highlighting something the server would reject.
+        try { ev.dataTransfer.dropEffect = 'none'; } catch (_) {}
+        return;
+    }
+    ev.preventDefault();
+    try { ev.dataTransfer.dropEffect = 'move'; } catch (_) {}
+    document.querySelectorAll('.drop-target').forEach(n => {
+        if (n !== node) n.classList.remove('drop-target');
+    });
+    node.classList.add('drop-target');
+});
+document.addEventListener('dragleave', (ev) => {
+    if (!_fileDragIds.length && _folderDragId == null) return;
+    const node = ev.target.closest('[data-folder-id]');
+    // Moving between child elements inside the node isn't a real leave.
+    if (node && !node.contains(ev.relatedTarget)) node.classList.remove('drop-target');
+});
+document.addEventListener('drop', async (ev) => {
+    if (!_fileDragIds.length && _folderDragId == null) return;
+    const node = ev.target.closest('[data-folder-id]');
+    if (!node || !_canDropOn(node)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const target = _dropTargetFolderId(node);
+    if (target === undefined) { _resetDragState(); return; }
+
+    // Snapshot before resetting — the reset listener below also clears these.
+    const draggedFolder = _folderDragId;
+    const ids = _fileDragIds.slice();
+    const skipped = _fileDragSkipped;
+    _resetDragState();
+
+    if (draggedFolder != null) { await moveFolderTo(draggedFolder, target); return; }
+    if (target === fileCurrentFolderId) return;
+    await moveFilesToFolder(ids, target, skipped);
 });
 
 // ── Drag-state safety nets ──
@@ -768,6 +984,116 @@ document.addEventListener('dragleave', (ev) => {
     // thing that clears a stranded "Drop to upload" overlay in that case.
     if (ev.relatedTarget === null) _resetDragState();
 });
+
+// ── "Move to…" picker ──
+// Non-drag path to the same operations. Renders from fileTreeCache (already
+// loaded) rather than re-fetching, and disables destinations the server would
+// reject so the invalid case is unreachable rather than merely handled.
+let _moveKind = null;        // 'files' | 'folder'
+let _movePayload = null;     // array of file ids, or a single folder id
+let _moveBlocked = new Set();
+let _moveCurrentParent;      // the destination that is already the current one
+let _movePicked;             // undefined = nothing chosen; null = Root
+
+function openMoveModal(kind, payload) {
+    const modal = document.getElementById('file-move-modal');
+    if (!modal) return;
+    _moveKind = kind;
+    _movePayload = payload;
+    _movePicked = undefined;
+
+    const subtitle = document.getElementById('file-move-subtitle');
+    if (kind === 'folder') {
+        _moveBlocked = _folderSubtreeIds(payload);
+        const path = _findFolderPath(payload, fileTreeCache, []);
+        _moveCurrentParent = (path && path.length) ? path[path.length - 1] : null;
+        if (subtitle) subtitle.textContent = `Moving folder "${findFolderName(payload) || payload}"`;
+    } else {
+        _moveBlocked = new Set();
+        _moveCurrentParent = fileCurrentFolderId;
+        const n = payload.length;
+        if (subtitle) {
+            subtitle.textContent = n === 1
+                ? `Moving "${(fileListCache.find(f => f.id === payload[0]) || {}).original_name || ''}"`
+                : `Moving ${n} files`;
+        }
+    }
+    _renderMovePicker();
+    modal.classList.remove('hidden');
+}
+
+function closeMoveModal() {
+    const modal = document.getElementById('file-move-modal');
+    if (modal) modal.classList.add('hidden');
+    _moveKind = null; _movePayload = null; _movePicked = undefined;
+    _moveBlocked = new Set();
+}
+
+function _moveOptionRow(id, name, depth, icon) {
+    const blocked = id != null && _moveBlocked.has(id);
+    const isCurrent = id === _moveCurrentParent;
+    const disabled = blocked || isCurrent;
+    const selected = _movePicked !== undefined && _movePicked === id;
+    const note = blocked ? 'Can’t move into itself' : (isCurrent ? 'Already here' : '');
+    return `
+        <div class="move-option${disabled ? ' disabled' : ''}${selected ? ' selected' : ''}"
+             style="padding-left:${8 + depth * 14}px"
+             ${disabled ? 'aria-disabled="true"' : `role="option" aria-selected="${selected}" tabindex="0" data-move-target="${id == null ? 'root' : id}"`}>
+            <svg class="move-option-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${icon}"/>
+            </svg>
+            <span class="move-option-name">${esc(name)}</span>
+            ${note ? `<span class="move-option-note">${note}</span>` : ''}
+        </div>`;
+}
+
+function _renderMovePicker() {
+    const host = document.getElementById('file-move-tree');
+    const confirm = document.getElementById('file-move-confirm');
+    if (!host) return;
+    _wireMovePicker(host);
+    const FOLDER_D = 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z';
+    const walk = (nodes, depth) => (nodes || []).map(n =>
+        _moveOptionRow(n.id, n.name, depth, FOLDER_D) + walk(n.children, depth + 1)).join('');
+    host.innerHTML = _moveOptionRow(null, 'Root', 0, FOLDER_D) + walk(fileTreeCache, 1);
+    if (confirm) confirm.disabled = (_movePicked === undefined);
+}
+
+// Bound to the picker container, NOT document: .modal-content carries
+// onclick="event.stopPropagation()" (so overlay clicks can close the modal),
+// which means these events never reach document.
+function _wireMovePicker(host) {
+    if (!host || host._wired) return;
+    host._wired = true;
+    host.addEventListener('click', (ev) => {
+        const opt = ev.target.closest('[data-move-target]');
+        if (!opt || !host.contains(opt)) return;
+        const raw = opt.getAttribute('data-move-target');
+        _movePicked = raw === 'root' ? null : parseInt(raw, 10);
+        _renderMovePicker();
+    });
+    host.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        const opt = ev.target.closest && ev.target.closest('[data-move-target]');
+        if (!opt) return;
+        ev.preventDefault();
+        opt.click();
+    });
+}
+
+async function confirmMove() {
+    if (_movePicked === undefined) return;
+    const kind = _moveKind, payload = _movePayload, target = _movePicked;
+    closeMoveModal();
+    if (kind === 'folder') await moveFolderTo(payload, target);
+    else await moveFilesToFolder(payload, target);
+}
+
+// Bulk-bar entry point: move every currently selected file.
+function openMoveSelectedModal() {
+    if (!fileSelectedIds.size) return;
+    openMoveModal('files', _movableFileIds([...fileSelectedIds]));
+}
 
 // ── New Folder modal ──
 function openNewFolderModal() {
@@ -838,16 +1164,6 @@ async function deleteFolder(fid) {
     loadFileStats();
 }
 
-// Event delegation for folder-delete buttons in the sidebar tree
-document.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-del-folder]');
-    if (!btn) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    const id = parseInt(btn.getAttribute('data-del-folder'), 10);
-    if (!isNaN(id)) deleteFolder(id);
-});
-
 // ── Edit folder (rename + classified) ──
 function findFolder(fid) {
     if (fid == null) return null;
@@ -895,16 +1211,6 @@ async function confirmFolderEdit(ev) {
     await loadFileTree();
 }
 
-// Event delegation for folder edit buttons — survives re-rendering
-document.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-edit-folder]');
-    if (!btn) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    const id = parseInt(btn.getAttribute('data-edit-folder'), 10);
-    if (!isNaN(id)) openFolderEditModal(id);
-});
-
 async function deleteFile(id) {
     const match = fileListCache.find(x => x.id === id);
     const name = match ? match.original_name : `#${id}`;
@@ -927,15 +1233,6 @@ async function deleteFile(id) {
     await loadFolderContents(fileCurrentFolderId);
     loadFileStats();
 }
-
-// Event delegation for delete buttons — survives re-rendering
-document.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-del-file]');
-    if (!btn) return;
-    ev.preventDefault();
-    const id = parseInt(btn.getAttribute('data-del-file'), 10);
-    if (!isNaN(id)) deleteFile(id);
-});
 
 // ── Edit file (classified flag) ──
 function openFileEditModal(id) {
@@ -971,15 +1268,6 @@ async function confirmFileEdit(ev) {
     toast(t('files.saved') || 'Saved');
     await loadFolderContents(fileCurrentFolderId);
 }
-
-// Event delegation for file edit buttons — survives re-rendering
-document.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-edit-file]');
-    if (!btn) return;
-    ev.preventDefault();
-    const id = parseInt(btn.getAttribute('data-edit-file'), 10);
-    if (!isNaN(id)) openFileEditModal(id);
-});
 
 // ── Uploads ──
 function onFileUploadChange(ev) {

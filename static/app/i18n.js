@@ -45,6 +45,8 @@ const _i18n = {
         'files.edit_folder_title': 'Edit Folder',
         'files.expand': 'Expand',
         'files.collapse': 'Collapse',
+        'files.move_title': 'Move to',
+        'files.move_confirm': 'Move here',
 
         // Shared buttons
         'btn.cancel': 'Cancel',
@@ -365,6 +367,8 @@ const _i18n = {
         'files.edit_folder_title': 'แก้ไขโฟลเดอร์',
         'files.expand': 'ขยาย',
         'files.collapse': 'ย่อ',
+        'files.move_title': 'ย้ายไปที่',
+        'files.move_confirm': 'ย้ายมาที่นี่',
 
         // Shared buttons
         'btn.cancel': 'ยกเลิก',

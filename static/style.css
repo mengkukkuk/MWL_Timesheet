@@ -1709,8 +1709,9 @@ body {
     .file-row-size,
     .file-row-uploader,
     .file-row-date      { display: none; }
-    /* Always show actions on mobile (no hover state on touch) */
-    .file-row .file-row-actions { display: inline-flex; }
+    /* The "⋯" trigger is always rendered (no hover on touch) — just make it
+       fully opaque rather than waiting for a hover that never comes. */
+    .file-row .file-row-menu-btn { opacity: 1; }
 }
 
 /* ── Calendar: tighter cells on very small screens ── */
@@ -1870,7 +1871,9 @@ body {
 }
 .file-row:hover { background: #fafbff; }
 .file-row.selected { background: #eef2ff; }
-.file-row.drag-source { opacity: 0.5; }
+.file-row.drag-source,
+.folder-tree-node.drag-source,
+.subfolder-card.drag-source { opacity: 0.5; }
 .file-row-checkbox { grid-column: span 1; display: flex; align-items: center; }
 .file-row-name {
     grid-column: span 5;
@@ -1896,23 +1899,149 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.file-row-actions {
-    display: none;            /* shown on hover */
-    gap: 0.25rem;
+/* Overflow "⋯" trigger — replaces the old inline Preview/Download/Edit/Delete
+   row. Always rendered (so it stays tappable on touch, where there is no
+   hover) but dimmed until the row is hovered or the button is focused/open. */
+.file-row-menu-btn,
+.subfolder-menu-btn {
     margin-left: auto;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.45;
+    transition: opacity 0.12s, background 0.12s, color 0.12s;
 }
-.file-row:hover .file-row-actions { display: inline-flex; }
-.file-row-actions a, .file-row-actions button {
-    padding: 0.15rem 0.5rem;
-    font-size: 0.7rem;
-    border-radius: 0.25rem;
+.file-row:hover .file-row-menu-btn,
+.subfolder-card:hover .subfolder-menu-btn { opacity: 1; }
+.file-row-menu-btn:hover,
+.subfolder-menu-btn:hover { background: var(--indigo-light); color: var(--indigo); }
+.file-row-menu-btn:focus-visible,
+.subfolder-menu-btn:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--indigo);
+    outline-offset: -1px;
+}
+.file-row-menu-btn[aria-expanded="true"],
+.subfolder-menu-btn[aria-expanded="true"] {
+    opacity: 1;
+    background: var(--indigo-light);
+    color: var(--indigo);
+}
+
+/* Tree variant: the node is not a flex container, so this floats instead. */
+.folder-tree-menu-btn {
     border: none;
     background: transparent;
+    color: #9ca3af;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0 0.25rem;
+    border-radius: 0.25rem;
     cursor: pointer;
-    color: #6b7280;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
 }
-.file-row-actions a:hover { color: var(--indigo); background: var(--indigo-light); }
-.file-row-actions button.danger:hover { color: #dc2626; background: #fef2f2; }
+.folder-tree-node:hover .folder-tree-menu-btn { opacity: 1; }
+.folder-tree-menu-btn:hover { color: var(--indigo); }
+.folder-tree-menu-btn:focus-visible,
+.folder-tree-menu-btn[aria-expanded="true"] { opacity: 1; color: var(--indigo); outline: none; }
+
+/* Popover — mounted on <body> and fixed-positioned so it is never clipped by
+   .file-row-name's overflow:hidden. */
+.action-menu {
+    position: fixed;
+    z-index: 60;
+    min-width: 11rem;
+    padding: 0.25rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+    animation: actionMenuIn 0.12s ease-out;
+}
+.action-menu.hidden { display: none; }
+@keyframes actionMenuIn {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.action-menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 0.55rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    font-size: 0.8rem;
+    color: #374151;
+    text-align: left;
+    cursor: pointer;
+}
+.action-menu-item:hover,
+.action-menu-item:focus-visible {
+    background: var(--indigo-light);
+    color: var(--indigo);
+    outline: none;
+}
+.action-menu-item.danger { color: #dc2626; }
+.action-menu-item.danger:hover,
+.action-menu-item.danger:focus-visible { background: #fef2f2; color: #b91c1c; }
+.action-menu-icon { width: 1rem; height: 1rem; flex-shrink: 0; }
+.action-menu-sep { height: 1px; margin: 0.25rem 0.3rem; background: #f3f4f6; }
+
+/* ── "Move to…" destination picker ── */
+.move-tree {
+    max-height: 18rem;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    background: #fcfcfd;
+}
+.move-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.85rem;
+    color: #374151;
+    cursor: pointer;
+    user-select: none;
+}
+.move-option:hover { background: #eef2ff; }
+.move-option:focus-visible { outline: 2px solid var(--indigo); outline-offset: -2px; }
+.move-option.selected {
+    background: var(--indigo);
+    color: #fff;
+    font-weight: 500;
+}
+.move-option.selected .move-option-icon { color: #fff; }
+.move-option.disabled {
+    cursor: not-allowed;
+    color: #9ca3af;
+    background: transparent;
+}
+.move-option-icon { width: 1rem; height: 1rem; flex-shrink: 0; color: #818cf8; }
+.move-option-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.move-option-note {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    color: #9ca3af;
+    font-style: italic;
+}
+.move-confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Folder tree drop highlight */
 .folder-tree-node.drop-target {
