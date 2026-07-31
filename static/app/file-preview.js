@@ -1,6 +1,6 @@
 // Document preview module — renders PDF/DOCX/XLSX/PPTX/plain-text files inline
 // in the File Share preview modal. Lazy-loaded on demand via loadModuleOnce('file-preview')
-// from files.js; vendor libraries below are themselves lazy-loaded per file type so
+// from files.js; the vendor libraries below are themselves lazy-loaded per file type so
 // opening the Files tab never pulls in these (fairly large) parsers.
 //
 // Depends on: nothing from other modules — operates purely on the DOM element refs

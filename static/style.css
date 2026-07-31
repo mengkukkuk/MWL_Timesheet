@@ -1920,6 +1920,27 @@ body {
     box-shadow: inset 2px 0 0 #f59e0b;
 }
 
+/* Subfolder card drop highlight — mirrors .folder-tree-node.drop-target */
+.subfolder-card.drop-target {
+    background: #fef3c7;
+    border-color: #f59e0b;
+}
+
+/* Multi-file drag ghost — parked offscreen; setDragImage needs it in the DOM */
+.file-drag-ghost {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: var(--indigo);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
 /* Image preview lightbox */
 .file-preview-content {
     background: white;

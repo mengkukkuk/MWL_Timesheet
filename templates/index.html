@@ -508,7 +508,8 @@
 
                 <!-- Contents pane -->
                 <section class="card bg-white md:col-span-3 p-4 min-h-[24rem]" id="file-contents-pane"
-                         ondragover="onFileDragOver(event)" ondragleave="onFileDragLeave(event)" ondrop="onFileDrop(event)">
+                         ondragenter="onFileDragEnter(event)" ondragover="onFileDragOver(event)"
+                         ondragleave="onFileDragLeave(event)" ondrop="onFileDrop(event)">
                     <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
                         <nav id="file-breadcrumbs" class="flex items-center gap-1 text-sm text-gray-500 flex-wrap"></nav>
                         <div class="flex items-center gap-2">

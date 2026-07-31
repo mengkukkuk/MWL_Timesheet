@@ -107,7 +107,7 @@ function renderFileTree() {
     if (!host) return;
 
     let html = `<div class="folder-tree-node ${fileCurrentFolderId === null ? 'active' : ''}"
-                     onclick="selectFolder(null)">
+                     data-folder-id="root" onclick="selectFolder(null)">
                     <svg class="w-4 h-4 inline-block -mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                     </svg>
@@ -136,7 +136,7 @@ function renderTreeNodes(nodes, depth) {
         // float-right reverses DOM order: list X first → renders rightmost; rename second → appears to its left
         return `
         <div class="folder-tree-node ${isActive ? 'active' : ''}" style="padding-left:${pad}px"
-             onclick="selectFolder(${n.id})">
+             data-folder-id="${n.id}" onclick="selectFolder(${n.id})">
             ${toggle}
             <svg class="w-4 h-4 inline-block -mt-0.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
@@ -233,7 +233,8 @@ function renderSubfolders(folders) {
     if (!folders.length) { wrap.classList.add('hidden'); host.innerHTML = ''; return; }
     wrap.classList.remove('hidden');
     host.innerHTML = folders.map(f => `
-        <div onclick="selectFolder(${f.id})" class="flex items-center gap-2 p-2 border border-gray-200 rounded-md cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-colors">
+        <div onclick="selectFolder(${f.id})" data-folder-id="${f.id}"
+             class="subfolder-card flex items-center gap-2 p-2 border border-gray-200 rounded-md cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-colors">
             <svg class="w-5 h-5 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z"/>
             </svg>
@@ -612,71 +613,160 @@ function closeRecentUploads(ev) {
     if (modal) modal.classList.add('hidden');
 }
 
-// ── Drag-to-move (file row → folder tree node) ──
-let _fileDragId = null;
+// ── Drag-to-move (file rows → folder tree node or subfolder card) ──
+// Drop targets are any element carrying data-folder-id: sidebar tree nodes
+// (including Root, which uses the "root" sentinel) and subfolder cards.
+let _fileDragIds = [];      // ids currently being dragged (already permission-filtered)
+let _fileDragSkipped = 0;   // selected-but-not-movable count, reported after the move
+let _dragGhostEl = null;
+
+// Mirrors the `canMove` rule used at row-render time. Needed because checkboxes
+// render on every row (and select-all takes every visible file), while
+// draggable="true" is only set for movable rows — so a Staff selection can
+// legitimately contain files they cannot move.
+function _movableFileIds(ids) {
+    const elevated = isElevated();
+    return ids.filter(id => {
+        const f = fileListCache.find(x => x.id === id);
+        return !!f && (elevated || (currentUser && currentUser.id === f.uploaded_by));
+    });
+}
+
+// setDragImage needs the element in the document, so it's parked offscreen
+// via .file-drag-ghost rather than hidden.
+function _setMultiDragImage(ev, n) {
+    const ghost = document.createElement('div');
+    ghost.className = 'file-drag-ghost';
+    ghost.textContent = `${n} files`;
+    document.body.appendChild(ghost);
+    _dragGhostEl = ghost;
+    ev.dataTransfer.setDragImage(ghost, 12, 12);
+}
 
 function onFileDragStart(ev, id) {
-    _fileDragId = id;
+    // Grabbing a selected row drags the whole selection; grabbing an unselected
+    // row drags just that row (standard file-manager behaviour).
+    const base = fileSelectedIds.has(id) ? [...fileSelectedIds] : [id];
+    _fileDragIds = _movableFileIds(base);
+    _fileDragSkipped = base.length - _fileDragIds.length;
+    if (!_fileDragIds.length) { ev.preventDefault(); _resetDragState(); return; }
     try {
-        ev.dataTransfer.setData('text/plain', String(id));
+        ev.dataTransfer.setData('text/plain', _fileDragIds.join(','));
         ev.dataTransfer.effectAllowed = 'move';
+        if (_fileDragIds.length > 1) _setMultiDragImage(ev, _fileDragIds.length);
     } catch (_) {}
-    const row = ev.target.closest('.file-row');
-    if (row) row.classList.add('drag-source');
+    _fileDragIds.forEach(fid => {
+        const row = document.querySelector(`.file-row[data-file-id="${fid}"]`);
+        if (row) row.classList.add('drag-source');
+    });
+}
+
+// Single place that unwinds every drag artefact: the in-flight id list, the
+// upload overlay + its depth counter, row/target highlights and the drag ghost.
+function _resetDragState() {
+    _fileDragIds = [];
+    _fileDragSkipped = 0;
+    fileDragDepth = 0;
+    const ov = document.getElementById('file-drop-overlay');
+    if (ov) ov.classList.add('hidden');
+    document.querySelectorAll('.file-row.drag-source').forEach(r => r.classList.remove('drag-source'));
+    document.querySelectorAll('.drop-target').forEach(n => n.classList.remove('drop-target'));
+    if (_dragGhostEl) { _dragGhostEl.remove(); _dragGhostEl = null; }
 }
 
 function onFileDragEnd(ev) {
-    _fileDragId = null;
-    document.querySelectorAll('.file-row.drag-source').forEach(r => r.classList.remove('drag-source'));
-    document.querySelectorAll('.folder-tree-node.drop-target').forEach(n => n.classList.remove('drop-target'));
+    _resetDragState();
 }
 
-// Wire folder tree nodes as move-targets via event delegation.
+// → null for Root, an int for a folder, undefined if the node isn't a target.
+// Explicit about Root because parseInt('') is NaN and JSON.stringify turns NaN
+// into null — which would silently *look* like a correct move to root.
+function _dropTargetFolderId(node) {
+    const raw = node.getAttribute('data-folder-id');
+    if (raw === 'root') return null;
+    const n = parseInt(raw, 10);
+    return Number.isNaN(n) ? undefined : n;
+}
+
+// Sequential, not parallel: db.py caches one pyodbc connection per thread and
+// Waitress's pool is small, so N concurrent POSTs cost threads for no gain.
+// Matches the idiom already used by uploadFiles().
+async function _moveFilesTo(ids, target) {
+    let ok = 0;
+    const failures = [];
+    for (const id of ids) {
+        try {
+            const res = await fetch(`/api/files/${id}/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder_id: target }),
+            });
+            const body = await res.json().catch(() => ({}));
+            if (res.ok) ok++;
+            else failures.push(body.error || res.status);
+        } catch (e) {
+            failures.push(e.message || e);
+        }
+    }
+    return { ok, failures };
+}
+
+// Wire drop targets via event delegation — survives tree/subfolder re-renders.
 document.addEventListener('dragover', (ev) => {
-    if (_fileDragId == null) return;
-    const node = ev.target.closest('.folder-tree-node');
+    if (!_fileDragIds.length) return;
+    const node = ev.target.closest('[data-folder-id]');
     if (!node) return;
     ev.preventDefault();
     try { ev.dataTransfer.dropEffect = 'move'; } catch (_) {}
-    document.querySelectorAll('.folder-tree-node.drop-target').forEach(n => n.classList.remove('drop-target'));
+    document.querySelectorAll('.drop-target').forEach(n => {
+        if (n !== node) n.classList.remove('drop-target');
+    });
     node.classList.add('drop-target');
 });
 document.addEventListener('dragleave', (ev) => {
-    if (_fileDragId == null) return;
-    const node = ev.target.closest('.folder-tree-node');
-    if (node) node.classList.remove('drop-target');
+    if (!_fileDragIds.length) return;
+    const node = ev.target.closest('[data-folder-id]');
+    // Moving between child elements inside the node isn't a real leave.
+    if (node && !node.contains(ev.relatedTarget)) node.classList.remove('drop-target');
 });
 document.addEventListener('drop', async (ev) => {
-    if (_fileDragId == null) return;
-    const node = ev.target.closest('.folder-tree-node');
+    if (!_fileDragIds.length) return;
+    const node = ev.target.closest('[data-folder-id]');
     if (!node) return;
     ev.preventDefault();
     ev.stopPropagation();
-    // Resolve target folder id from the node — the Root node has onclick="selectFolder(null)"
-    const onclickAttr = node.getAttribute('onclick') || '';
-    const m = /selectFolder\(([^)]+)\)/.exec(onclickAttr);
-    let target = null;
-    if (m && m[1].trim() !== 'null') target = parseInt(m[1], 10);
-    if (target === fileCurrentFolderId) { onFileDragEnd(); return; }
-    const movedId = _fileDragId;
-    onFileDragEnd();
-    try {
-        const res = await fetch(`/api/files/${movedId}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder_id: target }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            toast(`Move failed: ${body.error || res.status}`, 'error');
-            return;
-        }
-        toast('File moved');
-        await loadFolderContents(fileCurrentFolderId);
-        loadFolderStats();
-    } catch (e) {
-        toast(`Move error: ${e.message || e}`, 'error');
+    const target = _dropTargetFolderId(node);
+    if (target === undefined) { _resetDragState(); return; }
+    // Snapshot before resetting — the reset listener below also clears these.
+    const ids = _fileDragIds.slice();
+    const skipped = _fileDragSkipped;
+    _resetDragState();
+    if (target === fileCurrentFolderId) return;
+
+    const destName = target == null ? 'Root' : (findFolderName(target) || `Folder #${target}`);
+    const { ok, failures } = await _moveFilesTo(ids, target);
+    if (ok) toast(`Moved ${ok} file${ok === 1 ? '' : 's'} to ${destName}`);
+    if (failures.length) {
+        toast(`${failures.length} move${failures.length === 1 ? '' : 's'} failed (e.g. ${failures[0]})`, 'error');
     }
+    if (skipped) {
+        toast(`${skipped} file${skipped === 1 ? '' : 's'} skipped — you can only move your own uploads.`, 'error');
+    }
+    clearFileSelection();
+    await loadFolderContents(fileCurrentFolderId);
+    loadFolderStats();
+});
+
+// ── Drag-state safety nets ──
+// MUST be registered after the move-drop listener above: this one clears
+// _fileDragIds, and listeners on the same node fire in registration order.
+document.addEventListener('dragend', _resetDragState);
+document.addEventListener('drop', _resetDragState);
+document.addEventListener('dragleave', (ev) => {
+    // relatedTarget === null means the pointer left the window entirely.
+    // `dragend` never fires for an external OS file drag, so this is the only
+    // thing that clears a stranded "Drop to upload" overlay in that case.
+    if (ev.relatedTarget === null) _resetDragState();
 });
 
 // ── New Folder modal ──
@@ -1121,13 +1211,32 @@ async function uploadFiles(files) {
     loadFileStats();
 }
 
-function onFileDragOver(ev) {
+// The "Drop to upload" overlay is for external file drags only — an internal
+// row drag is a *move*, so raising an upload affordance would be misleading.
+// Internal drags carry only text/plain; OS file drags carry the "Files" type.
+function _isExternalFileDrag(ev) {
+    if (_fileDragIds.length) return false;              // internal move in flight
+    const types = ev.dataTransfer && ev.dataTransfer.types;
+    return !!types && Array.prototype.includes.call(types, 'Files');
+}
+
+// The ONLY place fileDragDepth is incremented. dragenter fires once per element
+// entered, so the counter stays balanced against dragleave.
+function onFileDragEnter(ev) {
+    if (!_isExternalFileDrag(ev)) return;
     ev.preventDefault();
     fileDragDepth++;
     const ov = document.getElementById('file-drop-overlay');
-    const pane = document.getElementById('file-contents-pane');
     if (ov) ov.classList.remove('hidden');
-    if (pane) pane.classList.add('relative');
+}
+
+function onFileDragOver(ev) {
+    // dragover fires continuously, so it must NOT touch fileDragDepth — that
+    // was the bug that left the dashed border stuck on screen. preventDefault
+    // is still required on every fire or the browser refuses the drop.
+    if (!_isExternalFileDrag(ev)) return;
+    ev.preventDefault();
+    try { ev.dataTransfer.dropEffect = 'copy'; } catch (_) {}
 }
 
 function onFileDragLeave(ev) {
@@ -1139,11 +1248,13 @@ function onFileDragLeave(ev) {
 }
 
 function onFileDrop(ev) {
-    ev.preventDefault();
+    ev.preventDefault();   // stop the browser navigating to the dropped file
     fileDragDepth = 0;
     const ov = document.getElementById('file-drop-overlay');
     if (ov) ov.classList.add('hidden');
     const files = ev.dataTransfer && ev.dataTransfer.files;
+    // Empty file list = internal move drop (e.g. onto a subfolder card, which
+    // lives inside this pane); the delegated move handler owns that case.
     if (!files || !files.length) return;
     uploadFiles(Array.from(files));
 }
