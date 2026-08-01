@@ -18,7 +18,7 @@
     <script defer src="/static/app/calendar.js?v={{ static_v('app/calendar.js') }}"></script>
     <script defer src="/static/app/allowance.js?v={{ static_v('app/allowance.js') }}"></script>
     <script defer src="/static/app/export.js?v={{ static_v('app/export.js') }}"></script>
-    <!-- Bootstrap shim runs last among defers — fires `modulesLoaded` event for legacy listeners. -->
+    <!-- Bootstrap shim runs last among deferring — fires `modulesLoaded` event for legacy listeners. -->
     <script defer src="/static/app.js?v={{ static_v('app.js') }}"></script>
     <!-- Cache-busting versions for lazy-loaded modules (used by loadModuleOnce in core.js) -->
     <script>window.STATIC_V={"settings":{{ static_v('app/settings.js') }},"files":{{ static_v('app/files.js') }},"projects-summary":{{ static_v('app/projects-summary.js') }},"draft":{{ static_v('app/draft.js') }},"file-preview":{{ static_v('app/file-preview.js') }}};</script>
@@ -73,7 +73,7 @@
 <body class="bg-gray-50 min-h-screen">
 
     <!-- Top Nav -->
-    <nav class="bg-white shadow-sm border-b border-gray-200">
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <!-- Logo -->
             <div class="flex items-center gap-3 flex-none">

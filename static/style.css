@@ -1974,6 +1974,28 @@ body {
     from { opacity: 0; transform: translateY(-4px) scale(0.98); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+/* Caret tethering the popover to the row it belongs to — opens beside the
+   item, so this reads as a flyout of that row rather than a stray popup. */
+.action-menu::before {
+    content: '';
+    position: absolute;
+    top: var(--menu-arrow-top, 14px);
+    left: -5px;
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border-left: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    transform: rotate(45deg);
+}
+.action-menu.flip-left::before {
+    left: auto;
+    right: -5px;
+    border-left: none;
+    border-bottom: none;
+    border-right: 1px solid #e5e7eb;
+    border-top: 1px solid #e5e7eb;
+}
 .action-menu-item {
     width: 100%;
     display: flex;

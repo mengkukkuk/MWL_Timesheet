@@ -135,7 +135,7 @@ function renderTreeNodes(nodes, depth) {
             </button>` : `<span class="inline-block w-4 h-4 flex-shrink-0"></span>`;
         return `
         <div class="folder-tree-node ${isActive ? 'active' : ''}" style="padding-left:${pad}px"
-             data-folder-id="${n.id}" onclick="selectFolder(${n.id})"
+             data-folder-id="${n.id}" onclick="if (!event.target.closest('[data-folder-menu]')) selectFolder(${n.id})"
              ${canManage ? `draggable="true" ondragstart="onFolderDragStart(event, ${n.id})" ondragend="onFileDragEnd(event)"` : ''}>
             ${toggle}
             <svg class="w-4 h-4 inline-block -mt-0.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,7 +231,7 @@ function renderSubfolders(folders) {
     wrap.classList.remove('hidden');
     const canManage = isElevated();
     host.innerHTML = folders.map(f => `
-        <div onclick="selectFolder(${f.id})" data-folder-id="${f.id}"
+        <div onclick="if (!event.target.closest('[data-folder-menu]')) selectFolder(${f.id})" data-folder-id="${f.id}"
              ${canManage ? `draggable="true" ondragstart="onFolderDragStart(event, ${f.id})" ondragend="onFileDragEnd(event)"` : ''}
              class="subfolder-card flex items-center gap-2 p-2 border border-gray-200 rounded-md cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-colors">
             <svg class="w-5 h-5 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -396,14 +396,23 @@ function _openActionMenu(btn, items) {
     menu._items = items;
     menu.classList.remove('hidden');
 
-    // Anchor below the button, right-aligned; flip above if it would overflow.
-    const r = btn.getBoundingClientRect();
+    // Anchor beside the selected row/node (not just the small "..." button),
+    // so the popover reads as a flyout of the item rather than a stray corner
+    // popup. Opens to the right of the item; flips to the left if it would
+    // overflow off the right edge, and clamps vertically within the viewport.
+    const anchor = btn.closest('.folder-tree-node, .file-row, .subfolder-card') || btn;
+    const r = anchor.getBoundingClientRect();
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
-    let left = Math.min(r.right - mw, window.innerWidth - mw - 8);
-    let top = r.bottom + 4;
-    if (top + mh > window.innerHeight - 8) top = r.top - mh - 4;
+    const openLeft = r.right + 6 + mw > window.innerWidth - 8;
+    let left = openLeft ? r.left - mw - 6 : r.right + 6;
+    let top = Math.min(r.top, window.innerHeight - mh - 8);
     menu.style.left = Math.max(8, left) + 'px';
     menu.style.top = Math.max(8, top) + 'px';
+    menu.classList.toggle('flip-left', openLeft);
+    // Tether the little caret to the row's vertical center so the popover
+    // visibly connects to the item it belongs to, even if `top` got clamped.
+    const arrowTop = Math.max(10, Math.min(mh - 18, (r.top + r.height / 2) - Math.max(8, top) - 4));
+    menu.style.setProperty('--menu-arrow-top', arrowTop + 'px');
 
     _openMenuBtn = btn;
     btn.setAttribute('aria-expanded', 'true');
