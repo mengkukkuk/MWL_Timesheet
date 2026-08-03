@@ -21,7 +21,12 @@
     <!-- Bootstrap shim runs last among deferring — fires `modulesLoaded` event for legacy listeners. -->
     <script defer src="/static/app.js?v={{ static_v('app.js') }}"></script>
     <!-- Cache-busting versions for lazy-loaded modules (used by loadModuleOnce in core.js) -->
-    <script>window.STATIC_V={"settings":{{ static_v('app/settings.js') }},"files":{{ static_v('app/files.js') }},"projects-summary":{{ static_v('app/projects-summary.js') }},"draft":{{ static_v('app/draft.js') }},"file-preview":{{ static_v('app/file-preview.js') }}};</script>
+    <script>window.STATIC_V={"settings":"{{ static_v('app/settings.js')}}",
+                        "files":"{{ static_v('app/files.js') }}",
+                        "projects-summary":"{{ static_v('app/projects-summary.js') }}",
+                        "draft":"{{ static_v('app/draft.js') }}",
+                        "file-preview":"{{ static_v('app/file-preview.js') }}"};
+    </script>
     <style>
 /* ── Projects Summary Dashboard ─────────────────────── */
 .ps-dash-title{font-family:'Syne',-apple-system,sans-serif;font-size:1.375rem;font-weight:800;color:#0f172a;letter-spacing:-.03em}
