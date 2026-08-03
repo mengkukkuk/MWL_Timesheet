@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Team Work Log</title>
+    <title>MWL-Timesheet-Login</title>
     <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
     <!-- auth.css must come last: it owns this page's layout and overrides the
@@ -28,14 +28,13 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                     </svg>
                 </div>
-                <div class="logo-text" data-i18n="login.title">Team Work Log</div>
+                <div class="logo-text" data-i18n="login.title">MWL-Timesheet</div>
             </div>
 
             <!-- Login Form -->
             <form id="login-form" onsubmit="handleLogin(event)">
                 <div class="form-header">
                     <h1 class="form-title" data-i18n="login.sign_in">Sign In</h1>
-                    <p class="form-subtitle" data-i18n="login.sign_in_sub">Access your timesheet and work logs</p>
                 </div>
 
                 <div id="login-error" class="error-msg hidden"></div>

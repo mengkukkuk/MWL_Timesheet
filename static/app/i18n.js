@@ -252,7 +252,7 @@ const _i18n = {
         'modal.staff_desc': 'Regular staff member',
 
         // Login page
-        'login.title': 'Team Work Log',
+        'login.title': 'MWL-Timesheet',
         'login.sign_in': 'Sign In',
         'login.sign_in_sub': 'Access your timesheet and work logs',
         'login.create_sub': 'Set up your team work log account',
@@ -574,7 +574,7 @@ const _i18n = {
         'modal.staff_desc': 'Staff',
 
         // Login page
-        'login.title': 'Team Work Log',
+        'login.title': 'MWL-Timesheet',
         'login.sign_in': 'เข้าสู่ระบบ',
         'login.sign_in_sub': 'เข้าถึงตารางเวลาและบันทึกการทำงานของคุณ',
         'login.create_sub': 'ตั้งค่าบัญชีบันทึกการทำงานของคุณ',
