@@ -20,6 +20,34 @@ async function loadWorklogs() {
     applyFilters();
 }
 
+async function prevMonth() {
+    const year  = parseInt(document.getElementById('year-select').value, 10);
+    const month = parseInt(document.getElementById('month-select').value, 10);
+
+    if (month === 1) {
+        document.getElementById('year-select').value = (year - 1).toString();
+        document.getElementById('month-select').value = '12';
+    } else {
+        document.getElementById('month-select').value = (month - 1).toString();
+    }
+
+    await loadWorklogs();
+}
+
+async function nextMonth() {
+    const year  = parseInt(document.getElementById('year-select').value, 10);
+    const month = parseInt(document.getElementById('month-select').value, 10);
+
+    if (month === 12) {
+        document.getElementById('year-select').value = (year + 1).toString();
+        document.getElementById('month-select').value = '1';
+    } else {
+        document.getElementById('month-select').value = (month + 1).toString();
+    }
+
+    await loadWorklogs();
+}
+
 function populateFilterProject() {
     const sel = document.getElementById('filter-project');
     const val = sel.value;

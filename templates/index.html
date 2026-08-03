@@ -284,7 +284,9 @@
                 <!-- Month selector + view toggle -->
                 <div class="flex items-center gap-2 flex-none">
                     <label class="text-sm font-medium text-gray-600" data-i18n="wl.month_label">Month:</label>
+                    <button id="btn-prev-month" class="btn-icon-prev" onclick="prevMonth()" title="Previous month" aria-label="Previous month"></button>
                     <select id="month-select" onchange="loadWorklogs()" class="input-field w-36"></select>
+                    <button id="btn-next-month" class="btn-icon-next" onclick="nextMonth()" title="Next month" aria-label="Next month"></button>
                 </div>
                 <div class="view-toggle flex-none" id="view-toggle">
                     <button id="toggle-table" class="view-toggle-btn active" onclick="setWorklogView('table')" title="Table view" aria-label="Table view">
