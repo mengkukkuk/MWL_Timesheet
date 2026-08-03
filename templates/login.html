@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MWL-Timesheet-Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
     <!-- auth.css must come last: it owns this page's layout and overrides the
@@ -12,7 +14,11 @@
          it means the login screen still renders after a `git pull` that hasn't
          been followed by `npm run build:css` (tailwind.css is gitignored). -->
     <link rel="stylesheet" href="/static/auth.css?v={{ static_v('auth.css') }}">
-    <script src="/static/app/i18n.js?v={{ static_v('app/i18n.js') }}"></script>
+    <!-- defer: i18n.js only needs to be ready before DOMContentLoaded (it
+         registers its own applyTranslations() listener); nothing on this page
+         calls t() synchronously during parse, so deferring it unblocks the
+         initial HTML parse/render instead of stalling on a 38KB script fetch. -->
+    <script defer src="/static/app/i18n.js?v={{ static_v('app/i18n.js') }}"></script>
 </head>
 <body>
 
