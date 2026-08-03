@@ -2671,8 +2671,8 @@ body {
     animation: revealUp 0.42s cubic-bezier(.2,.8,.3,1) both;
     animation-delay: calc(var(--i, 0) * 28ms);
 }
-#overall-member-grid.dir-prev .reveal-up { --dx: -14px; }
-#overall-member-grid.dir-next .reveal-up { --dx: 14px; }
+.dir-prev .reveal-up { --dx: -14px; }
+.dir-next .reveal-up { --dx: 14px; }
 
 @keyframes revealUp {
     from { opacity: 0; transform: translate3d(var(--dx, 0), 8px, 0); }

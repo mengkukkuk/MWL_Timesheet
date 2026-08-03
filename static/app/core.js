@@ -172,13 +172,17 @@ function countUp(el, to, ms = 600) {
     requestAnimationFrame(step);
 }
 
-// Ties the button press to the data change: the grid enters from the
-// direction of travel.
+// Ties the button press to the data change: the target enters from the
+// direction of travel. Shared by the Overall dashboard grid and the
+// Work Log table/calendar.
+function setDirClass(el, dir) {
+    if (!el) return;
+    el.classList.remove('dir-prev', 'dir-next');
+    el.classList.add(dir === 'prev' ? 'dir-prev' : 'dir-next');
+}
+
 function setMonthNavDirection(dir) {
-    const grid = document.getElementById('overall-member-grid');
-    if (!grid) return;
-    grid.classList.remove('dir-prev', 'dir-next');
-    grid.classList.add(dir === 'prev' ? 'dir-prev' : 'dir-next');
+    setDirClass(document.getElementById('overall-member-grid'), dir);
 }
 
 const REVEAL_STAGGER_CAP = 11;   // a 40-person team shouldn't take 1.1s to appear

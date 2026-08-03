@@ -31,6 +31,8 @@ async function prevMonth() {
         document.getElementById('month-select').value = (month - 1).toString();
     }
 
+    setDirClass(document.getElementById('worklog-body'), 'prev');
+    setDirClass(document.getElementById('cal-body'), 'prev');
     await loadWorklogs();
 }
 
@@ -45,6 +47,8 @@ async function nextMonth() {
         document.getElementById('month-select').value = (month + 1).toString();
     }
 
+    setDirClass(document.getElementById('worklog-body'), 'next');
+    setDirClass(document.getElementById('cal-body'), 'next');
     await loadWorklogs();
 }
 
@@ -184,9 +188,10 @@ function renderWorklogs(data) {
     }
     empty.classList.add('hidden');
 
-    data.forEach(w => {
+    data.forEach((w, idx) => {
         const tr = document.createElement('tr');
         tr.className = 'border-b border-gray-100';
+        revealStagger(tr, idx);
         const dateStr   = formatDate(w.log_date);
         const statusCls = w.status === 'Done' ? 'badge-done' : w.status === 'In Progress' ? 'badge-progress' : w.status === 'Man day' ? 'badge-manday' : 'badge-pending';
         const isSelected = worklogSelectedIds.has(w.id);

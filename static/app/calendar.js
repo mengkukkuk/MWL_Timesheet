@@ -51,6 +51,7 @@ function renderCalendar(data) {
     for (let i = 0; i < totalCells; i++) {
         const cell = document.createElement('div');
         cell.className = 'cal-cell';
+        revealStagger(cell, i);
 
         const dayNum = i - startDow + 1;
         const isOutside = dayNum < 1 || dayNum > daysInMonth;
