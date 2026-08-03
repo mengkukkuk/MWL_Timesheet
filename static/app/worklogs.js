@@ -661,6 +661,10 @@ function populateProjectDropdown() {
 
 async function saveWorklog(e) {
     e.preventDefault();
+    return withBusy(document.getElementById('modal-save-btn'), _saveWorklogEntries);
+}
+
+async function _saveWorklogEntries() {
     const id       = document.getElementById('wl-id').value;
     const dateFrom = document.getElementById('wl-date-from').value;
     const dateTo   = document.getElementById('wl-date-to').value;

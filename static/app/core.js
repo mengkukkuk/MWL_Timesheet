@@ -60,8 +60,139 @@ function loadChartJs() {
     return _chartJsPromise;
 }
 
+// ── UI motion helpers ──
+function _prefersReducedMotion() {
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Slides the 2px indicator under the active nav tab.
+// --rail-y is needed as well as --rail-x because the tab strip is flex-wrap.
+function positionNavRail() {
+    const rail = document.getElementById('nav-rail');
+    if (!rail) return;
+    const active = document.querySelector('.nav-tabs .tab-btn.active');
+    if (!active || !active.offsetWidth) { rail.classList.remove('is-ready'); return; }
+    rail.style.setProperty('--rail-x', active.offsetLeft + 'px');
+    rail.style.setProperty('--rail-y', (active.offsetTop + active.offsetHeight) + 'px');
+    rail.style.setProperty('--rail-w', active.offsetWidth + 'px');
+    rail.classList.add('is-ready');
+}
+
+// One mechanism covers resize, wrapping, tab unhide and the TH/EN label swap.
+function watchNavRail() {
+    const strip = document.querySelector('.nav-tabs');
+    if (!strip) return;
+    let frame = null;
+    const remeasure = () => {
+        if (frame) return;
+        frame = requestAnimationFrame(() => { frame = null; positionNavRail(); });
+    };
+    if (window.ResizeObserver) {
+        const ro = new ResizeObserver(remeasure);
+        ro.observe(strip);
+        strip.querySelectorAll('.tab-btn').forEach(btn => ro.observe(btn));
+    }
+    window.addEventListener('resize', remeasure);
+    remeasure();
+}
+
+// The nav sits flat at rest and only lifts once it actually overlays content.
+function watchNavScroll() {
+    const nav = document.querySelector('.app-nav');
+    if (!nav) return;
+    let ticking = false;
+    const update = () => {
+        ticking = false;
+        nav.classList.toggle('is-scrolled', window.scrollY > 4);
+    };
+    window.addEventListener('scroll', () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(update);
+    }, { passive: true });
+    update();
+}
+
+// ── Busy state ──
+const BUSY_SHOW_DELAY_MS = 180;   // fast responses never flash the bar
+let _busyCount = 0;
+let _busyTimer = null;
+
+function beginBusy() {
+    _busyCount++;
+    if (_busyCount !== 1 || _busyTimer) return;
+    _busyTimer = setTimeout(() => {
+        _busyTimer = null;
+        const bar = document.getElementById('page-progress');
+        if (bar) bar.classList.add('is-busy');
+    }, BUSY_SHOW_DELAY_MS);
+}
+
+function endBusy() {
+    _busyCount = Math.max(0, _busyCount - 1);
+    if (_busyCount > 0) return;
+    if (_busyTimer) { clearTimeout(_busyTimer); _busyTimer = null; }
+    const bar = document.getElementById('page-progress');
+    if (bar) bar.classList.remove('is-busy');
+}
+
+// Pins the width first so swapping the label for a spinner doesn't reflow.
+async function withBusy(btn, fn) {
+    if (!btn) return fn();
+    const prevWidth = btn.style.minWidth;
+    btn.style.minWidth = btn.offsetWidth + 'px';
+    btn.disabled = true;
+    btn.classList.add('is-saving');
+    try {
+        return await fn();
+    } finally {
+        btn.classList.remove('is-saving');
+        btn.disabled = false;
+        btn.style.minWidth = prevWidth;
+    }
+}
+
+function countUp(el, to, ms = 600) {
+    if (!el) return;
+    const target = Number(to);
+    if (!Number.isFinite(target)) { el.textContent = to; return; }
+    const from = Number(el.textContent);
+    const decimals = String(to).includes('.') ? 1 : 0;
+    if (_prefersReducedMotion() || !Number.isFinite(from) || from === target) {
+        el.textContent = target.toFixed(decimals);
+        return;
+    }
+    const start = performance.now();
+    const step = now => {
+        const p = Math.min(1, (now - start) / ms);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = (from + (target - from) * eased).toFixed(decimals);
+        if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
+
+// Ties the button press to the data change: the grid enters from the
+// direction of travel.
+function setMonthNavDirection(dir) {
+    const grid = document.getElementById('overall-member-grid');
+    if (!grid) return;
+    grid.classList.remove('dir-prev', 'dir-next');
+    grid.classList.add(dir === 'prev' ? 'dir-prev' : 'dir-next');
+}
+
+const REVEAL_STAGGER_CAP = 11;   // a 40-person team shouldn't take 1.1s to appear
+function revealStagger(el, index) {
+    if (!el) return;
+    el.style.setProperty('--i', Math.min(index, REVEAL_STAGGER_CAP));
+    el.classList.add('reveal-up');
+}
+
 // ── Init ──
 async function initializeApp() {
+    watchNavRail();
+    watchNavScroll();
+
     // Background glow tracking
     document.addEventListener('mousemove', e => {
         const x = (e.clientX / window.innerWidth) * 100;
@@ -190,6 +321,7 @@ function OnPreviousMonth() {
     const prev = new Date(curYear, curMonth - 1 - 1, 1); // JS months are 0-indexed
     monthSel.value = prev.getMonth() + 1;
     yearSel.value = prev.getFullYear();
+    setMonthNavDirection('prev');
     onContextChange();
     onOverallMonthChange();
 }
@@ -203,6 +335,7 @@ function OnNextMonth() {
     const next = new Date(curYear, curMonth - 1 + 1, 1); // JS months are 0-indexed
     monthSel.value = next.getMonth() + 1;
     yearSel.value = next.getFullYear();
+    setMonthNavDirection('next');
     onContextChange();
     onOverallMonthChange();
 }
@@ -218,6 +351,7 @@ async function showTab(name) {
         if (viewEl) viewEl.classList.toggle('hidden', t !== name);
         if (tabEl)  tabEl.classList.toggle('active', t === name);
     });
+    positionNavRail();
     // persist last selected tab so page reload restores it
     try { localStorage.setItem('lastTab', name); } catch (e) {}
 
@@ -288,27 +422,32 @@ async function api(url, opts = {}) {
         opts.headers = { 'Content-Type': 'application/json', ...opts.headers };
         opts.body = JSON.stringify(opts.body);
     }
-    const res = await fetch(url, opts);
-    if (res.status === 401) {
-        window.location.href = '/login';
-        return null;
-    }
-    if (res.status === 403) {
-        toast('Permission denied', 'error');
-        return null;
-    }
-    if (!res.ok && res.status !== 400) {
-        toast('Server error - please try again', 'error');
-        return null;
-    }
+    beginBusy();
     try {
-        return await res.json();
-    } catch (err) {
-        if (res.status === 400) {
-            return { error: 'Request failed' };
+        const res = await fetch(url, opts);
+        if (res.status === 401) {
+            window.location.href = '/login';
+            return null;
         }
-        toast('Server error - please try again', 'error');
-        return null;
+        if (res.status === 403) {
+            toast('Permission denied', 'error');
+            return null;
+        }
+        if (!res.ok && res.status !== 400) {
+            toast('Server error - please try again', 'error');
+            return null;
+        }
+        try {
+            return await res.json();
+        } catch (err) {
+            if (res.status === 400) {
+                return { error: 'Request failed' };
+            }
+            toast('Server error - please try again', 'error');
+            return null;
+        }
+    } finally {
+        endBusy();
     }
 }
 

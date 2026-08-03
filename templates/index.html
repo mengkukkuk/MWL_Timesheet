@@ -77,15 +77,18 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 
+    <!-- Route-level loading indicator -->
+    <div id="page-progress" class="page-progress" aria-hidden="true"><span class="page-progress-bar"></span></div>
+
     <!-- Top Nav -->
-    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <nav class="app-nav border-b border-gray-200 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <!-- Logo -->
             <div class="flex items-center gap-3 flex-none">
                 <img src="/static/mwllogo.png?v={{ static_v('mwllogo.png') }}" alt="MWL Timesheet" style="height:36px;width:auto;">
             </div>
             <!-- Tab buttons — grow to fill, wrap on small screens -->
-            <div class="flex items-center gap-1 flex-wrap flex-1 justify-center min-w-0 py-0.5">
+            <div class="nav-tabs flex items-center gap-1 flex-wrap flex-1 justify-center min-w-0 py-0.5">
                 <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn active px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.dashboard">Dashboard</button>
                 <button onclick="showTab('worklog')" id="tab-worklog" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.worklog">Work Log</button>
                 <button onclick="showTab('allowance')" id="tab-allowance" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium" data-i18n="nav.allowance">Allowance</button>
@@ -95,6 +98,7 @@
                     <span data-i18n="nav.settings">Settings</span>
                     <span id="nav-pending-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center" style="display:none">0</span>
                 </button>
+                <span id="nav-rail" class="nav-rail" aria-hidden="true"></span>
             </div>
             <!-- User controls — always pushed to end -->
             <div class="flex items-center gap-2 flex-none ml-auto">
@@ -180,13 +184,13 @@
             <div id="dashboard-content" class="hidden">
                 <!-- Export Buttons -->
                 <div class="flex flex-wrap justify-end mb-4 gap-2">
-                    <button id="btn-export-multiple" onclick="openBulkExportModal()" class="hidden inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors">
+                    <button id="btn-export-multiple" onclick="openBulkExportModal()" class="btn-lift hidden inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                         <span data-i18n="dash.export_multiple">Export Multiple</span>
                     </button>
-                    <button onclick="exportToExcel()" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors">
+                    <button id="btn-export-single" onclick="exportToExcel()" class="btn-lift inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg shadow-sm">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
@@ -198,15 +202,15 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div class="card bg-white">
                         <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.total_hours">Total Hours</p>
-                        <p id="dash-total-hours" class="text-2xl font-bold text-indigo-600 mt-1">0</p>
+                        <p id="dash-total-hours" class="kpi-num text-2xl font-bold text-indigo-600 mt-1">0</p>
                     </div>
                     <div class="card bg-white">
                         <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.tasks_done">Tasks Done</p>
-                        <p id="dash-total-done" class="text-2xl font-bold text-green-600 mt-1">0</p>
+                        <p id="dash-total-done" class="kpi-num text-2xl font-bold text-green-600 mt-1">0</p>
                     </div>
                     <div class="card bg-white">
                         <p class="text-xs text-gray-500 uppercase tracking-wide" data-i18n="dash.in_progress_card">In Progress</p>
-                        <p id="dash-total-ip" class="text-2xl font-bold text-yellow-600 mt-1">0</p>
+                        <p id="dash-total-ip" class="kpi-num text-2xl font-bold text-yellow-600 mt-1">0</p>
                     </div>
                 </div>
 

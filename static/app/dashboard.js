@@ -8,9 +8,9 @@ async function loadDashboard() {
         return;
     }
 
-    document.getElementById('dash-total-hours').textContent = data.total_hours;
-    document.getElementById('dash-total-done').textContent = data.total_done;
-    document.getElementById('dash-total-ip').textContent = data.total_in_progress;
+    countUp(document.getElementById('dash-total-hours'), data.total_hours);
+    countUp(document.getElementById('dash-total-done'), data.total_done);
+    countUp(document.getElementById('dash-total-ip'), data.total_in_progress);
     document.getElementById('dash-lvl').textContent = data.member.level;
     document.getElementById('dash-name').textContent = data.member.name;
     document.getElementById('dash-dept').textContent = data.member.department;
@@ -37,9 +37,10 @@ async function loadDashboard() {
     //Render monthly breakdown
     const tbody = document.getElementById('dash-months');
     tbody.innerHTML = '';
-    data.months.forEach(m => {
+    data.months.forEach((m, i) => {
         const tr = document.createElement('tr');
         tr.className = 'month-row border-b border-gray-100';
+        revealStagger(tr, i);
         tr.onclick = () => {
             document.getElementById('month-select').value = m.month;
             showTab('worklog');
@@ -212,12 +213,30 @@ function _renderMemberSkillsBox(memberId, canEdit, limit = SKILL_PREVIEW_COUNT) 
     `;
 }
 
+// Placeholder cards match the real grid geometry, so there's no empty flash
+// and no layout jump when the real cards land.
+function _renderOverallSkeleton() {
+    const grid = document.getElementById('overall-member-grid');
+    if (!grid || grid.dataset.skeleton === '1') return;
+    const count = Math.max(4, Math.min(grid.children.length || 8, 12));
+    grid.dataset.skeleton = '1';
+    grid.innerHTML = Array.from({ length: count }, () => `
+        <div class="skel-card">
+            <div class="skel skel-avatar"></div>
+            <div class="skel skel-line" style="width:62%"></div>
+            <div class="skel skel-line" style="width:44%"></div>
+            <div class="skel skel-block"></div>
+        </div>`).join('');
+}
+
 async function loadOverallDashboard() {
     // Resolve year + month for the missing-entry per-card badge
     const yrEl = document.getElementById('year-select');
     const moEl = document.getElementById('overall-month-select');
     const yr = (yrEl && yrEl.value) ? parseInt(yrEl.value) : new Date().getFullYear();
     const mo = (moEl && moEl.value) ? parseInt(moEl.value) : (new Date().getMonth() + 1);
+
+    _renderOverallSkeleton();
 
     // Fetch skills and missing-entry map in parallel
     let _missingMap = {};
@@ -262,13 +281,15 @@ async function loadOverallDashboard() {
 
     const grid = document.getElementById('overall-member-grid');
     grid.innerHTML = '';
+    delete grid.dataset.skeleton;
 
-    members.forEach(m => {
+    members.forEach((m, i) => {
         const roles = memberProjects[m.id];
         const hasProjects = roles.main.length > 0 || roles.support.length > 0;
 
         const card = document.createElement('div');
-        card.className = 'rounded-2xl p-5 text-white text-center cursor-pointer transition-all duration-150 hover:scale-105 hover:shadow-lg select-none';
+        card.className = 'member-card rounded-2xl p-5 text-white text-center cursor-pointer select-none';
+        revealStagger(card, i);
         card.style.background = hasProjects ? '#4f46e5' : '#9ca3af';
 
         const mainText = roles.main.length ? esc(roles.main.join(', ')) : '<span class="opacity-50">—</span>';

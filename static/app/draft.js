@@ -621,13 +621,8 @@ async function saveDraftDeployment() {
     }
 
     const btn = document.querySelector('.draft-save-btn');
-    const originalHTML = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="animate-spin mr-2">⏳</span> DEPLOYING...';
-    }
 
-    try {
+    await withBusy(btn, async () => {
         const draftedIds   = [...(_draftDeployed[_draftProjectId] || new Set())];
         const draftedIdSet = new Set(draftedIds.map(Number));
         const currentIds = _parseMemberIds(project.main_members);
@@ -638,7 +633,6 @@ async function saveDraftDeployment() {
 
         if (!toAdd.length && !toRemove.length) {
             toast('No changes to save');
-            if (btn) { btn.disabled = false; btn.innerHTML = originalHTML; }
             return;
         }
 
@@ -673,16 +667,10 @@ async function saveDraftDeployment() {
 
         renderDraftPanel();
         if (typeof loadOverallDashboard === 'function') loadOverallDashboard();
-
-    } catch (err) {
+    }).catch(err => {
         console.error('Deployment failed:', err);
         toast('Deployment failed: ' + err.message, 'error');
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-        }
-    }
+    });
 }
 
 // ─────────────────────────────────────────────────────
