@@ -16,6 +16,8 @@
 </head>
 <body>
 
+    <canvas id="bg-canvas" aria-hidden="true"></canvas>
+
     <div class="login-wrapper">
         <div class="login-card">
             <button class="lang-toggle" id="lang-toggle-btn" onclick="toggleLang()">TH</button>
@@ -158,6 +160,185 @@
     </div>
 
     <script>
+        // ── Interactive background: "ledger ribbons" — four horizontal hour
+        // scales drifting past at different speeds/depths, in the same
+        // indigo/blue/violet tones as the card glow + button gradient
+        // (auth.css). Each ribbon is a 24-hour ruler: the 12:00–13:00 lunch
+        // hour and the 08:30–17:30 workday window are the same thresholds
+        // worklogs.hours/overtime_hours are computed against (CLAUDE.md §4),
+        // picked out here instead of a generic drifting starfield. Small
+        // "entries" ride the ribbons like logged worklog blocks — each has its
+        // own randomly-wandering velocity (with a soft spring back to its
+        // ribbon) so they feel alive rather than perfectly synced, and they
+        // still get pulled toward the cursor and glow brighter near it.
+        // Bows out entirely for prefers-reduced-motion and pauses off-screen.
+        (function initBackgroundLedger() {
+            const canvas = document.getElementById('bg-canvas');
+            if (!canvas || !canvas.getContext) return;
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+            const ctx = canvas.getContext('2d');
+            const LINE_RGB    = '79, 70, 229';   // indigo-600 — ribbon baseline + hour ticks
+            const WORKDAY_RGB = '59, 130, 246';  // blue-500   — 08:30–17:30 wash
+            const LUNCH_RGB   = '139, 92, 246';  // violet-500 — 12:00–13:00 band
+            const DOT_RGB     = '167, 139, 250'; // violet-400 — drifting worklog entries
+            const GLOW_RADIUS = 140;
+
+            // Speeds run 1.5x the original drift; dot counts bumped way up for
+            // a denser, galaxy-like field of entries riding each ribbon.
+            const RIBBONS = [
+                { yFrac: 0.20, speed: 15,   alpha: 0.55, dotCount: 18 },
+                { yFrac: 0.46, speed: 24,   alpha: 0.30, dotCount: 24 },
+                { yFrac: 0.68, speed: 10.5, alpha: 0.45, dotCount: 18 },
+                { yFrac: 0.88, speed: 19.5, alpha: 0.22, dotCount: 12 },
+            ];
+
+            let width, height, dpr, hourWidth, totalWidth;
+            const pointer = { x: -9999, y: -9999, active: false };
+            const startTime = performance.now();
+            let lastNow = startTime;
+
+            function makeDot(ribbon) {
+                return {
+                    x: Math.random() * width,
+                    y: ribbon.yFrac * height + (Math.random() - 0.5) * 24,
+                    vx: -ribbon.speed * (0.7 + Math.random() * 0.6),
+                    vy: (Math.random() - 0.5) * 10,
+                };
+            }
+
+            function resize() {
+                dpr = window.devicePixelRatio || 1;
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                canvas.style.width = width + 'px';
+                canvas.style.height = height + 'px';
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                // Two full 24h cycles span the width — gives the ruler visible density.
+                hourWidth = width / 12;
+                totalWidth = hourWidth * 24;
+                for (const ribbon of RIBBONS) {
+                    ribbon.dots = Array.from({ length: ribbon.dotCount }, () => makeDot(ribbon));
+                }
+            }
+
+            function drawRibbonLine(ribbon, elapsed) {
+                const y = ribbon.yFrac * height;
+                const offset = (elapsed * ribbon.speed) % totalWidth;
+
+                ctx.strokeStyle = `rgba(${LINE_RGB}, ${ribbon.alpha * 0.35})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+
+                for (let hour = 0; hour < 24; hour++) {
+                    const x = ((hour * hourWidth - offset) % totalWidth + totalWidth) % totalWidth;
+                    if (x > width + hourWidth) continue;
+
+                    const boost = pointer.active
+                        ? Math.max(0, 1 - Math.hypot(pointer.x - (x + hourWidth / 2), pointer.y - y) / GLOW_RADIUS) * 0.6
+                        : 0;
+
+                    if (hour === 12) {
+                        ctx.fillStyle = `rgba(${LUNCH_RGB}, ${ribbon.alpha * 0.5 + boost})`;
+                        ctx.fillRect(x, y - 9, hourWidth, 18);
+                    } else if (hour >= 8 && hour < 17) {
+                        ctx.fillStyle = `rgba(${WORKDAY_RGB}, ${ribbon.alpha * 0.16 + boost * 0.4})`;
+                        ctx.fillRect(x, y - 5, hourWidth, 10);
+                    }
+
+                    ctx.strokeStyle = `rgba(${LINE_RGB}, ${ribbon.alpha * 0.5 + boost})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y - 4);
+                    ctx.lineTo(x, y + 4);
+                    ctx.stroke();
+                }
+            }
+
+            function updateAndDrawDots(ribbon, dt) {
+                const baseY = ribbon.yFrac * height;
+
+                for (const dot of ribbon.dots) {
+                    // Random wander + a soft spring back toward the ribbon's
+                    // own line, so motion feels organic without drifting away.
+                    dot.vy += (Math.random() - 0.5) * 20 * dt;
+                    dot.vy += (baseY - dot.y) * 0.8 * dt;
+                    dot.vy *= 0.97;
+                    // Ease back toward the base scroll speed after a cursor tug.
+                    dot.vx += (-ribbon.speed - dot.vx) * 0.6 * dt;
+
+                    if (pointer.active) {
+                        const dx = pointer.x - dot.x;
+                        const dy = pointer.y - dot.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < GLOW_RADIUS && dist > 0.01) {
+                            const pull = (1 - dist / GLOW_RADIUS) * 55;
+                            dot.vx += (dx / dist) * pull * dt;
+                            dot.vy += (dy / dist) * pull * dt;
+                        }
+                    }
+
+                    dot.x += dot.vx * dt;
+                    dot.y += dot.vy * dt;
+
+                    if (dot.x < -20) dot.x = width + 20;
+                    if (dot.x > width + 20) {
+                        dot.x = -20;
+                        dot.y = baseY + (Math.random() - 0.5) * 24;
+                    }
+
+                    const glow = pointer.active
+                        ? Math.max(0, 1 - Math.hypot(pointer.x - dot.x, pointer.y - dot.y) / GLOW_RADIUS)
+                        : 0;
+
+                    ctx.beginPath();
+                    ctx.fillStyle = `rgba(${DOT_RGB}, ${0.5 + glow * 0.4})`;
+                    ctx.shadowColor = `rgba(${DOT_RGB}, 0.8)`;
+                    ctx.shadowBlur = 6 + glow * 10;
+                    ctx.arc(dot.x, dot.y, 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            let rafId = null;
+            function step(now) {
+                const elapsed = (now - startTime) / 1000;
+                const dt = Math.min(0.05, Math.max(0, (now - lastNow) / 1000));
+                lastNow = now;
+
+                ctx.clearRect(0, 0, width, height);
+                for (const ribbon of RIBBONS) {
+                    drawRibbonLine(ribbon, elapsed);
+                    updateAndDrawDots(ribbon, dt);
+                }
+
+                if (pointer.active) {
+                    const spotlight = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 220);
+                    spotlight.addColorStop(0, `rgba(${DOT_RGB}, 0.05)`);
+                    spotlight.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = spotlight;
+                    ctx.fillRect(0, 0, width, height);
+                }
+
+                rafId = requestAnimationFrame(step);
+            }
+            function start() { if (rafId === null) { lastNow = performance.now(); rafId = requestAnimationFrame(step); } }
+            function stop() { if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; } }
+
+            resize();
+            start();
+            window.addEventListener('resize', resize);
+            window.addEventListener('mousemove', (e) => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true; });
+            window.addEventListener('mouseleave', () => { pointer.active = false; });
+            document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
+        })();
+
         // ── Remembered-credentials store ──
         // Pluggable abstraction. Today: username only (mode 'username').
         // To enable password later: switch _REMEMBER_MODE to 'username_password'

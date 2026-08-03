@@ -40,12 +40,43 @@ body::before {
     content: '';
     position: fixed;
     inset: 0;
-    background:
-        radial-gradient(circle at 20% 50%, rgba(79, 70, 229, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-        radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.04) 0%, transparent 60%);
+    background-image:
+        radial-gradient(circle, rgba(79, 70, 229, 0.10) 0%, transparent 55%),
+        radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 55%),
+        radial-gradient(circle, rgba(139, 92, 246, 0.06) 0%, transparent 60%);
+    background-repeat: no-repeat;
+    background-size: 60vmax 60vmax, 70vmax 70vmax, 80vmax 80vmax;
+    background-position: 20% 50%, 80% 80%, 50% 0%;
+    animation: auroraDrift 26s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
+}
+
+/* Slow, looping drift of the three glows — same rgba stops as before, just
+   walked around the viewport instead of pinned in place. Purely decorative,
+   so it's the first thing switched off for reduced-motion users below. */
+@keyframes auroraDrift {
+    0%   { background-position: 20% 50%, 80% 80%, 50% 0%; }
+    25%  { background-position: 32% 35%, 68% 62%, 62% 18%; }
+    50%  { background-position: 12% 62%, 86% 92%, 38% 8%; }
+    75%  { background-position: 34% 42%, 64% 74%, 56% 22%; }
+    100% { background-position: 20% 50%, 80% 80%, 50% 0%; }
+}
+
+/* Interactive particle layer (login.html only — see its inline script).
+   Sits between body::before (z-index:0, painted first) and .login-wrapper
+   (z-index:1), so it drifts behind the card without blocking clicks. */
+#bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body::before { animation: none; }
+    #bg-canvas { display: none; }
 }
 
 .login-wrapper {
