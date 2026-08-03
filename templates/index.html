@@ -129,7 +129,9 @@
             <!-- Month selector for Overall Dashboard (hidden by default; toggled in core.js) -->
             <div class="flex items-center gap-2 flex-none" id="overall-month-wrap" style="display:none;">
                 <label for="overall-month-select" class="text-sm font-medium text-gray-600" data-i18n="dash.overall_month_label">Month:</label>
+                <button id="overall-btn-prev-month" class="btn-icon-prev" onclick="OnPreviousMonth()" title="Previous month" aria-label="Previous month"></button>
                 <select id="overall-month-select" onchange="onOverallMonthChange()" class="input-field w-28"></select>
+                <button id="overall-btn-next-month" class="btn-icon-next" onclick="OnNextMonth()" title="Next month" aria-label="Next month"></button>
             </div>
         </div>
 

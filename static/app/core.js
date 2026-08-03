@@ -181,6 +181,33 @@ function onOverallMonthChange() {
 }
 try { window.onOverallMonthChange = onOverallMonthChange; } catch (e) {}
 
+//Previous month overall
+function OnPreviousMonth() {
+    const yearSel = document.getElementById('year-select');
+    const monthSel = document.getElementById('overall-month-select');
+    const curYear = parseInt(yearSel.value, 10) || new Date().getFullYear();
+    const curMonth = parseInt(monthSel.value, 10) || (new Date().getMonth() + 1);
+    const prev = new Date(curYear, curMonth - 1 - 1, 1); // JS months are 0-indexed
+    monthSel.value = prev.getMonth() + 1;
+    yearSel.value = prev.getFullYear();
+    onContextChange();
+    onOverallMonthChange();
+}
+
+//Next month overall
+function OnNextMonth() {
+    const yearSel = document.getElementById('year-select');
+    const monthSel = document.getElementById('overall-month-select');
+    const curYear = parseInt(yearSel.value, 10) || new Date().getFullYear();
+    const curMonth = parseInt(monthSel.value, 10) || (new Date().getMonth() + 1);
+    const next = new Date(curYear, curMonth - 1 + 1, 1); // JS months are 0-indexed
+    monthSel.value = next.getMonth() + 1;
+    yearSel.value = next.getFullYear();
+    onContextChange();
+    onOverallMonthChange();
+}
+
+
 // ── Tabs ──
 async function showTab(name) {
     if (name === 'settings' && !isElevated()) return;

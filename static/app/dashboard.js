@@ -318,6 +318,14 @@ async function loadOverallDashboard() {
     });
 }
 
+//Overall Dashboard prev and next month
+//Prev month is the month before the current month
+//Next month is the current month
+//If the current month is January, the prev month is December of the previous year
+//If the current month is December, the next month is January of the next year
+
+
+
 function toggleSkillSort() {
     _skillSortMode = (_skillSortMode === 'level') ? 'name' : 'level';
     if (currentMemberId) {
