@@ -66,7 +66,7 @@ mwl deploy/
 │   ├── worklogs.py         # Worklog CRUD + dashboard + projects-summary
 │   ├── users.py            # User account admin (approve/role/reset)
 │   ├── avatars.py          # Profile photo upload/serve
-│   ├── files.py            # File-share tree, upload/download
+│   ├── files.py            # File-share tree, upload/download, move (drag & drop + "Move to..." — see §7b)
 │   ├── exports.py          # Excel export from openpyxl templates
 │   ├── mail.py             # Brevo email sending (API + SMTP fallback) — password reset
 │   └── helpers.py          # parse_time, parse_members, format_members, EMAIL_RE
@@ -364,6 +364,71 @@ Requires the Brevo env vars in §10. If neither `BREVO_API_KEY` nor
 `SMTP_HOST` credentials are configured, `/api/forgot-password` still
 returns its generic 200 but the send fails silently server-side (logged
 via `app.logger.warning`, never surfaced to the client).
+
+---
+
+## 7b. File Share — drag & drop, multi-select, folder move
+
+The Files tab ([app/files.py](app/files.py) + [static/app/files.js](static/app/files.js))
+supports moving files/folders by drag-and-drop or via a "Move to…" picker
+modal, on top of the original upload/download/rename/delete CRUD.
+
+**Move endpoints:**
+- `POST /api/files/<id>/move` — move a file. Body `{folder_id: int|null}`
+  (`null` = root). `@login_required`; permission is uploader-or-elevated
+  (`move_file()` checks `row['uploaded_by'] == session['user_id']` unless
+  `session['role']` is elevated). Staff additionally can't move a file that
+  is classified or sits under a classified folder
+  (`_file_hidden_for_staff()` — the move 404s as if the file doesn't exist,
+  same anti-enumeration shape as the rest of the classified-file handling).
+- `POST /api/files/folder/<id>/move` — move a folder. Body
+  `{parent_id: int|null}`. `@elevated_required` (folders are a structural
+  change, unlike an individual file). Guards, in order: target folder must
+  exist, a folder can't become its own parent, `_is_descendant(target, fid)`
+  blocks moving a folder into its own subtree (cycle guard — argument order
+  matters, swapping it silently returns `False` for every real cycle), a
+  no-op if the target is already the current parent, and
+  `_folder_name_conflict()` mirrors the DB's `(parent_id, name)` UNIQUE
+  constraint (with the NULL-parent split, since SQL `parent_id = NULL`
+  never matches) to reject a same-name collision at the destination.
+
+**Frontend drag-and-drop** ([static/app/files.js](static/app/files.js)):
+- Files and folders are `draggable="true"` only when `canMove`/`isElevated()`
+  is true for that row — the UI never offers a drag handle for a move the
+  API would reject.
+- Grabbing an already-selected row drags the whole multi-selection;
+  grabbing an unselected row drags just that row (standard file-manager
+  behavior) — see `onFileDragStart()`. Folders drag **one at a time**
+  (`onFolderDragStart()` — `_folderDragId` is a scalar, not a set).
+  `_movableFileIds()` re-derives the permission filter at drag time because
+  checkboxes render on every row while `draggable` doesn't, so a Staff
+  multi-select can legitimately contain files that user can't move.
+- Drop targets are any element carrying `data-folder-id` (sidebar tree
+  nodes, the Root sentinel, subfolder cards); `_canDropOn()` / the shared
+  `dragover` listener repaints highlighting and refuses the drop
+  (`dataTransfer.dropEffect = 'none'`) for a folder-into-its-own-subtree
+  drop before it ever reaches the server.
+- **Internal move vs external upload are disambiguated by
+  `_isExternalFileDrag()`**, which checks `ev.dataTransfer.types` for a
+  native `Files` payload. Internal drags carry a `text/plain` payload
+  instead (`"id,id,id"` for files, `"folder:<id>"` for a folder) — dropping
+  those onto the panel background (not a folder target) is a no-op, while
+  an external OS file drag anywhere in the panel opens the upload overlay
+  and starts `uploadFiles()`. `_resetDragState()` is the single place that
+  unwinds every drag artifact (highlight classes, the drag ghost element,
+  the overlay, `fileDragDepth`) — extend it rather than adding a parallel
+  cleanup path if you touch this code.
+- The "Move to…" modal (`openMoveModal()` / `confirmMove()`) is the
+  keyboard/click-accessible alternative to dragging — same two endpoints,
+  same blocked-target set (`_moveBlocked`, mirroring the server's
+  `_is_descendant` guard so a folder's own subtree is greyed out in the
+  picker, not just rejected after the fact).
+
+**Related read endpoints:** `GET /api/files/folder/<id>/stats` (and the
+no-id `.../folder/stats` variant) return `{file_count, total_bytes,
+subfolder_count}` for a subtree — used to show folder sizes without
+loading every file; `GET /api/files/recent` lists the most recently
+uploaded files across all folders (used by the Recent Uploads panel).
 
 ---
 
