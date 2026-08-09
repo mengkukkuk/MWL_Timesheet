@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>MWL — Security Workflow</title>
+<style>
+  :root{
+    --bg:#0b0f17; --bg2:#111826; --card:#151d2c; --line:#243044;
+    --ink:#e6edf7; --dim:#93a3bd; --faint:#5f7192;
+    --ok:#3fb984; --warn:#e0a63c; --hi:#e8743b; --crit:#e05561; --acc:#5aa9f7; --acc2:#9d7cf5;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",Roboto,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    overflow:hidden;-webkit-font-smoothing:antialiased;
+  }
+  .deck{height:100vh;width:100vw;position:relative}
+  .slide{
+    position:absolute;inset:0;padding:44px 60px 74px;
+    display:none;flex-direction:column;overflow:hidden;
+    animation:in .3s ease;
+  }
+  .slide.on{display:flex}
+  @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  h1{font-size:52px;font-weight:700;letter-spacing:-1.2px;line-height:1.1}
+  h2{font-size:31px;font-weight:650;letter-spacing:-.5px;margin-bottom:4px}
+  h3{font-size:15px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--dim)}
+  p{line-height:1.55}
+
+  .eyebrow{
+    font:600 12px/1 var(--mono);letter-spacing:2.2px;text-transform:uppercase;
+    color:var(--acc);margin-bottom:14px;display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow .num{
+    background:var(--acc);color:#06101f;border-radius:4px;padding:3px 7px;font-weight:800;
+  }
+  .head{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:22px;flex:none}
+  .sub{color:var(--dim);font-size:15px;margin-top:6px}
+  .body{flex:1;min-height:0;overflow:auto;padding-right:6px}
+  .body::-webkit-scrollbar{width:7px}
+  .body::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+  code,.mono{font-family:var(--mono);font-size:.88em}
+  .ref{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:16px 18px}
+  .card h4{font-size:15px;font-weight:650;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .card p{font-size:13.5px;color:var(--dim)}
+  .card.ok{border-left:3px solid var(--ok)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card.hi{border-left:3px solid var(--hi)}
+  .card.crit{border-left:3px solid var(--crit)}
+  .card.acc{border-left:3px solid var(--acc)}
+
+  .pill{
+    display:inline-block;font:700 10px/1 var(--mono);letter-spacing:1px;
+    padding:4px 8px;border-radius:20px;text-transform:uppercase;
+  }
+  .p-ok{background:rgba(63,185,132,.15);color:var(--ok)}
+  .p-warn{background:rgba(224,166,60,.15);color:var(--warn)}
+  .p-hi{background:rgba(232,116,59,.15);color:var(--hi)}
+  .p-crit{background:rgba(224,85,97,.16);color:var(--crit)}
+  .p-acc{background:rgba(90,169,247,.15);color:var(--acc)}
+
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .step{
+    background:var(--bg2);border:1px solid var(--line);border-radius:9px;
+    padding:12px 14px;flex:1;min-width:0;position:relative;
+  }
+  .step .t{font-size:13px;font-weight:650;margin-bottom:5px}
+  .step .d{font-size:11.5px;color:var(--dim);line-height:1.45}
+  .step.ok{border-color:rgba(63,185,132,.45)}
+  .step.bad{border-color:rgba(224,85,97,.5);background:rgba(224,85,97,.06)}
+  .arrow{
+    flex:0 0 26px;display:flex;align-items:center;justify-content:center;
+    color:var(--faint);font-size:17px;
+  }
+  .lane{display:flex;align-items:center;gap:0;margin-bottom:12px}
+  .lane-l{
+    flex:0 0 116px;font:600 11px/1.3 var(--mono);letter-spacing:.6px;
+    text-transform:uppercase;color:var(--faint);padding-right:12px;text-align:right;
+  }
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{
+    text-align:left;font:700 10.5px/1 var(--mono);letter-spacing:1.1px;text-transform:uppercase;
+    color:var(--faint);padding:0 10px 9px;border-bottom:1px solid var(--line);
+  }
+  td{padding:9px 10px;border-bottom:1px solid rgba(36,48,68,.55);vertical-align:top;color:var(--dim)}
+  td:first-child{color:var(--ink)}
+  tr:last-child td{border-bottom:none}
+
+  pre{
+    background:#0a0e16;border:1px solid var(--line);border-left:3px solid var(--acc);
+    border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;
+    line-height:1.6;overflow:auto;color:#cfe0f5;
+  }
+  pre.bad{border-left-color:var(--crit)}
+  pre.good{border-left-color:var(--ok)}
+  pre .c{color:var(--faint)}
+  pre .r{color:#ff9aa2}
+  pre .g{color:#8fe3bb}
+
+  ul{list-style:none}
+  li{font-size:13.5px;color:var(--dim);line-height:1.65;padding-left:18px;position:relative;margin-bottom:5px}
+  li::before{content:"\25B8";position:absolute;left:0;color:var(--faint)}
+  li.ok::before{content:"\2713";color:var(--ok)}
+  li.no::before{content:"\2715";color:var(--crit)}
+
+  .note{
+    background:rgba(90,169,247,.07);border:1px solid rgba(90,169,247,.25);
+    border-radius:9px;padding:12px 15px;font-size:13px;color:var(--dim);
+  }
+  .note.crit{background:rgba(224,85,97,.08);border-color:rgba(224,85,97,.3)}
+  .note.ok{background:rgba(63,185,132,.07);border-color:rgba(63,185,132,.28)}
+  .note b{color:var(--ink)}
+
+  .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--acc);transition:width .3s}
+  .foot{
+    position:absolute;left:60px;right:60px;bottom:22px;display:flex;
+    justify-content:space-between;align-items:center;font:600 11px/1 var(--mono);
+    letter-spacing:1px;color:var(--faint);text-transform:uppercase;pointer-events:none;
+  }
+  .nav{position:absolute;right:60px;bottom:16px;display:flex;gap:6px;z-index:5}
+  .nav button{
+    background:var(--card);border:1px solid var(--line);color:var(--dim);
+    width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:13px;
+  }
+  .nav button:hover{background:var(--line);color:var(--ink)}
+
+  .title{justify-content:center;align-items:flex-start;
+    background:radial-gradient(1100px 520px at 22% 12%,rgba(90,169,247,.13),transparent 62%),
+               radial-gradient(800px 460px at 88% 88%,rgba(157,124,245,.11),transparent 60%);}
+  .title .meta{display:flex;gap:36px;margin-top:34px;padding-top:24px;border-top:1px solid var(--line);width:100%}
+  .title .meta div{font-size:12.5px;color:var(--faint);font-family:var(--mono)}
+  .title .meta b{display:block;color:var(--ink);font-size:14px;margin-top:5px;font-family:inherit;font-weight:600}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:26px}
+  .chip{
+    background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:7px 15px;font-size:12.5px;color:var(--dim);
+  }
+  .chip b{color:var(--acc);font-family:var(--mono);margin-right:6px}
+
+  @media print{
+    body{overflow:visible;background:#fff}
+    .slide{display:flex!important;position:relative;page-break-after:always;height:100vh}
+    .nav,.bar{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- ═══ 0 TITLE ═══ -->
+<section class="slide title on">
+  <div class="eyebrow"><span class="num">MWL</span> Security Workflow &middot; Audit 2026-08-07</div>
+  <h1>How security works<br>in MeterWorklog</h1>
+  <p class="sub" style="max-width:720px;margin-top:18px;font-size:17px">
+    End-to-end walkthrough of the six security domains &mdash; what the request actually
+    does, which control fires where, and where the chain currently breaks.
+  </p>
+  <div class="chips">
+    <span class="chip"><b>1</b>Auth</span>
+    <span class="chip"><b>2</b>Login / Password</span>
+    <span class="chip"><b>3</b>Database</span>
+    <span class="chip"><b>4</b>Deployment / ngrok</span>
+    <span class="chip"><b>5</b>Service</span>
+    <span class="chip"><b>6</b>File share</span>
+  </div>
+  <div class="meta">
+    <div>STACK<b>Flask 3.1.3 &middot; Waitress 3.0.2 &middot; MSSQL</b></div>
+    <div>EXPOSURE<b>ngrok + Tailscale Serve</b></div>
+    <div>SQL INJECTION<b style="color:var(--ok)">0 findings</b></div>
+    <div>CRITICAL<b style="color:var(--crit)">3 open</b></div>
+  </div>
+</section>
+
+<!-- ═══ 1 PIPELINE ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">00</span> Cross-cutting</div>
+    <h2>Every request runs this gauntlet</h2>
+    <p class="sub">Controls fire in a fixed order. Knowing the order tells you which layer a bug belongs to.</p>
+  </div>
+  <div class="body">
+    <div class="lane">
+      <div class="lane-l">Edge</div>
+      <div class="flow">
+        <div class="step"><div class="t">ngrok / Tailscale</div><div class="d">TLS terminates here. Adds <code>X-Forwarded-*</code>.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step"><div class="t">Waitress</div><div class="d">Body-size cap enforced <b>before</b> Flask sees it.</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Flask hooks</div>
+      <div class="flow">
+        <div class="step ok"><div class="t">ensure_db()</div><div class="d">One-shot init + loads <code>worklog_open</code>.<div class="ref">__init__.py:161</div></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">verify_api_csrf_origin()</div><div class="d">Non-GET <code>/api/*</code> &rarr; Origin must match trusted set, else <b>403</b>.<div class="ref">__init__.py:201</div></div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Route</div>
+      <div class="flow">
+        <div class="step ok"><div class="t">@login_required</div><div class="d">Session has <code>user_id</code>? else 401.<div class="ref">auth.py:91</div></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">@elevated_required</div><div class="d">Role in ELEVATED_ROLES.<div class="ref">auth.py:117</div></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step bad"><div class="t">Row ownership</div><div class="d">Per-endpoint, hand-written. <b>This is where it breaks.</b></div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Data</div>
+      <div class="flow">
+        <div class="step ok"><div class="t">db.query / db.execute</div><div class="d">pyodbc <code>?</code> binding, always parameterized.<div class="ref">db.py</div></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">MSSQL</div><div class="d">Windows Auth by default.</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Response</div>
+      <div class="flow">
+        <div class="step bad"><div class="t">after_request</div><div class="d">Sets <b>only</b> Cache-Control + Vary. No CSP / X-Frame-Options / nosniff / HSTS.<div class="ref">__init__.py:66-84</div></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step bad"><div class="t">Browser render</div><div class="d">SPA builds HTML by string interpolation &rarr; XSS sinks.</div></div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:6px">
+      <b>Read this as a funnel.</b> The first four stages are solid. Both remaining
+      problem classes live at the ends: <b>row-level authorization</b> (hand-rolled per endpoint)
+      and <b>response hardening</b> (headers absent, so a single XSS is unconstrained).
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 2 AUTH ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">01</span> Auth</div>
+    <h2>Session model &amp; the three-tier role gate</h2>
+    <p class="sub">Server-side Flask session in a signed cookie. No JWT, no localStorage token.</p>
+  </div>
+  <div class="body">
+    <div class="grid g2" style="margin-bottom:14px">
+      <div class="card ok">
+        <h4>Session contents <span class="pill p-ok">Good</span></h4>
+        <pre style="margin-top:8px"><span class="c"># set at login, signed with SECRET_KEY</span>
+session['user_id']
+session['username']
+session['role']
+session['member_id']  <span class="c"># = EmployeeID (NVARCHAR!)</span></pre>
+        <ul style="margin-top:10px">
+          <li class="ok"><code>HttpOnly</code> &mdash; JS cannot read it <span class="ref">__init__.py:95</span></li>
+          <li class="ok"><code>SameSite=Lax</code> <span class="ref">__init__.py:96</span></li>
+          <li class="ok"><code>Secure</code> auto-on when a public domain is set <span class="ref">:100-110</span></li>
+          <li class="ok"><code>SECRET_KEY</code> fail-fast, no default fallback <span class="ref">:87-92</span></li>
+        </ul>
+      </div>
+      <div class="card acc">
+        <h4>Role ladder</h4>
+        <table style="margin-top:4px">
+          <tr><td><b>Staff</b></td><td>Own worklogs only. Classified files invisible.</td></tr>
+          <tr><td><b>Leader</b></td><td rowspan="2" style="border-left:1px solid var(--line);padding-left:12px">
+            <span class="pill p-acc">ELEVATED_ROLES</span><br><br>
+            Cross-employee reads, Settings tab, project mutations, sees classified files.
+          </td></tr>
+          <tr><td><b>Admin</b></td></tr>
+          <tr><td><b>Super_Ultimate_ADMIN</b></td><td>+ role changes, approvals, any avatar. Cannot self-reset password.</td></tr>
+        </table>
+        <div class="note" style="margin-top:12px;font-size:12.5px">
+          Frontend mirrors this with <code>isElevated()</code> in <code>core.js</code> &mdash; but that is
+          <b>cosmetic only</b>. Every gate is re-checked server-side.
+        </div>
+      </div>
+    </div>
+    <div class="grid g3">
+      <div class="card ok"><h4>CSRF strategy</h4><p>No tokens. Origin/Referer validated against
+        <code>host_url</code>, <code>X-Forwarded-Host</code>, <code>NGROK_DOMAIN</code>, <code>TAILSCALE_DOMAIN</code>.
+        Correct choice for a same-origin SPA.<div class="ref" style="margin-top:6px">__init__.py:201-240</div></p></div>
+      <div class="card ok"><h4>12 blueprints, all gated</h4><p>auth &middot; avatars &middot; users &middot; core &middot; members &middot;
+        employees &middot; projects &middot; skills &middot; worklogs &middot; allowance &middot; export &middot; files.<div class="ref" style="margin-top:6px">__init__.py:278-289</div></p></div>
+      <div class="card warn"><h4>Session lifetime</h4><p>No idle timeout, no absolute expiry.
+        A session lives until the cookie dies or <code>SECRET_KEY</code> rotates.
+        <span class="pill p-warn" style="margin-top:8px">Low</span></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 3 AUTH FINDINGS ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">01</span> Auth &mdash; where it breaks</div>
+    <h2>A business flag is wired into an authorization check</h2>
+  </div>
+  <div class="body">
+    <div class="grid g2">
+      <div>
+        <h3 style="margin-bottom:8px">The pattern, in 3 endpoints</h3>
+        <pre class="bad"><span class="c"># app/worklogs.py:28-41 &mdash; get_worklogs</span>
+employee_id = request.args.get('member_id')
+
+if (<span class="r">not app_pkg._worklog_open</span>
+        and session.get('role') not in ELEVATED_ROLES
+        and employee_id != session.get('member_id')):
+    return jsonify({'error': 'Permission denied'}), 403</pre>
+        <div class="note crit" style="margin-top:12px">
+          <b>Defect A &mdash; the flag disables the check.</b> <code>_worklog_open</code> means
+          <i>"the submission window is open"</i>. When it is <code>True</code>, the first term is
+          <code>False</code> and the whole <code>and</code> chain short-circuits.
+          <b>Any Staff user reads any employee's worklogs</b> by changing <code>?member_id=</code>.
+        </div>
+        <div class="note crit" style="margin-top:10px">
+          <b>Defect B &mdash; type confusion.</b> <code>get_dashboard</code> reads the param with
+          <code>type=int</code> while the session holds an NVARCHAR string.
+          <code>int != str</code> is <b>always True</b> &mdash; so the ownership term never matches
+          even when the flag is off. <span class="ref">worklogs.py:521-533</span>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:8px">The fix &mdash; separate the concerns</h3>
+        <pre class="good"><span class="c"># authorize unconditionally, normalize both sides</span>
+requested = str(request.args.get('member_id') or '').strip()
+own       = str(session.get('member_id') or '').strip()
+
+if session.get('role') not in ELEVATED_ROLES <span class="g">and</span> requested != own:
+    return jsonify({'error': 'Permission denied'}), 403
+
+<span class="c"># _worklog_open governs WRITES only, further down</span></pre>
+        <div class="card hi" style="margin-top:14px">
+          <h4>Third defect &mdash; same file <span class="pill p-hi">High</span></h4>
+          <p><code>update_worklog</code> correctly verifies the <i>existing</i> row's owner at
+          <code>worklogs.py:387</code> &mdash; then takes <code>member_id</code> straight from the request
+          body at <code>:394</code> and uses it in the overlap query at <code>:427-428</code>,
+          never validating it against that owner.
+          <br><br><b>Effect:</b> a Staff user edits their own row while <b>reassigning it to
+          someone else</b>.</p>
+        </div>
+        <div class="note" style="margin-top:12px">
+          <b>Root cause, all three:</b> row-level authorization is hand-written per endpoint
+          with no shared helper. Extract one &mdash; <code>assert_can_read(employee_id)</code> &mdash; and
+          the class of bug disappears.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 4 LOGIN ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">02</span> Login / Password</div>
+    <h2>Login sequence &mdash; throttle, verify, then reveal status</h2>
+    <p class="sub">Ordering here is deliberate and correct. Do not "optimize" it.</p>
+  </div>
+  <div class="body">
+    <div class="flow" style="margin-bottom:16px">
+      <div class="step"><div class="t">1 &middot; POST /api/login</div><div class="d">Origin checked first by the CSRF hook.</div></div>
+      <div class="arrow">&rarr;</div>
+      <div class="step ok"><div class="t">2 &middot; Lockout gate</div><div class="d">5 fails / 15 min &rarr; locked 5 min.<br>Super Admin: 3 / 15 &rarr; 30 min.</div></div>
+      <div class="arrow">&rarr;</div>
+      <div class="step ok"><div class="t">3 &middot; scrypt verify</div><div class="d">Constant-work hash compare.</div></div>
+      <div class="arrow">&rarr;</div>
+      <div class="step ok"><div class="t">4 &middot; Status check</div><div class="d"><b>After</b> password, on purpose.<div class="ref">auth.py:205-217</div></div></div>
+      <div class="arrow">&rarr;</div>
+      <div class="step"><div class="t">5 &middot; Session issued</div><div class="d">Signed cookie set.</div></div>
+    </div>
+    <div class="note ok" style="margin-bottom:16px">
+      <b>Why step 4 comes last.</b> If <code>Pending</code>/<code>Declined</code> were rejected before the
+      password check, response timing and wording would reveal <i>which usernames exist</i>.
+      Checking after means a wrong password and a disabled account are indistinguishable.
+      <b>This is a deliberate anti-enumeration design and it is right.</b>
+    </div>
+    <div class="grid g2">
+      <div class="card ok">
+        <h4>Password storage <span class="pill p-ok">Correct</span></h4>
+        <pre style="margin-top:8px">scrypt : N=32768 , r=8 , p=1
+via Werkzeug 3.1.8  <span class="c">(current)</span></pre>
+        <ul style="margin-top:10px">
+          <li class="ok">Memory-hard &mdash; resists GPU/ASIC cracking</li>
+          <li class="ok">Per-password salt, one-way</li>
+          <li class="ok">Not MD5, not SHA1, not reversible encryption</li>
+          <li class="ok">No admin, and no DB reader, can recover a password</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <h4>What is missing <span class="pill p-warn">Medium</span></h4>
+        <ul style="margin-top:6px">
+          <li class="no">No minimum length</li>
+          <li class="no">No complexity or passphrase rule</li>
+          <li class="no">No breached-password check</li>
+          <li class="no">No rotation or reuse history</li>
+        </ul>
+        <div class="note" style="margin-top:12px;font-size:12.5px">
+          Storage is excellent, but a 4-character password hashed with scrypt is still a
+          4-character password. <b>The hash cannot compensate for the input.</b>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 5 RESET ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">02</span> Login / Password</div>
+    <h2>Password reset &mdash; the best-built flow in the codebase</h2>
+  </div>
+  <div class="body">
+    <div class="lane">
+      <div class="lane-l">Request</div>
+      <div class="flow">
+        <div class="step"><div class="t">Username submitted</div><div class="d">POST /api/forgot-password</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">Uniform 200</div><div class="d">Same response whether the account exists, lacks an email, is inactive, is Super Admin, or is in cooldown.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">token_urlsafe(32)</div><div class="d">CSPRNG, 256-bit.</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Storage</div>
+      <div class="flow">
+        <div class="step ok"><div class="t">SHA-256 hash only</div><div class="d">Raw token <b>never</b> persisted or logged. A DB leak yields no usable tokens.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">+ expiry, + cooldown</div><div class="d"><code>reset_token_expires_at</code>, <code>last_reset_email_sent_at</code> in <code>user_security_state</code>.</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Delivery</div>
+      <div class="flow">
+        <div class="step"><div class="t">Brevo API &rarr; SMTP fallback</div><div class="d">Link built from <code>APP_BASE_URL</code>.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">Host-forgery guard</div><div class="d"><code>APP_BASE_URL</code> is pinned at install time rather than derived from <code>X-Forwarded-Host</code> &mdash; which a request could forge.<div class="ref">install-service.bat:67-68</div></div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Redeem</div>
+      <div class="flow">
+        <div class="step ok"><div class="t">Standalone page</div><div class="d"><code>meta referrer=no-referrer</code>, no Google Fonts, token scrubbed from URL via <code>history.replaceState</code>.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">Verify &rarr; confirm</div><div class="d">Single-use: token nulled on success. Also clears any login lockout.</div></div>
+      </div>
+    </div>
+    <div class="note ok" style="margin-top:8px">
+      <b>Nothing to fix here.</b> Hash-only storage, single-use, TTL, resend cooldown, uniform
+      responses, referrer suppression, and explicit host-forgery hardening. If you extend this
+      flow, preserve every one of those properties &mdash; especially the <b>uniform 200</b>: do not add
+      a branch that tells the caller which case fired.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 6 DATABASE ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">03</span> Database</div>
+    <h2>Single choke point &mdash; and it holds</h2>
+    <p class="sub">Every query in the app goes through <code>db.py</code>. Audit result: <b>zero SQL injection findings.</b></p>
+  </div>
+  <div class="body">
+    <div class="grid g2" style="margin-bottom:14px">
+      <div>
+        <pre class="good"><span class="c"># db.py &mdash; the only way in</span>
+query(sql, params=(), fetchone=False)   <span class="c"># -&gt; dict rows</span>
+execute(sql, params=())                 <span class="c"># -&gt; new id</span>
+
+<span class="c"># pyodbc binds ? &mdash; values never touch the SQL string</span>
+db.query(<span class="g">"SELECT * FROM users WHERE username = ?"</span>, (username,))</pre>
+        <pre class="bad" style="margin-top:12px"><span class="c"># NEVER &mdash; not present in this codebase, keep it that way</span>
+db.query(<span class="r">f"SELECT * FROM users WHERE username = '{username}'"</span>)</pre>
+      </div>
+      <div class="card ok">
+        <h4>Verification matrix</h4>
+        <table style="margin-top:4px">
+          <tr><td>Parameterized throughout</td><td><span class="pill p-ok">Pass</span></td></tr>
+          <tr><td>Concatenated user input</td><td><span class="pill p-ok">None found</span></td></tr>
+          <tr><td>Credentials in source</td><td><span class="pill p-ok">None &mdash; env vars</span></td></tr>
+          <tr><td>Default auth mode</td><td>Windows Auth (Trusted_Connection)</td></tr>
+          <tr><td>Connection handling</td><td>Thread-local, validated, auto-reconnect</td></tr>
+          <tr><td>Least privilege</td><td><span class="pill p-warn">Unverified</span></td></tr>
+        </table>
+        <div class="note" style="margin-top:12px;font-size:12.5px">
+          <b>Open action:</b> confirm the SQL login is not <code>sysadmin</code> / <code>db_owner</code>.
+          Grant only <code>SELECT/INSERT/UPDATE/DELETE</code> on the app schema.
+        </div>
+      </div>
+    </div>
+    <h3 style="margin-bottom:8px">Four sites build SQL <i>structure</i> dynamically &mdash; all safe, one fragile</h3>
+    <table>
+      <thead><tr><th>Site</th><th>Pattern</th><th>Why it is safe</th><th>Risk</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">files.py:643, :860</td><td class="mono">IN ({placeholders})</td><td>Placeholders are generated <code>?</code> marks; values still bound.</td><td><span class="pill p-ok">Safe</span></td></tr>
+        <tr><td class="mono">files.py:889</td><td class="mono">TOP {limit}</td><td><code>limit</code> clamped to 1&ndash;100 before interpolation.</td><td><span class="pill p-ok">Safe</span></td></tr>
+        <tr><td class="mono">files.py:188, :887</td><td class="mono">AND is_classified = 0</td><td>Literal fragment appended by role; no input involved.</td><td><span class="pill p-ok">Safe</span></td></tr>
+        <tr><td class="mono">auth.py:352-368</td><td class="mono">column names via f-string</td><td>Callers pass fixed kwargs only &mdash; but <b>there is no whitelist guard</b>.</td><td><span class="pill p-warn">Fragile</span></td></tr>
+      </tbody>
+    </table>
+    <div class="note" style="margin-top:14px">
+      <b>Watch <code>_upsert_security_state()</code>.</b> It is safe as written and the single place
+      where one careless future edit becomes injection. Add an explicit column allowlist before
+      anyone extends it.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 7 DEPLOYMENT ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">04</span> Deployment / ngrok</div>
+    <h2>Two public front doors into one local socket</h2>
+  </div>
+  <div class="body">
+    <div class="lane">
+      <div class="lane-l">Path A</div>
+      <div class="flow">
+        <div class="step"><div class="t">Internet</div><div class="d">Anyone, anywhere.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step"><div class="t">ngrok reserved domain</div><div class="d">TLS terminates at ngrok. Free tier, stable subdomain.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step"><div class="t">ngrok agent</div><div class="d">Outbound tunnel &rarr; <code>localhost:5050</code></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">Waitress</div><div class="d">0.0.0.0:5050</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Path B</div>
+      <div class="flow">
+        <div class="step"><div class="t">Tailnet member</div><div class="d">Device-authenticated by Tailscale.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">tailscale serve --https=443</div><div class="d">WireGuard + tailnet ACLs. <b>Materially stronger than Path A.</b></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">Waitress</div><div class="d">Same socket.</div></div>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:8px">
+      <div class="card ok">
+        <h4>Proxy-aware trust &mdash; done properly</h4>
+        <p>Behind a proxy, <code>request.host_url</code> is always the local socket and never matches
+        the browser's <code>Origin</code>. The CSRF hook resolves this with four layers:</p>
+        <ul style="margin-top:8px">
+          <li><code>X-Forwarded-Host</code> &mdash; set by ngrok / tailscale serve</li>
+          <li><code>NGROK_DOMAIN</code> &mdash; explicit trust from env</li>
+          <li><code>TAILSCALE_DOMAIN</code> &mdash; explicit tailnet trust</li>
+          <li><code>request.host_url</code> &mdash; plain LAN / localhost</li>
+        </ul>
+        <p style="margin-top:8px">Cookie <code>Secure</code> also auto-flips on when either domain is
+        configured &mdash; so the cookie is not silently dropped over HTTPS.</p>
+      </div>
+      <div class="card crit">
+        <h4>The tunnel's own key is committed <span class="pill p-crit">Critical</span></h4>
+        <table style="margin-top:4px">
+          <tr><td class="mono">install-service.bat:23</td><td><code>SECRET_KEY</code> &mdash; a dictionary word</td></tr>
+          <tr><td class="mono">install-service.bat:24</td><td>live ngrok authtoken</td></tr>
+          <tr><td class="mono">install-service.bat:25</td><td>reserved ngrok domain</td></tr>
+        </table>
+        <div class="note crit" style="margin-top:12px">
+          <b>Impact of the authtoken:</b> a third party can bind the same reserved domain and
+          <b>MITM every user</b> &mdash; the URL your team has bookmarked would point at them.
+          <br><br>
+          <b>Impact of SECRET_KEY:</b> forge a session cookie asserting any <code>user_id</code> and
+          <code>role</code>. Login throttling, lockouts, and password strength are all bypassed &mdash;
+          the login endpoint is never touched.
+        </div>
+      </div>
+    </div>
+    <div class="note ok" style="margin-top:14px">
+      <b>Confirmed negative finding:</b> <code>.env</code> is correctly ignored
+      (<code>.gitignore:160</code>) and has <b>never</b> been committed &mdash; verified against full git
+      history. The leak is the <code>.bat</code> defaults, not the env file.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 8 SERVICE ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">05</span> Service</div>
+    <h2>Two NSSM services, one dependency edge</h2>
+  </div>
+  <div class="body">
+    <div class="grid g2" style="margin-bottom:14px">
+      <div class="card acc">
+        <h4>MeterWorklog <span class="pill p-acc">SERVICE_AUTO_START</span></h4>
+        <pre style="margin-top:8px">python -m waitress
+  --host=0.0.0.0 --port=5050
+  --channel-timeout=3600
+  --max-request-body-size=5368709120
+  app:app</pre>
+        <p style="margin-top:10px">Runs as <b>LocalSystem</b>. Secrets injected via NSSM
+        <code>AppEnvironmentExtra</code>. Logs &rarr; <code>logs\app.log</code> /
+        <code>app-error.log</code>, rotating at 5 MB.<div class="ref" style="margin-top:6px">install-service.bat:101-110</div></p>
+      </div>
+      <div class="card acc">
+        <h4>MeterWorklog-ngrok <span class="pill p-acc">DependOnService</span></h4>
+        <pre style="margin-top:8px">ngrok http 5050
+  --url=%NGROK_DOMAIN%
+  --authtoken=%NGROK_AUTHTOKEN%</pre>
+        <p style="margin-top:10px">Starts only after the app service. Logs &rarr;
+        <code>logs\ngrok.log</code>, same rotation.
+        Optional third leg: <code>tailscale serve --bg --https=443</code>.<div class="ref" style="margin-top:6px">install-service.bat:126-135, :146</div></p>
+      </div>
+    </div>
+
+    <div class="grid g2">
+      <div class="card warn">
+        <h4>Config drift &mdash; docs vs. installer <span class="pill p-warn">Medium</span></h4>
+        <table style="margin-top:4px">
+          <thead><tr><th>Item</th><th>CLAUDE.md says</th><th>Installer sets</th></tr></thead>
+          <tbody>
+            <tr><td>Storage drive</td><td class="mono">D:\MeterWorklog_Storage</td><td class="mono">E:\MeterWorklog_Storage</td></tr>
+            <tr><td>DB name</td><td class="mono">MeterWorklog</td><td class="mono">MWLTimesheet</td></tr>
+            <tr><td>ngrok path</td><td class="mono">ngrokv3\ngrok.exe</td><td class="mono">deployer\ngrok.exe</td></tr>
+            <tr><td>Storage cap</td><td class="mono">20480 MB</td><td class="mono">614400 MB</td></tr>
+          </tbody>
+        </table>
+        <div class="note crit" style="margin-top:12px;font-size:12.5px">
+          <b>This is a real security consequence, not a docs nit.</b> An operator following the
+          documented hardening will run <code>icacls</code> against <code>D:\</code> &mdash; while actual
+          user files sit unprotected on <code>E:\</code>.
+        </div>
+      </div>
+      <div>
+        <div class="card warn" style="margin-bottom:12px">
+          <h4>What the installer does <i>not</i> do</h4>
+          <ul style="margin-top:6px">
+            <li class="no">Create the storage directories &mdash; first upload fails with <b>no Flask log entry</b></li>
+            <li class="no">Apply the ACL lockdown &mdash; must be run by hand</li>
+            <li class="no">Run <code>init_db2.sql</code> &mdash; only <code>init_db.sql</code> is auto-applied</li>
+          </ul>
+        </div>
+        <pre class="good"><span class="c">:: run as Administrator, against the REAL path</span>
+icacls "E:\MeterWorklog_Storage" /reset
+icacls "E:\MeterWorklog_Storage" /grant:r ^
+       "NT AUTHORITY\SYSTEM:(OI)(CI)F"
+icacls "E:\MeterWorklog_Storage" /inheritance:r</pre>
+        <div class="note" style="margin-top:12px;font-size:12.5px">
+          Also verify: <code>FLASK_DEBUG</code> empty in prod (debug mode exposes the Werkzeug
+          console), and <code>WAITRESS_MAX_REQUEST_BODY</code> &ge; <code>FILE_UPLOAD_MAX_MB &times; 1024&sup2;</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 9 FILE SHARE ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">06</span> File share</div>
+    <h2>Strong file handling, near-absent access control</h2>
+    <p class="sub">Two very different stories. Read both.</p>
+  </div>
+  <div class="body">
+    <div class="lane">
+      <div class="lane-l">Upload</div>
+      <div class="flow">
+        <div class="step ok"><div class="t">Size gate</div><div class="d">Waitress cap, then Flask <code>MAX_CONTENT_LENGTH</code>.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">Quota gate</div><div class="d">Pool cap + <code>FILE_MIN_FREE_MB</code> headroom.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">UUID rename</div><div class="d">User filename <b>never</b> touches disk.<div class="ref">files.py:398</div></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">Write blob</div><div class="d">Metadata to DB, bytes to storage.</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Download</div>
+      <div class="flow">
+        <div class="step ok"><div class="t">@login_required</div><div class="d">Any account.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step bad"><div class="t">Permission filter</div><div class="d"><b>None.</b> Only the classified bit is consulted.</div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step ok"><div class="t">realpath + prefix</div><div class="d">Traversal blocked.<div class="ref">files.py:409</div></div></div>
+        <div class="arrow">&rarr;</div>
+        <div class="step bad"><div class="t">?inline=1</div><div class="d">Serves stored MIME instead of forcing download.<div class="ref">files.py:545</div></div></div>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:10px">
+      <div class="card ok">
+        <h4>Genuinely solid <span class="pill p-ok">Keep</span></h4>
+        <ul style="margin-top:6px">
+          <li class="ok"><b>UUID blob names</b> &mdash; user filenames never reach the filesystem</li>
+          <li class="ok"><b><code>realpath</code> + prefix check</b> on every resolution &mdash; traversal blocked</li>
+          <li class="ok"><b>Avatars sniffed by magic bytes</b>, not extension or Content-Type <span class="ref">avatars.py:47</span></li>
+          <li class="ok"><b>Classified items return 404</b>, not 403 &mdash; no existence disclosure</li>
+          <li class="ok"><b>Avatar writes: self or Super Admin only</b> &mdash; PDPA-aligned</li>
+        </ul>
+      </div>
+      <div class="card hi">
+        <h4>The access model <span class="pill p-hi">High</span></h4>
+        <pre style="margin-top:8px"><span class="c"># app/files.py:702 &mdash; the code says it itself</span>
+<span class="c"># "No permission filter &mdash; any logged-in</span>
+<span class="c">#  user can download any file"</span></pre>
+        <ul style="margin-top:10px">
+          <li class="no">No per-user ownership on downloads</li>
+          <li class="no">No per-department or per-folder scoping</li>
+          <li class="no"><b>"Classified" is a single Staff-vs-elevated bit</b> &mdash; not access control</li>
+        </ul>
+        <div class="note crit" style="margin-top:10px;font-size:12.5px">
+          <b>Tell the team plainly:</b> the File Share is a company-wide noticeboard, not personal
+          storage. Marking something Classified hides it from Staff &mdash; and from nobody else.
+        </div>
+      </div>
+    </div>
+    <div class="note crit" style="margin-top:14px">
+      <b>Stored-HTML &rarr; XSS chain.</b> <code>?inline=1</code> renders any stored MIME in-browser.
+      Upload an <code>.html</code> or <code>.svg</code>, share the inline link, and it executes
+      <b>same-origin</b> against the victim's logged-in session &mdash; with <b>no CSP</b> to stop it.
+      Fix: restrict inline to an image/PDF allowlist, or serve user files from a separate origin.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 10 XSS ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">06+</span> Frontend &mdash; the amplifier</div>
+    <h2>The <code>esc()</code> trap</h2>
+    <p class="sub">One helper, three call sites, two wrong contexts. This is the most likely source of the next incident.</p>
+  </div>
+  <div class="body">
+    <div class="grid g2" style="margin-bottom:14px">
+      <div>
+        <pre class="bad"><span class="c">// static/app/worklogs.js:473-477</span>
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;   <span class="c">// text-node serialization</span>
+}</pre>
+        <div class="note crit" style="margin-top:12px">
+          Serializing a <b>text node</b> escapes only
+          <code>&amp;</code> <code>&lt;</code> <code>&gt;</code> and U+00A0.
+          It escapes <b>neither</b> <code>"</code> <b>nor</b> <code>'</code>.
+          <br><br>That makes <code>esc()</code> safe in exactly one context &mdash; and quietly unsafe in
+          the two places it is most often reached for.
+        </div>
+      </div>
+      <div>
+        <table>
+          <thead><tr><th>Context</th><th>esc() safe?</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">&lt;td&gt;${x}&lt;/td&gt;</td><td><span class="pill p-ok">Yes</span></td><td><code>esc()</code></td></tr>
+            <tr><td class="mono">title="${x}"</td><td><span class="pill p-crit">No</span> &mdash; <code>"</code> passes</td><td><code>_psEsc()</code></td></tr>
+            <tr><td class="mono">onclick="f('${x}')"</td><td><span class="pill p-crit">No</span> &mdash; <code>'</code> passes</td><td>addEventListener</td></tr>
+            <tr><td class="mono">onclick='f(${JSON})'</td><td><span class="pill p-crit">No</span> &mdash; none at all</td><td>addEventListener</td></tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:12px;font-size:12.5px">
+          <code>_psEsc()</code> in <code>projects-summary.js</code> is the quote-safe version.
+          Consolidate on it in <code>core.js</code> and delete the duplicate.
+        </div>
+      </div>
+    </div>
+    <h3 style="margin-bottom:8px">Three live sinks &mdash; all reachable by any authenticated user, all persisted</h3>
+    <table>
+      <thead><tr><th>#</th><th>Location</th><th>Sink</th><th>Sev</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="mono">worklogs.js:203</td><td><code>onclick='editWorklog(${JSON.stringify(w)})'</code> &mdash; the whole worklog object interpolated raw into an inline handler. <code>JSON.stringify</code> escapes for <i>JSON</i>, not for HTML attributes.</td><td><span class="pill p-crit">Worst</span></td></tr>
+        <tr><td>2</td><td class="mono">worklogs.js:212</td><td><code>title="${esc(...)}"</code> &mdash; attribute breakout via unescaped <code>"</code>.</td><td><span class="pill p-hi">High</span></td></tr>
+        <tr><td>3</td><td class="mono">settings.js:172,183,187</td><td><code>esc()</code> inside single quotes, plus <code>${u.role}</code> with <b>no escaping at all</b>.</td><td><span class="pill p-hi">High</span></td></tr>
+      </tbody>
+    </table>
+    <div class="note crit" style="margin-top:14px">
+      <b>Why this matters more than it looks.</b> Worklog text is rendered in
+      <i>every</i> viewer's browser &mdash; including admins opening the Settings tab.
+      Combined with the absent CSP, a stored payload runs unconstrained with an
+      admin's session. <b>Payload persists in the database until removed.</b>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 11 SCORECARD ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">07</span> Scorecard</div>
+    <h2>Where each domain stands</h2>
+  </div>
+  <div class="body">
+    <table style="margin-bottom:18px">
+      <thead><tr><th>Domain</th><th>Verdict</th><th>Strongest control</th><th>Weakest link</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>1 &middot; Auth</b></td><td><span class="pill p-hi">Needs work</span></td>
+          <td>Decorator tiers + CSRF origin check</td>
+          <td>Business flag short-circuits row-level authz</td>
+        </tr>
+        <tr>
+          <td><b>2 &middot; Login / Password</b></td><td><span class="pill p-ok">Strong</span></td>
+          <td>scrypt + hash-only reset tokens + anti-enumeration ordering</td>
+          <td>No password policy at all</td>
+        </tr>
+        <tr>
+          <td><b>3 &middot; Database</b></td><td><span class="pill p-ok">Clean</span></td>
+          <td>Single parameterized choke point &mdash; 0 injection findings</td>
+          <td>Least-privilege unverified; one unguarded column f-string</td>
+        </tr>
+        <tr>
+          <td><b>4 &middot; Deployment / ngrok</b></td><td><span class="pill p-crit">Critical</span></td>
+          <td>Proxy-aware origin trust; <code>.env</code> never committed</td>
+          <td>SECRET_KEY + authtoken committed since <code>5516f91</code></td>
+        </tr>
+        <tr>
+          <td><b>5 &middot; Service</b></td><td><span class="pill p-warn">Medium</span></td>
+          <td>NSSM dependency ordering, log rotation, env injection</td>
+          <td>Docs/installer drift &rarr; ACLs applied to the wrong drive</td>
+        </tr>
+        <tr>
+          <td><b>6 &middot; File share</b></td><td><span class="pill p-hi">Needs work</span></td>
+          <td>UUID blobs, realpath containment, magic-byte sniffing</td>
+          <td>No per-user permissions; inline render enables stored XSS</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="grid g4">
+      <div class="card crit"><h4>3 Critical</h4><p>All secrets. All in git history since the initial commit. Rotation alone is insufficient.</p></div>
+      <div class="card hi"><h4>4 High</h4><p>IDOR chain (2), unvalidated reassignment (1), stored XSS (3 sinks).</p></div>
+      <div class="card warn"><h4>8 Medium</h4><p>No security headers, raw exception leaks, unthrottled enumeration, no password policy, path drift.</p></div>
+      <div class="card ok"><h4>13 Clean</h4><p>SQL, hashing, reset design, traversal, avatars, throttling, cookies, CSRF, deps.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 12 ROADMAP ═══ -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow"><span class="num">08</span> Remediation</div>
+    <h2>Ordered backlog</h2>
+    <p class="sub">Sequence matters &mdash; items 1&ndash;3 make every other control meaningful.</p>
+  </div>
+  <div class="body">
+    <div class="grid g3">
+      <div class="card crit">
+        <h4><span class="pill p-crit">Now</span> Secrets</h4>
+        <ul style="margin-top:8px">
+          <li>Rotate <code>SECRET_KEY</code>; blank the <code>.bat</code> default</li>
+          <li>Revoke + reissue the ngrok token</li>
+          <li>Change/remove the seeded admin; drop the <code>INSERT</code> from <code>init_db.sql</code></li>
+        </ul>
+        <div class="note crit" style="margin-top:10px;font-size:12.5px">
+          Rotating <code>SECRET_KEY</code> invalidates every session &mdash; everyone re-logs in.
+          <b>That is intended.</b> Values remain in git history; treat them as burned.
+        </div>
+      </div>
+      <div class="card hi">
+        <h4><span class="pill p-hi">Next</span> Authorization &amp; XSS</h4>
+        <ul style="margin-top:8px">
+          <li>Remove <code>_worklog_open</code> from all 3 read checks</li>
+          <li>Normalize <code>EmployeeID</code> to <code>str().strip()</code> on both sides</li>
+          <li>Validate <code>member_id</code> in <code>update_worklog</code> against the row owner</li>
+          <li>Fix 3 XSS sinks; consolidate on a quote-safe escaper</li>
+          <li>Extract one shared <code>assert_can_read()</code> helper</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <h4><span class="pill p-warn">Then</span> Hardening</h4>
+        <ul style="margin-top:8px">
+          <li>Add security headers &mdash; <b>CSP first</b></li>
+          <li>Replace raw exception responses with generic text</li>
+          <li>Rate-limit <code>/api/employee-lookup</code></li>
+          <li>Restrict <code>?inline=1</code> to image/PDF</li>
+          <li>Add a password policy (12+ chars)</li>
+          <li>Align storage paths; re-apply ACLs to the real drive</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card acc">
+        <h4>Pre-commit checklist</h4>
+        <ul style="margin-top:6px">
+          <li><code>git diff --cached</code> reviewed for keys/tokens/connection strings</li>
+          <li>All new SQL parameterized; dynamic identifiers whitelisted</li>
+          <li>Row-ownership check present, <b>independent of any feature flag</b></li>
+          <li><code>EmployeeID</code> normalized on both sides</li>
+          <li>Context-correct escaper used in the frontend</li>
+          <li>No raw exception text returned to clients</li>
+        </ul>
+      </div>
+      <div class="card acc">
+        <h4>Two structural lessons</h4>
+        <p style="margin-bottom:10px"><b>1 &middot; Authorization needs one implementation.</b>
+        Three near-identical hand-written checks produced three different bugs. A single helper
+        would have produced zero.</p>
+        <p><b>2 &middot; Escaping is context-dependent, not value-dependent.</b>
+        <code>esc()</code> is not "the safe function" &mdash; it is safe in text nodes and unsafe
+        everywhere else. Name helpers after their context.</p>
+        <div class="note" style="margin-top:12px;font-size:12.5px">
+          Full detail, with every finding cited by <code>file:line</code> &rarr;
+          <b>SECURITY.md</b> in the repo root.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="nav">
+  <button onclick="go(-1)" title="Previous">&lsaquo;</button>
+  <button onclick="go(1)" title="Next">&rsaquo;</button>
+</div>
+<div class="bar" id="bar"></div>
+</div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var i = 0;
+
+  slides.forEach(function(s, n){
+    if (n === 0) return;
+    var f = document.createElement('div');
+    f.className = 'foot';
+    var cur = String(n).length < 2 ? '0' + n : String(n);
+    var tot = String(slides.length - 1).length < 2 ? '0' + (slides.length - 1) : String(slides.length - 1);
+    f.innerHTML = '<span>MWL &middot; Security Workflow</span><span>' + cur + ' / ' + tot + '</span>';
+    s.appendChild(f);
+  });
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function(s, k){ s.classList.toggle('on', k === i); });
+    document.getElementById('bar').style.width = (i / (slides.length - 1) * 100) + '%';
+    var b = slides[i].querySelector('.body');
+    if (b) b.scrollTop = 0;
+  }
+  window.go = function(d){ show(i + d); };
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+  });
+
+  document.getElementById('deck').addEventListener('click', function(e){
+    if (e.target.closest('.nav') || e.target.closest('.body')) return;
+    go(1);
+  });
+
+  show(0);
+})();
+</script>
+</body>
+</html>

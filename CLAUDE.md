@@ -745,6 +745,11 @@ These are real issues caught by the project-wide code review. Docs were
 updated to flag them; code fixes are still pending and intentionally
 out-of-scope for that review.
 
+> **Security:** see [SECURITY.md](SECURITY.md) for the 2026-08-07 audit
+> (login/auth, password storage, database, file share), the team-member
+> guide, and the developer security rules. Its **Part 0** lists three
+> CRITICAL items that outrank everything in the table below.
+
 | # | Where | Issue | Severity |
 |---|-------|-------|----------|
 | 1 | [install-service.bat](install-service.bat):19-26 | `SECRET_KEY`, `NGROK_AUTHTOKEN`, `DB_SERVER`, `NGROK_DOMAIN` hardcoded as `SET` defaults; will leak into NSSM env if `.env` is missing any key. Rotate the exposed ngrok token + `SECRET_KEY` and blank the defaults. | Critical |
