@@ -1,11 +1,11 @@
 /* =========================
    DATABASE INIT
 ========================= */
-IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'MeterWorklog')
-    CREATE DATABASE MeterWorklog;
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'MWLtimesheet')
+    CREATE DATABASE MWLtimesheet;
 GO
 
-USE MeterWorklog;
+USE MWLtimesheet;
 GO
 
 /* =========================
