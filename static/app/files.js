@@ -10,6 +10,11 @@ let fileSearchTerm = '';          // case-insensitive substring filter
 let fileSortKey = 'name';         // 'name' | 'size' | 'date' | 'uploader'
 let fileSortDir = 'asc';          // 'asc' | 'desc'
 let fileSearchDebounce = null;
+// Per-upload cap, refreshed from /api/files/stats. Uploads traverse the
+// Cloudflare Worker, whose plan-based request-body limit drops an oversized
+// POST at the edge — Flask never sees it, so there is no useful server error to
+// surface. 0 = not known yet; skip the check rather than guess.
+let fileMaxUploadBytes = 0;
 let fileTreeCollapsed = new Set();  // folder ids currently collapsed in the sidebar tree
 try {
     fileTreeCollapsed = new Set(JSON.parse(localStorage.getItem('mwl_files_collapsed') || '[]'));
@@ -51,6 +56,7 @@ async function loadFileStats() {
     if (!host) return;
     const s = await api('/api/files/stats');
     if (!s) { host.innerHTML = ''; if (meta) meta.innerHTML = ''; return; }
+    fileMaxUploadBytes = s.max_upload_bytes || 0;
 
     host.innerHTML = `
         <span class="inline-flex items-center gap-1">
@@ -1458,7 +1464,18 @@ document.addEventListener('click', (ev) => {
     cancelUpload(btn.getAttribute('data-cancel-upload'));
 });
 
-async function uploadFiles(files) {
+async function uploadFiles(allFiles) {
+    // Reject oversized files before starting: the edge aborts the request
+    // mid-body, which otherwise surfaces as an opaque network failure.
+    const overLimit = fileMaxUploadBytes > 0
+        ? allFiles.filter(f => f.size > fileMaxUploadBytes)
+        : [];
+    for (const f of overLimit) {
+        toast(`"${f.name}" is ${fmtBytes(f.size)} — over the ${fmtBytes(fileMaxUploadBytes)} per-file limit`, 'error');
+    }
+    const files = overLimit.length ? allFiles.filter(f => f.size <= fileMaxUploadBytes) : allFiles;
+    if (!files.length) return;
+
     const destName = fileCurrentFolderId == null
         ? 'Root'
         : (findFolderName(fileCurrentFolderId) || `Folder #${fileCurrentFolderId}`);

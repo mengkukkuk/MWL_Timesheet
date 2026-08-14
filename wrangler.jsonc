@@ -1,0 +1,62 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "mwl-timesheet",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-13",
+
+
+
+  // dist/ is produced by `npm run build` (build:css + build:static).
+  // run_worker_first is explicit rather than relying on asset-miss fallthrough.
+  //
+  // not_found_handling is deliberately left at its default (404). This SPA does
+  // client-side *tab* routing under "/", not path routing, so serving index.html
+  // for unmatched paths would only mask real 404s.
+  "assets": {
+    "directory": "./dist/",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "observability": { "enabled": true },
+
+  // ── Local development (`wrangler dev`) ─────────────────────────────────────
+  // Proxies /api/* to the Flask that dev.bat starts, with a plain fetch().
+  // dev.bat overrides this with `--var ORIGIN_URL:http://localhost:%APP_PORT%`
+  // so .env's APP_PORT stays the single source of truth; the value below is
+  // only the fallback for a bare `npx wrangler dev`.
+  //
+  // `vars` is NOT inherited by named environments, so production never sees it —
+  // that is deliberate, and it is why `--env production` warns that "vars exists
+  // at the top level, but not on env.production". Leave it that way: production
+  // must reach Flask through the VPC binding, never a plain URL.
+  "vars": {
+    "ORIGIN_URL": "http://localhost:5050"
+  },
+
+  // ── Production (`wrangler deploy --env production`) ────────────────────────
+  // ORIGIN is a Workers VPC Service pointing at localhost:%APP_PORT% through the
+  // existing MeterWorklog-cloudflared tunnel, so Flask needs no public hostname.
+  //
+  // Create it once, then paste the returned id below:
+  //   npx wrangler vpc service create mwl-flask-origin \
+  //     --type http --tunnel-id <MeterWorklog tunnel id> \
+  //     --ipv4 127.0.0.1 --http-port 5050
+  //
+  // (--ipv4 rather than --hostname: cloudflared resolves this from the same box
+  // Flask runs on, and --hostname additionally requires --resolver-ips.)
+  //
+  // NOTE: vpc_services is not inherited from the top level — it must be declared
+  // in each named environment that needs it.
+  "env": {
+    "production": {
+      "vpc_services": [
+        {
+          "binding": "ORIGIN",
+          "service_id": "019ffb7d-713f-71f1-b9a2-2c21e71def73",
+          "remote": true
+        }
+      ]
+    }
+  }
+}

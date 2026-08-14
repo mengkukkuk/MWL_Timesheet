@@ -95,8 +95,9 @@ app.secret_key = _secret
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # Cookie 'Secure' flag — explicit env wins; otherwise auto: ON when any HTTPS-fronted
-# deployment is configured (NGROK_DOMAIN or TAILSCALE_DOMAIN), OFF for plain-HTTP LAN /
-# raw Tailscale device IPs (so the session cookie isn't silently dropped by the browser).
+# deployment is configured (CF_TUNNEL_DOMAIN, WORKER_DOMAIN, NGROK_DOMAIN, TAILSCALE_DOMAIN), OFF
+# for plain-HTTP LAN / raw Tailscale device IPs (so the session cookie isn't silently
+# dropped by the browser). NGROK_DOMAIN is dormant/deprecated, kept for rollback only.
 _secure_env = os.getenv('SESSION_COOKIE_SECURE', '').strip().lower()
 if _secure_env in ('true', '1', 'yes'):
     app.config['SESSION_COOKIE_SECURE'] = True
@@ -104,14 +105,21 @@ elif _secure_env in ('false', '0', 'no'):
     app.config['SESSION_COOKIE_SECURE'] = False
 else:
     _has_https_front = bool(
-        os.getenv('NGROK_DOMAIN', '').strip()
+        os.getenv('CF_TUNNEL_DOMAIN', '').strip()
+        or os.getenv('WORKER_DOMAIN', '').strip()
+        or os.getenv('NGROK_DOMAIN', '').strip()
         or os.getenv('TAILSCALE_DOMAIN', '').strip()
     )
     app.config['SESSION_COOKIE_SECURE'] = _has_https_front
 
 # File Share: caps & paths
 # Per-upload limit — blocks one huge request.
-_max_mb = int(os.getenv('FILE_UPLOAD_MAX_MB', '5120'))
+# Default 100 MB, matching Cloudflare's proxied request-body cap on the Free/Pro
+# plans (Business 200 MB, Enterprise 500 MB). Uploads now traverse the Worker,
+# so anything above the plan's cap is rejected at the edge before Flask sees it
+# — raising this alone will not help. static/app/files.js enforces the same
+# number client-side so users get a clear message instead of an opaque failure.
+_max_mb = int(os.getenv('FILE_UPLOAD_MAX_MB', '100'))
 app.config['MAX_CONTENT_LENGTH'] = _max_mb * 1024 * 1024
 # File-share storage — can be moved to separate drive for backups/performance.
 # Override with FILE_STORAGE_DIR env var if needed.
@@ -148,6 +156,21 @@ app.config['APP_BASE_URL']                  = os.getenv('APP_BASE_URL', '').rstr
 # Password-reset tuning
 app.config['RESET_TOKEN_TTL_MINUTES']       = int(os.getenv('RESET_TOKEN_TTL_MINUTES', '60'))
 app.config['RESET_EMAIL_COOLDOWN_SECONDS']  = int(os.getenv('RESET_EMAIL_COOLDOWN_SECONDS', '300'))
+
+def _domain_env(name):
+    """Read a *_DOMAIN env var as a bare hostname.
+
+    These are documented as hostnames ("mwl.example.com"), but pasting a full
+    URL is an easy mistake — and it used to fail silently: the trusted origin
+    was built as f"https://{value}/", so a value of "https://host" produced
+    "https://https://host/", which matches nothing and rejects every non-GET
+    /api/* request with an unexplained 403. Normalize instead.
+    """
+    value = os.getenv(name, '').strip()
+    if '//' in value:
+        value = value.split('//', 1)[1]
+    return value.split('/', 1)[0]
+
 
 def _is_same_origin(source_url, target_url):
     try:
@@ -206,18 +229,34 @@ def verify_api_csrf_origin():
         return None
 
     # ── Build the set of trusted origins ────────────────────────────────────
-    # When running behind ngrok / a reverse proxy / `tailscale serve`, the raw
-    # request.host_url is always the local socket (e.g. http://localhost:5000/)
+    # When running behind cloudflared / ngrok / a reverse proxy / `tailscale serve`,
+    # the raw request.host_url is always the local socket (e.g. http://localhost:5000/)
     # which never matches the browser's Origin header. We resolve this with
-    # four layers:
+    # five layers:
     #
-    #  1. X-Forwarded-Host    — set by ngrok and `tailscale serve`.
-    #  2. NGROK_DOMAIN env    — explicit trust from .env, works even if the
-    #                           proxy rewrites Host back to localhost.
-    #  3. TAILSCALE_DOMAIN    — explicit trust for the tailnet HTTPS domain,
+    #  1. X-Forwarded-Host    — set by cloudflared, ngrok, `tailscale serve`, and
+    #                           worker/index.ts. NOTE: this layer is INERT under
+    #                           Waitress (i.e. in production) — see below.
+    #  2. CF_TUNNEL_DOMAIN env — explicit trust for the Cloudflare Tunnel public
+    #                           hostname, works even if the proxy rewrites Host
+    #                           back to localhost.
+    #  2b. WORKER_DOMAIN env  — the Cloudflare Worker hostname that serves the SPA
+    #                           and proxies /api/* here (see worker/index.ts).
+    #  3. NGROK_DOMAIN env    — dormant/deprecated (rollback path only): explicit
+    #                           trust for the legacy ngrok domain.
+    #  4. TAILSCALE_DOMAIN    — explicit trust for the tailnet HTTPS domain,
     #                           e.g. mypc.tail1234a.ts.net.
-    #  4. request.host_url    — plain LAN / localhost access.
+    #  5. request.host_url    — plain LAN / localhost access.
 
+    # Layer 1. Only actually reachable under the Flask dev server (dev.bat) and in
+    # tests. Waitress 3.x defaults to trusted_proxy=None +
+    # clear_untrusted_proxy_headers=True, so in production it STRIPS every
+    # X-Forwarded-* header before Flask is invoked — no matter what the Worker
+    # sent. That is a deliberate anti-forgery default and we keep it, but it means
+    # the explicit *_DOMAIN layers below are the only thing making a proxied
+    # deployment work. Do not "simplify" them away on the assumption that the
+    # forwarded headers cover it. (Verified empirically 2026-08-13: a POST with a
+    # matching Origin + X-Forwarded-Host still 403s against the Waitress service.)
     forwarded_proto = request.headers.get('X-Forwarded-Proto', request.scheme)
     forwarded_host  = request.headers.get('X-Forwarded-Host') or request.host
     proxy_host_url  = f"{forwarded_proto}://{forwarded_host}/"
@@ -226,12 +265,32 @@ def verify_api_csrf_origin():
     #trusted = {request.host_url}
 
 
-    ngrok_domain = os.getenv('NGROK_DOMAIN', '').strip()
+    cf_tunnel_domain = _domain_env('CF_TUNNEL_DOMAIN')
+    if cf_tunnel_domain:
+        # cloudflared forwards the public hostname via X-Forwarded-Host in the common
+        # case (already covered by proxy_host_url above), but this explicit block is
+        # defense when those headers are stripped/rewritten, and keeps domain trust
+        # explicit and auditable rather than implicitly trusting whatever Host header
+        # shows up.
+        trusted.add(f"https://{cf_tunnel_domain}/")
+        trusted.add(f"http://{cf_tunnel_domain}/")
+
+    worker_domain = _domain_env('WORKER_DOMAIN')
+    if worker_domain:
+        # The Cloudflare Worker (worker/index.ts) serves the SPA and proxies /api/*
+        # to this origin, so the browser's Origin is the Worker's hostname. The
+        # Worker does set X-Forwarded-Host/-Proto (covered by proxy_host_url
+        # above); this stays explicit for the same auditability reason as
+        # CF_TUNNEL_DOMAIN, and covers the *.workers.dev staging hostname.
+        trusted.add(f"https://{worker_domain}/")
+        trusted.add(f"http://{worker_domain}/")
+
+    ngrok_domain = _domain_env('NGROK_DOMAIN')
     if ngrok_domain:
         trusted.add(f"https://{ngrok_domain}/")
         trusted.add(f"http://{ngrok_domain}/")
 
-    tailscale_domain = os.getenv('TAILSCALE_DOMAIN', '').strip()
+    tailscale_domain = _domain_env('TAILSCALE_DOMAIN')
     if tailscale_domain:
         # tailscale serve is HTTPS-only on the public side, but accept both for safety
         trusted.add(f"https://{tailscale_domain}/")

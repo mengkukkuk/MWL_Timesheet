@@ -12,20 +12,31 @@ IF "%APP_DIR:~-1%"=="\" SET APP_DIR=%APP_DIR:~0,-1%
 SET PYTHON_EXE=%APP_DIR%\.venv\Scripts\python.exe
 SET NSSM_EXE=C:\Windows\System32\nssm.exe
 SET NGROK_EXE=%APP_DIR%\deployer\ngrok.exe
+SET CLOUDFLARED_EXE=%APP_DIR%\deployer\cloudflared.exe
 SET TAILSCALE_EXE=C:\Program Files\Tailscale\tailscale.exe
 SET SVC_APP=MeterWorklog
+REM NGROK_* / SVC_NGROK are DEPRECATED — kept dormant (defined but no longer
+REM installed below) as a fast rollback path during the Cloudflare Tunnel
+REM transition. Safe to delete once Cloudflare Tunnel is confirmed stable.
 SET SVC_NGROK=MeterWorklog-ngrok
+SET SVC_CLOUDFLARED=MeterWorklog-cloudflared
 SET APP_PORT=5050
 SET DB_SERVER=localhost\SQLEXPRESS
 SET DB_NAME=MWLTimesheet
 SET DB_DRIVER={ODBC Driver 17 for SQL Server}
 SET DB_TRUST_CERT=yes
 SET SECRET_KEY=Metercenter
-SET NGROK_AUTHTOKEN=3DinmxLPcvA70ZuiOHbXblahP75_3ENVxYkKeDjQajAbCLfod
-SET NGROK_DOMAIN=unpreventively-inconvertible-rolande.ngrok-free.dev
+SET NGROK_AUTHTOKEN=
+SET NGROK_DOMAIN=
+SET CF_TUNNEL_TOKEN=
+SET CF_TUNNEL_DOMAIN=
+REM Hostname of the Cloudflare Worker that serves the SPA and proxies /api/* here.
+REM The browser's Origin is the Worker's hostname, so the CSRF check must trust it.
+SET WORKER_DOMAIN=
 SET TAILSCALE_DOMAIN=
 REM Public base URL used to build password-reset links in emails. Blank on purpose —
-REM derived from NGROK_DOMAIN after the .env block below unless .env overrides it.
+REM derived from CF_TUNNEL_DOMAIN (or NGROK_DOMAIN as a fallback) after the .env
+REM block below unless .env overrides it.
 SET APP_BASE_URL=
 REM Waitress channel timeout (seconds). Default 3600 = 60 min — needed for multi-GB
 REM uploads over Tailscale, especially via DERP relays. Override in .env if needed.
@@ -33,13 +44,17 @@ SET WAITRESS_CHANNEL_TIMEOUT=3600
 REM Waitress max request body size (bytes). Waitress's OWN default is 1 GB and it
 REM rejects oversized requests BEFORE Flask's MAX_CONTENT_LENGTH is consulted, so
 REM this MUST be at least as large as FILE_UPLOAD_MAX_MB * 1024 * 1024.
-REM Default 5368709120 = 5 GB (matches FILE_UPLOAD_MAX_MB=5120 with no headroom).
-REM For larger uploads, raise both this and FILE_UPLOAD_MAX_MB.
-SET WAITRESS_MAX_REQUEST_BODY=5368709120
+REM Default 104857600 = 100 MB (matches FILE_UPLOAD_MAX_MB=100 exactly).
+SET WAITRESS_MAX_REQUEST_BODY=104857600
 REM Storage paths — recommended to use separate drive (e.g. D:\) for safety & backups
 SET FILE_STORAGE_DIR=E:\MeterWorklog_Storage\files
 SET AVATAR_STORAGE_DIR=E:\MeterWorklog_Storage\avatars
-SET FILE_UPLOAD_MAX_MB=5120
+REM Per-file upload cap (MB). Capped at 100 because requests reach Flask through
+REM the Cloudflare Worker, and Cloudflare's proxied request-body limit is 100 MB
+REM on Free/Pro (200 MB Business, 500 MB Enterprise). Raising this alone does NOT
+REM raise the real limit — larger uploads die at the edge with a 413 Flask never
+REM sees. Raise the Cloudflare plan first, then this AND WAITRESS_MAX_REQUEST_BODY.
+SET FILE_UPLOAD_MAX_MB=100
 SET FILE_STORAGE_CAP_MB=614400
 SET FILE_MIN_FREE_MB=8192
 
@@ -50,6 +65,10 @@ if exist "%APP_DIR%\.env" (
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b DB_NAME "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="DB_NAME" set DB_NAME=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b NGROK_AUTHTOKEN "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="NGROK_AUTHTOKEN" set NGROK_AUTHTOKEN=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b NGROK_DOMAIN "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="NGROK_DOMAIN" set NGROK_DOMAIN=%%B
+    REM Quoted set: the token can contain characters an unquoted set would mishandle.
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b CF_TUNNEL_TOKEN "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="CF_TUNNEL_TOKEN" set "CF_TUNNEL_TOKEN=%%B"
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b CF_TUNNEL_DOMAIN "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="CF_TUNNEL_DOMAIN" set CF_TUNNEL_DOMAIN=%%B
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /b WORKER_DOMAIN "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="WORKER_DOMAIN" set WORKER_DOMAIN=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b TAILSCALE_DOMAIN "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="TAILSCALE_DOMAIN" set TAILSCALE_DOMAIN=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b WAITRESS_CHANNEL_TIMEOUT "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="WAITRESS_CHANNEL_TIMEOUT" set WAITRESS_CHANNEL_TIMEOUT=%%B
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b WAITRESS_MAX_REQUEST_BODY "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="WAITRESS_MAX_REQUEST_BODY" set WAITRESS_MAX_REQUEST_BODY=%%B
@@ -62,9 +81,14 @@ if exist "%APP_DIR%\.env" (
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /b APP_BASE_URL "%APP_DIR%\.env" 2^>nul`) do if /i "%%A"=="APP_BASE_URL" set "APP_BASE_URL=%%B"
 )
 
-REM Default the reset-link base URL to the ngrok domain so the two can never drift.
+REM Default the reset-link base URL to the public domain so the two can never drift.
 REM Without this, _base_url() in app\auth.py falls back to the client-supplied
 REM X-Forwarded-Host header, which lets a request forge the domain in reset emails.
+REM WORKER_DOMAIN wins: once the Worker fronts the app, it is the only hostname
+REM users can reach, and the tunnel's own public hostname route gets removed.
+REM CF_TUNNEL_DOMAIN is next; NGROK_DOMAIN is a dormant fallback.
+if not defined APP_BASE_URL if defined WORKER_DOMAIN if not "%WORKER_DOMAIN%"=="" set "APP_BASE_URL=https://%WORKER_DOMAIN%"
+if not defined APP_BASE_URL if defined CF_TUNNEL_DOMAIN if not "%CF_TUNNEL_DOMAIN%"=="" set "APP_BASE_URL=https://%CF_TUNNEL_DOMAIN%"
 if not defined APP_BASE_URL if defined NGROK_DOMAIN set "APP_BASE_URL=https://%NGROK_DOMAIN%"
 
 net session >nul 2>&1
@@ -114,6 +138,8 @@ echo [2/4] Installing %SVC_APP% service...
     "DB_TRUST_CERT=%DB_TRUST_CERT%" ^
     "SECRET_KEY=%SECRET_KEY%" ^
     "NGROK_DOMAIN=%NGROK_DOMAIN%" ^
+    "CF_TUNNEL_DOMAIN=%CF_TUNNEL_DOMAIN%" ^
+    "WORKER_DOMAIN=%WORKER_DOMAIN%" ^
     "TAILSCALE_DOMAIN=%TAILSCALE_DOMAIN%" ^
     "FILE_STORAGE_DIR=%FILE_STORAGE_DIR%" ^
     "AVATAR_STORAGE_DIR=%AVATAR_STORAGE_DIR%" ^
@@ -122,22 +148,27 @@ echo [2/4] Installing %SVC_APP% service...
     "FILE_MIN_FREE_MB=%FILE_MIN_FREE_MB%" ^
     "APP_BASE_URL=%APP_BASE_URL%"
 
-echo [3/4] Installing %SVC_NGROK% service...
-%NSSM_EXE% install %SVC_NGROK% "%NGROK_EXE%"
-%NSSM_EXE% set %SVC_NGROK% AppParameters "http %APP_PORT% --url=%NGROK_DOMAIN% --authtoken=%NGROK_AUTHTOKEN%"
-%NSSM_EXE% set %SVC_NGROK% AppDirectory "%APP_DIR%"
-%NSSM_EXE% set %SVC_NGROK% DisplayName "MeterWorklog ngrok Tunnel"
-%NSSM_EXE% set %SVC_NGROK% Start SERVICE_AUTO_START
-%NSSM_EXE% set %SVC_NGROK% AppStdout "%APP_DIR%\logs\ngrok.log"
-%NSSM_EXE% set %SVC_NGROK% AppStderr "%APP_DIR%\logs\ngrok-error.log"
-%NSSM_EXE% set %SVC_NGROK% AppRotateFiles 1
-%NSSM_EXE% set %SVC_NGROK% AppRotateBytes 5242880
-%NSSM_EXE% set %SVC_NGROK% DependOnService %SVC_APP%
+echo [3/4] Installing %SVC_CLOUDFLARED% service...
+REM NOTE: %SVC_NGROK% (MeterWorklog-ngrok) is intentionally NOT (re)installed here —
+REM Cloudflare Tunnel replaces it. If a MeterWorklog-ngrok service is still registered
+REM from a prior install, it's left alone (untouched, not started) as a rollback path:
+REM `nssm start MeterWorklog-ngrok` brings the old public path back instantly if the
+REM Cloudflare Tunnel token/route turns out to be misconfigured post-cutover.
+%NSSM_EXE% install %SVC_CLOUDFLARED% "%CLOUDFLARED_EXE%"
+%NSSM_EXE% set %SVC_CLOUDFLARED% AppParameters "tunnel run --token %CF_TUNNEL_TOKEN%"
+%NSSM_EXE% set %SVC_CLOUDFLARED% AppDirectory "%APP_DIR%"
+%NSSM_EXE% set %SVC_CLOUDFLARED% DisplayName "MeterWorklog Cloudflare Tunnel"
+%NSSM_EXE% set %SVC_CLOUDFLARED% Start SERVICE_AUTO_START
+%NSSM_EXE% set %SVC_CLOUDFLARED% AppStdout "%APP_DIR%\logs\cloudflared.log"
+%NSSM_EXE% set %SVC_CLOUDFLARED% AppStderr "%APP_DIR%\logs\cloudflared-error.log"
+%NSSM_EXE% set %SVC_CLOUDFLARED% AppRotateFiles 1
+%NSSM_EXE% set %SVC_CLOUDFLARED% AppRotateBytes 5242880
+%NSSM_EXE% set %SVC_CLOUDFLARED% DependOnService %SVC_APP%
 
 echo Starting services...
 %NSSM_EXE% start %SVC_APP%
 timeout /t 3 >nul
-%NSSM_EXE% start %SVC_NGROK%
+%NSSM_EXE% start %SVC_CLOUDFLARED%
 
 echo [4/4] Configuring Tailscale Serve (HTTPS reverse proxy)...
 if exist "%TAILSCALE_EXE%" (
@@ -162,7 +193,8 @@ echo.
 
 echo === Done! ===
 echo   Local:    http://localhost:%APP_PORT%
-echo   Public:   https://%NGROK_DOMAIN%
+if defined CF_TUNNEL_DOMAIN if not "%CF_TUNNEL_DOMAIN%"=="" echo   Public:   https://%CF_TUNNEL_DOMAIN%
+if defined NGROK_DOMAIN if not "%NGROK_DOMAIN%"=="" echo   Public (ngrok, legacy/rollback): https://%NGROK_DOMAIN%
 if defined TAILSCALE_DOMAIN if not "%TAILSCALE_DOMAIN%"=="" (
     echo   Tailnet:  https://%TAILSCALE_DOMAIN%
 )

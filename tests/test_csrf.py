@@ -131,3 +131,87 @@ class TestCsrfHook:
                 headers={'Origin': 'https://mypc.tail1234a.ts.net'},
             )
         assert resp.status_code == 200
+
+    # -- Cloudflare Tunnel domain trust --------------------------------------
+
+    def test_cf_tunnel_domain_trusted_when_env_set(self, client):
+        with patch.dict('os.environ', {'CF_TUNNEL_DOMAIN': 'mwl.example.com'}):
+            resp = client.post(
+                '/api/logout',
+                json={},
+                headers={'Origin': 'https://mwl.example.com'},
+            )
+        assert resp.status_code == 200
+
+    def test_different_cf_tunnel_domain_rejected(self, client):
+        with patch.dict('os.environ', {'CF_TUNNEL_DOMAIN': 'mwl.example.com'}):
+            resp = client.post(
+                '/api/logout',
+                json={},
+                headers={'Origin': 'https://other.example.com'},
+            )
+        assert resp.status_code == 403
+
+    # -- Cloudflare Worker domain trust --------------------------------------
+    # The Worker (worker/index.ts) serves the SPA and proxies /api/* here, so the
+    # browser's Origin is the Worker's hostname, not the tunnel's.
+
+    def test_worker_domain_trusted_when_env_set(self, client):
+        with patch.dict('os.environ', {'WORKER_DOMAIN': 'mwl-timesheet.example.workers.dev'}):
+            resp = client.post(
+                '/api/logout',
+                json={},
+                headers={'Origin': 'https://mwl-timesheet.example.workers.dev'},
+            )
+        assert resp.status_code == 200
+
+    def test_different_worker_domain_rejected(self, client):
+        with patch.dict('os.environ', {'WORKER_DOMAIN': 'mwl-timesheet.example.workers.dev'}):
+            resp = client.post(
+                '/api/logout',
+                json={},
+                headers={'Origin': 'https://evil.workers.dev'},
+            )
+        assert resp.status_code == 403
+
+    def test_worker_domain_tolerates_a_full_url(self, client):
+        """A *_DOMAIN var pasted as a full URL must still be trusted.
+
+        Regression: the raw value was interpolated into f"https://{value}/",
+        so "https://host" became "https://https://host/", which matched
+        nothing and silently 403'd every non-GET /api/* request behind the
+        Worker.
+        """
+        for value in (
+            'https://mwl-timesheet.example.workers.dev',
+            'https://mwl-timesheet.example.workers.dev/',
+        ):
+            with patch.dict('os.environ', {'WORKER_DOMAIN': value}):
+                resp = client.post(
+                    '/api/logout',
+                    json={},
+                    headers={'Origin': 'https://mwl-timesheet.example.workers.dev'},
+                )
+            assert resp.status_code == 200, value
+
+    def test_worker_forwarded_headers_are_trusted(self, client):
+        """X-Forwarded-Host/-Proto alone are enough to build a trusted origin.
+
+        SCOPE WARNING — this holds for the Werkzeug test client and the Flask dev
+        server, but NOT in production: Waitress 3.x defaults to
+        trusted_proxy=None + clear_untrusted_proxy_headers=True and strips every
+        X-Forwarded-* header before Flask sees it. So this test does NOT show that
+        a deploy which forgot WORKER_DOMAIN still works — it won't; every non-GET
+        /api/* will 403. Keep this test for the dev-server path, but rely on
+        test_worker_domain_* for the production guarantee.
+        """
+        resp = client.post(
+            '/api/logout',
+            json={},
+            headers={
+                'Origin': 'https://mwl.example.com',
+                'X-Forwarded-Host': 'mwl.example.com',
+                'X-Forwarded-Proto': 'https',
+            },
+        )
+        assert resp.status_code == 200

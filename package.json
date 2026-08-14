@@ -2,11 +2,16 @@
   "name": "mwl-timesheet-css",
   "private": true,
   "version": "1.0.0",
-  "description": "Local Tailwind CSS build for the vanilla-JS SPA served by Flask (templates/index.html, templates/login.html). Replaces the jsdelivr CDN link with a purged, self-hosted static/tailwind.css.",
+  "description": "Build + edge deployment for the vanilla-JS SPA: purged Tailwind CSS, static render of templates/*.html into dist/, and the Cloudflare Worker that serves dist/ and proxies /api/* to the on-prem Flask origin.",
   "scripts": {
-    "build:css": "tailwindcss -i ./static/tailwind-src.css -o ./static/tailwind.css --minify"
+    "build:css": "tailwindcss -i ./static/tailwind-src.css -o ./static/tailwind.css --minify",
+    "build:static": "node scripts/render-static.mjs",
+    "build": "npm run build:css && npm run build:static",
+    "dev": "wrangler dev",
+    "deploy": "npm run build && wrangler deploy --env production"
   },
   "devDependencies": {
-    "tailwindcss": "2.2.19"
+    "tailwindcss": "2.2.19",
+    "wrangler": "^4.122.0"
   }
 }

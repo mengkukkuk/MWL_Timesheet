@@ -125,6 +125,10 @@ def _storage_snapshot():
         'cap_bytes': int(current_app.config['FILE_STORAGE_CAP_BYTES']),
         'free_disk_bytes': int(free_disk),
         'min_free_bytes': int(current_app.config['FILE_MIN_FREE_BYTES']),
+        # Per-upload ceiling, so the UI can reject an oversized file up front
+        # instead of spending a long upload on a request the Cloudflare edge
+        # will drop before Flask ever sees it.
+        'max_upload_bytes': int(current_app.config['MAX_CONTENT_LENGTH']),
     }
 
 
