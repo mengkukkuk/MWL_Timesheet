@@ -1,11 +1,15 @@
 /* =========================
    DATABASE INIT
 ========================= */
-IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'MWLtimesheet')
-    CREATE DATABASE MWLtimesheet;
+/* {DBNAME} is substituted by db._init_db_mssql() from the DB_NAME env var.
+   T-SQL cannot parameterise CREATE DATABASE / USE, and hard-coding a name
+   here means a DB_NAME that differs from it (as MeterWorklog does) would
+   silently build a second, empty database and leave the real one untouched. */
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = '{DBNAME}')
+    CREATE DATABASE [{DBNAME}];
 GO
 
-USE MWLtimesheet;
+USE [{DBNAME}];
 GO
 
 /* =========================
@@ -151,7 +155,12 @@ CREATE TABLE worklogs (
                                   END
                               ) PERSISTED,
 
-                          status NVARCHAR(50) CHECK (status IN ('Done','In Progress','Pending','Man day')),
+                          -- 'Leave' is offered by the app (VALID_STATUSES in
+                          -- app/worklogs.py and the <option> in templates/index.html);
+                          -- the CK_worklogs_status rebuild near the end of this file
+                          -- repairs databases created before it was added here.
+                          status NVARCHAR(50) CONSTRAINT CK_worklogs_status
+                              CHECK (status IN ('Done','In Progress','Pending','Man day','Leave')),
                           note NVARCHAR(1000),
 
                           created_at DATETIME2 DEFAULT GETDATE(),
@@ -451,7 +460,7 @@ GO
    parameter before SQL binding, so this backfill only matters for rows
    written before that fix landed.
 ========================= */
-USE MWLTimesheet
+USE [{DBNAME}];
 UPDATE dbo.Employee
 SET EmployeeID = RTRIM(EmployeeID)
 WHERE DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
@@ -475,6 +484,10 @@ WHERE EmployeeID IS NOT NULL
   AND DATALENGTH(EmployeeID) <> DATALENGTH(RTRIM(EmployeeID));
 GO
 
+-- Guarded: the table is created further down this file (it was missing here
+-- entirely until the 2026-08-14 parity backfill), so on a from-scratch build
+-- it does not exist yet at this point. Nothing to trim in that case anyway.
+IF OBJECT_ID('dbo.ProjectAndBudget', 'U') IS NOT NULL
 UPDATE ProjectAndBudget
 SET
     Description = RTRIM(Description),
@@ -573,7 +586,7 @@ CREATE TABLE dbo.holiday (
 GO
 
 -- Allowance table --
-USE MWLTimesheet
+USE [{DBNAME}];
 IF NOT EXISTS (
     SELECT 1
     FROM sys.tables
@@ -594,4 +607,69 @@ IF NOT EXISTS (
             IsEditRow BIT DEFAULT 1
         );
     END
+GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Parity backfill (added 2026-08-14, during the PostgreSQL port).
+--
+-- Everything below already exists in the live MeterWorklog database but was
+-- never written into this file, so a database built from scratch here did not
+-- match production and postgres_init_db.sql could not be parity-tested
+-- against it. Column types mirror sys.columns on live exactly, including the
+-- nchar padding — this file documents what IS, not what ought to be.
+-- All idempotent; safe to re-run via init_db().
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ProjectAndBudget: read by 8 app queries (project/budget code lookups feeding
+-- the worklog form) but never created here. Note ID is a plain INT, not an
+-- IDENTITY, and there are no CreateAt/UpdateAt columns — the app only ever
+-- SELECTs from this table; rows are loaded out-of-band.
+IF NOT EXISTS (SELECT 1 FROM sys.tables
+               WHERE name = 'ProjectAndBudget' AND schema_id = SCHEMA_ID('dbo'))
+    CREATE TABLE dbo.ProjectAndBudget (
+        ID                INT NOT NULL,
+        projectcode       NCHAR(20) NULL,
+        budgetcode        NCHAR(20) NULL,
+        description       NCHAR(200) NULL,
+        ProjectDepartment NCHAR(10) NULL,
+        Status            NCHAR(15) NULL
+    );
+GO
+
+-- is_classified: 15 app sites read these (Staff cannot see classified files or
+-- anything beneath a classified folder), but neither column was ever added here.
+IF NOT EXISTS (SELECT 1 FROM sys.columns
+               WHERE object_id = OBJECT_ID('dbo.files') AND name = 'is_classified')
+    ALTER TABLE dbo.files
+        ADD is_classified BIT NOT NULL CONSTRAINT DF_files_is_classified DEFAULT 0;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns
+               WHERE object_id = OBJECT_ID('dbo.file_folders') AND name = 'is_classified')
+    ALTER TABLE dbo.file_folders
+        ADD is_classified BIT NOT NULL CONSTRAINT DF_file_folders_is_classified DEFAULT 0;
+GO
+
+-- worklogs.status: databases created before 'Leave' was added to the inline
+-- CHECK above carry an auto-named constraint (e.g. CK__worklogs__status__43D61337)
+-- that rejects it, so saving a Leave entry fails at runtime even though the app
+-- offers it. Drop whatever constraint guards the column and rebuild it by name.
+DECLARE @ck SYSNAME = (
+    SELECT TOP 1 cc.name
+    FROM sys.check_constraints cc
+    JOIN sys.columns c
+      ON c.object_id = cc.parent_object_id AND c.column_id = cc.parent_column_id
+    WHERE cc.parent_object_id = OBJECT_ID('dbo.worklogs')
+      AND c.name = 'status'
+      AND cc.definition NOT LIKE '%Leave%'
+);
+IF @ck IS NOT NULL
+    EXEC('ALTER TABLE dbo.worklogs DROP CONSTRAINT ' + @ck);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints
+               WHERE parent_object_id = OBJECT_ID('dbo.worklogs')
+                 AND name = 'CK_worklogs_status')
+    ALTER TABLE dbo.worklogs ADD CONSTRAINT CK_worklogs_status
+        CHECK (status IN ('Done','In Progress','Pending','Man day','Leave'));
 GO

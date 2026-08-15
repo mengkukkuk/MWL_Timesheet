@@ -22,10 +22,10 @@ MAX_NAME_LEN = 120
 def _can_edit(member_id):
     if session.get('role') in ELEVATED_ROLES:
         return True
-    # Compare as stripped strings: the URL converter <int:mid> gives an int,
-    # while session['member_id'] is the NVARCHAR EmployeeID (string) — and old
-    # sessions may still carry the legacy trailing-whitespace pad. Normalise
-    # both sides so staff can edit their own skills.
+    # Compare as stripped strings: member_id here is the NVARCHAR EmployeeID
+    # (string), same as session['member_id'] — and old sessions may still
+    # carry the legacy trailing-whitespace pad. Normalise both sides so staff
+    # can edit their own skills.
     sess = session.get('member_id')
     if sess is None or member_id is None:
         return False
@@ -54,8 +54,8 @@ def get_all_skills():
     """Return all skills keyed by EmployeeID. Frontend continues to use the
     key name `member_id` opaquely — the value here is EmployeeID."""
     rows = app_pkg.db.query(
-        "SELECT id, EmployeeID, name, level FROM member_skills "
-        "WHERE EmployeeID IS NOT NULL ORDER BY level DESC, name"
+        'SELECT id, EmployeeID AS "EmployeeID", name, level FROM member_skills '
+        'WHERE EmployeeID IS NOT NULL ORDER BY level DESC, name'
     )
     grouped = {}
     for row in rows:
@@ -67,12 +67,13 @@ def get_all_skills():
     return jsonify(grouped)
 
 
-@skills_bp.route('/api/members/<int:mid>/skills', methods=['GET'])
+@skills_bp.route('/api/members/<mid>/skills', methods=['GET'])
 @login_required
 def get_member_skills(mid):
     """Path param `mid` is an EmployeeID."""
+    mid = mid.strip()
     emp = app_pkg.db.query(
-        "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID FROM Employee WHERE EmployeeID=?",
         (mid,), fetchone=True,
     )
     if not emp:
@@ -84,15 +85,16 @@ def get_member_skills(mid):
     return jsonify(rows)
 
 
-@skills_bp.route('/api/members/<int:mid>/skills', methods=['POST'])
+@skills_bp.route('/api/members/<mid>/skills', methods=['POST'])
 @login_required
 def create_member_skill(mid):
     """Path param `mid` is an EmployeeID."""
+    mid = mid.strip()
     if not _can_edit(mid):
         return jsonify({'error': 'permission denied'}), 403
 
     emp = app_pkg.db.query(
-        "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID FROM Employee WHERE EmployeeID=?",
         (mid,), fetchone=True,
     )
     if not emp:
@@ -117,7 +119,7 @@ def create_member_skill(mid):
     # members.id, which is a different key space.
     skill_id = app_pkg.db.execute(
         "INSERT INTO member_skills (member_id, EmployeeID, name, level) "
-        "OUTPUT INSERTED.id VALUES (?, ?, ?, ?)",
+        "{OUTPUT_ID} VALUES (?, ?, ?, ?) {RETURNING_ID}",
         (None, mid, name, level),
     )
     return jsonify({'id': skill_id, 'member_id': mid, 'name': name, 'level': level}), 201
@@ -127,7 +129,7 @@ def create_member_skill(mid):
 @login_required
 def update_skill(sid):
     skill = app_pkg.db.query(
-        "SELECT id, EmployeeID, name FROM member_skills WHERE id=?", (sid,), fetchone=True,
+        'SELECT id, EmployeeID AS "EmployeeID", name FROM member_skills WHERE id=?', (sid,), fetchone=True,
     )
     if not skill:
         return jsonify({'error': 'skill not found'}), 404
@@ -151,7 +153,7 @@ def update_skill(sid):
             return jsonify({'error': 'Skill with this name already exists for the member'}), 409
 
     app_pkg.db.execute(
-        "UPDATE member_skills SET name=?, level=?, updated_at=GETDATE() WHERE id=?",
+        "UPDATE member_skills SET name=?, level=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
         (name, level, sid),
     )
     return jsonify({
@@ -163,7 +165,7 @@ def update_skill(sid):
 @login_required
 def delete_skill(sid):
     skill = app_pkg.db.query(
-        "SELECT id, EmployeeID FROM member_skills WHERE id=?", (sid,), fetchone=True,
+        'SELECT id, EmployeeID AS "EmployeeID" FROM member_skills WHERE id=?', (sid,), fetchone=True,
     )
     if not skill:
         return jsonify({'error': 'skill not found'}), 404

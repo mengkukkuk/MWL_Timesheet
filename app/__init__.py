@@ -168,9 +168,15 @@ def ensure_db():
             try:
                 db.init_db()
             except Exception as exc:
-                print(f"DB init note: {exc}")
+                # A swallowed init failure leaves the app running against a
+                # schema that may not exist, which resurfaces later as a
+                # confusing "invalid object name" on the first real query.
+                # Log the full traceback, and fail loudly in dev/CI.
+                app.logger.error("DB init failed: %s", exc, exc_info=True)
+                if os.getenv('DB_INIT_STRICT', '').strip() == '1':
+                    raise
             try:
-                row = db.query("SELECT value FROM settings WHERE [key]='worklog_open'", fetchone=True)
+                row = db.query('SELECT value FROM settings WHERE "key"=\'worklog_open\'', fetchone=True)
                 if row:
                     _worklog_open = row['value'] == '1'
             except Exception as exc:

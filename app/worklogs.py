@@ -48,15 +48,14 @@ def get_worklogs():
         SELECT w.id,
                w.EmployeeID  AS member_id,   -- alias preserved for frontend payload
                w.log_date, w.project, w.task,
-               CONVERT(VARCHAR(5), w.start_time, 108) as start_time,
-               CONVERT(VARCHAR(5), w.end_time, 108) as end_time,
+               w.start_time, w.end_time,
                w.hours, w.regular_hours, w.OT1, w.OT1_5, w.OT3,
                w.status, w.note,
-               ISNULL(w.IsEditRow, 1) AS IsEditRow,
-               ISNULL(w.is_allowance, 0) AS is_allowance,
+               COALESCE(w.IsEditRow, {TRUE}) AS "IsEditRow",
+               COALESCE(w.is_allowance, {FALSE}) AS is_allowance,
                pb.Description AS project_description
         FROM worklogs w
-        LEFT JOIN dbo.ProjectAndBudget pb
+        LEFT JOIN ProjectAndBudget pb
                ON pb.ProjectCode = w.project
         WHERE w.EmployeeID = ? AND w.log_date BETWEEN ? AND ?
         AND pb.Description = w.Description
@@ -74,6 +73,12 @@ def get_worklogs():
         for col in ('hours', 'regular_hours', 'OT1', 'OT1_5', 'OT3'):
             if row.get(col) is not None:
                 row[col] = float(row[col])
+        # `time` columns aren't JSON-serializable via Flask's default encoder.
+        for tcol in ('start_time', 'end_time'):
+            if isinstance(row.get(tcol), time):
+                row[tcol] = row[tcol].strftime('%H:%M')
+            elif row.get(tcol) is not None:
+                row[tcol] = str(row[tcol])[:5]
         if row.get('IsEditRow') is not None:
             row['IsEditRow'] = int(row['IsEditRow'])
         else:
@@ -92,11 +97,14 @@ def get_holiday():
     year = request.args.get('year', type=int, default=date.today().year)
     month = request.args.get('month', type=int, default=date.today().month)
 
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
+
     holidays_rows = app_pkg.db.query("""
-            SELECT date, description
-            FROM holiday WHERE YEAR(date) = ? AND MONTH(date) = ?
+            SELECT "date", description
+            FROM holiday WHERE "date" BETWEEN ? AND ?
         """,
-        (year, month),fetchone=False)
+        (first_day, last_day),fetchone=False)
 
     for hol in holidays_rows:
         if hol['date']:
@@ -175,9 +183,9 @@ def _calc_overtime(start: time, end: time, is_holiday: bool) -> dict:
 
 
 def _is_holiday(log_date) -> bool:
-    """Return True if log_date (YYYY-MM-DD string or date) is in dbo.holiday or saturday/sunday"""
+    """Return True if log_date (YYYY-MM-DD string or date) is in holiday or saturday/sunday"""
     row = app_pkg.db.query(
-        "SELECT 1 AS hit FROM dbo.holiday WHERE [date]=?",
+        'SELECT 1 AS hit FROM holiday WHERE "date"=?',
         (log_date,), fetchone=True,
     )
     if not row:
@@ -186,10 +194,10 @@ def _is_holiday(log_date) -> bool:
     return bool(row)
 
 def _employee_jg_num(emp_id):
-    """Return the numeric suffix of dbo.Employee.JG (e.g. 'JG06' -> 6), or None
+    """Return the numeric suffix of Employee.JG (e.g. 'JG06' -> 6), or None
     if unset or unparseable."""
     row = app_pkg.db.query(
-        "SELECT JG FROM dbo.Employee WHERE EmployeeID=?",
+        'SELECT JG AS "JG" FROM Employee WHERE EmployeeID=?',
         (emp_id,), fetchone=True,
     )
     jg = (row or {}).get('JG') or ''
@@ -300,14 +308,13 @@ def create_worklog():
 
     if not target_employee:
         return jsonify({'error': 'member_id is required'}), 400
-    try:
-        target_employee = int(target_employee)
-    except (TypeError, ValueError):
+    target_employee = str(target_employee).strip()
+    if not target_employee.isdigit():
         return jsonify({'error': 'member_id must be a number'}), 400
 
     # Validate the target Employee exists (FK safety even though we don't enforce it yet)
     emp = app_pkg.db.query(
-        "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID FROM Employee WHERE EmployeeID=?",
         (target_employee,), fetchone=True,
     )
     if not emp:
@@ -331,7 +338,8 @@ def create_worklog():
     project_dep = None
     if project:
         mapp = app_pkg.db.query(
-            "SELECT ProjectCode,ProjectDepartment FROM dbo.ProjectAndBudget WHERE Description=?",
+            'SELECT ProjectCode AS "ProjectCode", ProjectDepartment AS "ProjectDepartment" '
+            'FROM ProjectAndBudget WHERE Description=?',
             (project,), fetchone=True,
         )
         project_code = mapp.get('ProjectCode')
@@ -357,8 +365,9 @@ def create_worklog():
         INSERT INTO worklogs
             (member_id, EmployeeID, log_date, project, ProjectDepartment, Description, task,
              start_time, end_time, status, note, OT1, OT1_5, OT3, is_allowance ,allowance_overtime)
-        OUTPUT INSERTED.id
+        {OUTPUT_ID}
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        {RETURNING_ID}
         """,
         (
             None,
@@ -368,7 +377,7 @@ def create_worklog():
             data.get('end_time') or None,
             status, note,
             ot['OT1'], ot['OT1_5'], ot['OT3'],
-            1 if is_allowance else 0, allow_ot
+            is_allowance, allow_ot
         ),
     )
     # JG06-JG08: day-total allowance OT is recomputed across all rows for this
@@ -382,7 +391,7 @@ def create_worklog():
 def update_worklog(wid):
     if session['role'] not in ELEVATED_ROLES:
         row = app_pkg.db.query(
-            "SELECT EmployeeID FROM worklogs WHERE id=?", (wid,), fetchone=True
+            'SELECT EmployeeID AS "EmployeeID" FROM worklogs WHERE id=?', (wid,), fetchone=True
         )
         if not row or row['EmployeeID'] != str(session['member_id']):
             return jsonify({'error': 'You can only edit your own worklogs'}), 403
@@ -392,6 +401,8 @@ def update_worklog(wid):
     task = data.get('task', '')
     note = data.get('note', '')
     member_id = data.get('member_id')
+    if member_id is not None:
+        member_id = str(member_id).strip()
 
     #Not necessary to check if the worklog is open, because the frontend will not allow creating a worklog if the worklog is not open
     """if project_des=='':
@@ -438,17 +449,21 @@ def update_worklog(wid):
     project_code, project_dep = None, None
     if project_des != '':
         mapp = app_pkg.db.query(
-            "SELECT ProjectCode, ProjectDepartment FROM dbo.ProjectAndBudget WHERE Description=?",
+            'SELECT ProjectCode AS "ProjectCode", ProjectDepartment AS "ProjectDepartment" '
+            'FROM ProjectAndBudget WHERE Description=?',
             (project_des,), fetchone=True,
         )
         project_code = mapp.get('ProjectCode')
         project_dep = mapp.get('ProjectDepartment')
 
     else:
-        wl_des = app_pkg.db.query("SELECT Description FROM worklogs WHERE id=?", (wid,), fetchone=True)
+        wl_des = app_pkg.db.query(
+            'SELECT Description AS "Description" FROM worklogs WHERE id=?', (wid,), fetchone=True
+        )
         project_des = wl_des.get('Description')
         mapp = app_pkg.db.query(
-            "SELECT ProjectCode, ProjectDepartment FROM dbo.ProjectAndBudget WHERE Description=?",
+            'SELECT ProjectCode AS "ProjectCode", ProjectDepartment AS "ProjectDepartment" '
+            'FROM ProjectAndBudget WHERE Description=?',
             (project_des,), fetchone=True,
         )
         project_code = mapp.get('ProjectCode')
@@ -470,7 +485,7 @@ def update_worklog(wid):
     app_pkg.db.execute(
     """
     UPDATE worklogs SET log_date=?, project=?, Description=?, ProjectDepartment=?, task=?, start_time=?, end_time=?,
-           status=?, note=?, OT1=?, OT1_5=?, OT3=?, is_allowance=?, updated_at=GETDATE(), allowance_overtime=?
+           status=?, note=?, OT1=?, OT1_5=?, OT3=?, is_allowance=?, updated_at=CURRENT_TIMESTAMP, allowance_overtime=?
     WHERE id=?
     """,
     (
@@ -479,7 +494,7 @@ def update_worklog(wid):
         data.get('end_time') or None,
         status, note,
         ot['OT1'], ot['OT1_5'], ot['OT3'],
-        1 if is_allowance else 0, allow_ot,
+        is_allowance, allow_ot,
         wid,
         ),
     )
@@ -503,7 +518,7 @@ def delete_worklog(wid):
     # Pull EmployeeID + log_date BEFORE the delete so we can rebalance the
     # surviving rows of that day afterwards (JG06-JG08 employees).
     target = app_pkg.db.query(
-        "SELECT EmployeeID, log_date FROM worklogs WHERE id=?",
+        'SELECT EmployeeID AS "EmployeeID", log_date FROM worklogs WHERE id=?',
         (wid,), fetchone=True,
     )
     if session['role'] not in ELEVATED_ROLES:
@@ -521,7 +536,7 @@ def delete_worklog(wid):
 @worklogs_bp.route('/api/dashboard', methods=['GET'])
 @login_required
 def get_dashboard():
-    employee_id = request.args.get('member_id', type=int)   # value is EmployeeID
+    employee_id = request.args.get('member_id')   # value is EmployeeID (varchar business key)
     year = request.args.get('year', type=int, default=date.today().year)
 
     if not employee_id:
@@ -537,9 +552,9 @@ def get_dashboard():
                   Department  AS department,
                   Position    AS position,
                   Level       AS level,
-                  CAST(EmployeeID AS NVARCHAR(20)) AS staff_id,
-                  AvatarPath, AvatarUpdatedAt
-           FROM dbo.Employee
+                  EmployeeID  AS staff_id,
+                  AvatarPath AS "AvatarPath", AvatarUpdatedAt AS "AvatarUpdatedAt"
+           FROM Employee
            WHERE EmployeeID=?""",
         (employee_id,), fetchone=True,
     )
@@ -555,34 +570,50 @@ def get_dashboard():
     else:
         member['avatar_url'] = None
 
+    # ── Missing-entry days per month for this employee ──────────────────
+    # Definition: weekday in month, NOT a holiday, AND employee has no worklog row that day.
+    first_yr = date(year, 1, 1)
+    last_yr  = date(year, 12, 31)
+
     # Hours are computed per-day using the same logic as the calendar view:
     #   day_hours = ((max(end_time) - min(start_time)) - lunch_overlap) / 60
     # This avoids double-counting overlapping entries on the same day.
     # Lunch time (12:00-13:00) is deducted from the daily span.
     # Time before 08:30 and after 17:30 is kept as overtime duration.
+    month_expr = app_pkg.db.month('log_date')
+    mb_full = app_pkg.db.minutes_between('MIN(start_time)', 'MAX(end_time)')
+    mb_lunch = app_pkg.db.minutes_between(
+        "CASE WHEN MIN(start_time) > '12:00' THEN MIN(start_time) ELSE '12:00' END",
+        "CASE WHEN MAX(end_time) < '13:00' THEN MAX(end_time) ELSE '13:00' END",
+    )
+    mb_early = app_pkg.db.minutes_between(
+        'MIN(start_time)',
+        "CASE WHEN MAX(end_time) < '08:30' THEN MAX(end_time) ELSE '08:30' END",
+    )
+    mb_late = app_pkg.db.minutes_between(
+        "CASE WHEN MIN(start_time) > '17:30' THEN MIN(start_time) ELSE '17:30' END",
+        'MAX(end_time)',
+    )
     monthly = app_pkg.db.query(
-        """
+        f"""
         SELECT month,
-               ISNULL(SUM(CASE WHEN is_manday = 0 THEN day_hours ELSE 0 END), 0) AS total_hours,
-               ISNULL(SUM(CASE WHEN is_manday = 0 THEN overtime_hours ELSE 0 END), 0) AS overtime_hours,
-               ISNULL(SUM(CASE WHEN is_manday = 1 THEN day_hours ELSE 0 END), 0) AS man_day,
-               ISNULL(SUM(ot1_day),   0) AS total_ot1,
-               ISNULL(SUM(ot1_5_day), 0) AS total_ot1_5,
-               ISNULL(SUM(ot3_day),   0) AS total_ot3,
+               COALESCE(SUM(CASE WHEN is_manday = 0 THEN day_hours ELSE 0 END), 0) AS total_hours,
+               COALESCE(SUM(CASE WHEN is_manday = 0 THEN overtime_hours ELSE 0 END), 0) AS overtime_hours,
+               COALESCE(SUM(CASE WHEN is_manday = 1 THEN day_hours ELSE 0 END), 0) AS man_day,
+               COALESCE(SUM(ot1_day),   0) AS total_ot1,
+               COALESCE(SUM(ot1_5_day), 0) AS total_ot1_5,
+               COALESCE(SUM(ot3_day),   0) AS total_ot3,
                SUM(done) AS done,
                SUM(in_progress) AS in_progress
         FROM (
-            SELECT MONTH(log_date) AS month,
+            SELECT {month_expr} AS month,
                    log_date,
                    CASE WHEN status = 'Man day' THEN 1 ELSE 0 END AS is_manday,
                    CASE WHEN MIN(start_time) IS NOT NULL AND MAX(end_time) IS NOT NULL
                         THEN (
-                            DATEDIFF(MINUTE, MIN(start_time), MAX(end_time)) -
+                            {mb_full} -
                             CASE WHEN MIN(start_time) < '13:00' AND MAX(end_time) > '12:00' THEN
-                                DATEDIFF(MINUTE,
-                                    CASE WHEN MIN(start_time) > '12:00' THEN MIN(start_time) ELSE '12:00' END,
-                                    CASE WHEN MAX(end_time) < '13:00' THEN MAX(end_time) ELSE '13:00' END
-                                )
+                                {mb_lunch}
                             ELSE 0 END
                         ) / 60.0
                         ELSE 0
@@ -590,37 +621,32 @@ def get_dashboard():
                    CASE WHEN MIN(start_time) IS NOT NULL AND MAX(end_time) IS NOT NULL
                         THEN (
                             (CASE WHEN MIN(start_time) < '08:30' THEN
-                                DATEDIFF(MINUTE, MIN(start_time), CASE WHEN MAX(end_time) < '08:30' THEN MAX(end_time) ELSE '08:30' END)
+                                {mb_early}
                              ELSE 0 END) +
                             (CASE WHEN MAX(end_time) > '17:30' THEN
-                                DATEDIFF(MINUTE, CASE WHEN MIN(start_time) > '17:30' THEN MIN(start_time) ELSE '17:30' END, MAX(end_time))
+                                {mb_late}
                              ELSE 0 END)
                         ) / 60.0
                         ELSE 0
                    END AS overtime_hours,
-                   ISNULL(SUM(OT1),   0) AS ot1_day,
-                   ISNULL(SUM(OT1_5), 0) AS ot1_5_day,
-                   ISNULL(SUM(OT3),   0) AS ot3_day,
+                   COALESCE(SUM(OT1),   0) AS ot1_day,
+                   COALESCE(SUM(OT1_5), 0) AS ot1_5_day,
+                   COALESCE(SUM(OT3),   0) AS ot3_day,
                    SUM(CASE WHEN status = 'Done' THEN 1 ELSE 0 END) AS done,
                    SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress
             FROM worklogs
-            WHERE EmployeeID = ? AND YEAR(log_date) = ?
-            GROUP BY MONTH(log_date), log_date,
+            WHERE EmployeeID = ? AND log_date BETWEEN ? AND ?
+            GROUP BY {month_expr}, log_date,
                      CASE WHEN status = 'Man day' THEN 1 ELSE 0 END
         ) day_agg
         GROUP BY month
         ORDER BY month
         """,
-        (employee_id, year),
+        (employee_id, first_yr, last_yr),
     )
 
-    # ── Missing-entry days per month for this employee ──────────────────
-    # Definition: weekday in month, NOT a holiday, AND employee has no worklog row that day.
-    first_yr = date(year, 1, 1)
-    last_yr  = date(year, 12, 31)
-
     holiday_rows = app_pkg.db.query(
-        "SELECT [date] FROM dbo.holiday WHERE [date] BETWEEN ? AND ?",
+        'SELECT "date" FROM holiday WHERE "date" BETWEEN ? AND ?',
         (first_yr, last_yr),
     )
     holiday_set = set()
@@ -639,13 +665,13 @@ def get_dashboard():
             d += timedelta(days=1)
 
     logged_rows = app_pkg.db.query(
-        """
-        SELECT MONTH(log_date) AS m, COUNT(DISTINCT log_date) AS days_logged
+        f"""
+        SELECT {month_expr} AS m, COUNT(DISTINCT log_date) AS days_logged
         FROM worklogs
-        WHERE EmployeeID = ? AND YEAR(log_date) = ?
-        GROUP BY MONTH(log_date)
+        WHERE EmployeeID = ? AND log_date BETWEEN ? AND ?
+        GROUP BY {month_expr}
         """,
-        (employee_id, year),
+        (employee_id, first_yr, last_yr),
     )
     logged_per_month = {int(r['m']): int(r['days_logged']) for r in logged_rows}
 
@@ -742,7 +768,7 @@ def get_overall_missing():
 
     # 2) Holidays in month → drop from workdays
     holiday_rows = app_pkg.db.query(
-        "SELECT [date] FROM dbo.holiday WHERE [date] BETWEEN ? AND ?",
+        'SELECT "date" FROM holiday WHERE "date" BETWEEN ? AND ?',
         (first_day, last_day),
     )
     for r in holiday_rows:
@@ -761,7 +787,7 @@ def get_overall_missing():
     params = [first_day, last_day, *list(workdays)]
     rows = app_pkg.db.query(
         f"""
-        SELECT EmployeeID, COUNT(DISTINCT log_date) AS days_logged
+        SELECT EmployeeID AS "EmployeeID", COUNT(DISTINCT log_date) AS days_logged
         FROM worklogs
         WHERE log_date BETWEEN ? AND ?
           AND log_date IN ({placeholders})
@@ -775,7 +801,7 @@ def get_overall_missing():
     }
 
     # 4) For every Employee in HR, compute expected - logged
-    emp_rows = app_pkg.db.query("SELECT EmployeeID FROM dbo.Employee")
+    emp_rows = app_pkg.db.query('SELECT EmployeeID AS "EmployeeID" FROM Employee')
     out = {}
     for er in emp_rows:
         eid = str(er['EmployeeID'])
@@ -817,6 +843,9 @@ def get_projects_summary():
     if month < 1 or month > 12:
         return jsonify({'error': 'month must be 1-12'}), 400
 
+    month_start = date(year, month, 1)
+    month_end = date(year, month, calendar.monthrange(year, month)[1])
+
     rows = app_pkg.db.query(
         """
         SELECT w.EmployeeID        AS employee_id,
@@ -825,19 +854,18 @@ def get_projects_summary():
                w.ProjectDepartment AS project_department,
                w.Description       AS project_description,
                SUM(w.hours)        AS raw_hours,
-               CONVERT(VARCHAR(5), MIN(w.start_time), 108) AS s,
-               CONVERT(VARCHAR(5), MAX(w.end_time),   108) AS e
+               MIN(w.start_time) AS s,
+               MAX(w.end_time)   AS e
         FROM worklogs w
-        LEFT JOIN dbo.Employee e ON e.EmployeeID = w.EmployeeID
-        WHERE YEAR(w.log_date) = ?
-          AND MONTH(w.log_date) = ?
+        LEFT JOIN Employee e ON e.EmployeeID = w.EmployeeID
+        WHERE w.log_date BETWEEN ? AND ?
           AND w.ProjectDepartment IS NOT NULL
           AND LTRIM(RTRIM(w.ProjectDepartment)) <> ''
-          AND ISNULL(w.hours, 0) > 0
+          AND COALESCE(w.hours, 0) > 0
         GROUP BY w.EmployeeID, e.EmployeeName, w.log_date,
                  w.ProjectDepartment, w.Description
         """,
-        (year, month),
+        (month_start, month_end),
     )
 
     LUNCH_S, LUNCH_E = 12 * 60, 13 * 60   # 12:00, 13:00 in minutes

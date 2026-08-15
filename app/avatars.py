@@ -113,7 +113,7 @@ def _delete_blob_silent(stored_name):
 def get_avatar(eid):
     eid = eid.strip()
     row = app_pkg.db.query(
-        "SELECT AvatarPath, AvatarMime FROM dbo.Employee WHERE EmployeeID=?",
+        'SELECT AvatarPath AS "AvatarPath", AvatarMime AS "AvatarMime" FROM Employee WHERE EmployeeID=?',
         (eid,), fetchone=True,
     )
     if not row or not row.get('AvatarPath'):
@@ -142,7 +142,7 @@ def upload_avatar(eid):
 
     try:
         emp = app_pkg.db.query(
-            "SELECT EmployeeID, AvatarPath FROM dbo.Employee WHERE EmployeeID=?",
+            'SELECT EmployeeID, AvatarPath AS "AvatarPath" FROM Employee WHERE EmployeeID=?',
             (eid,), fetchone=True,
         )
         if not emp:
@@ -180,8 +180,8 @@ def upload_avatar(eid):
 
     old_path = emp.get('AvatarPath')
     app_pkg.db.execute(
-        """UPDATE dbo.Employee
-              SET AvatarPath=?, AvatarMime=?, AvatarUpdatedAt=GETDATE()
+        """UPDATE Employee
+              SET AvatarPath=?, AvatarMime=?, AvatarUpdatedAt=CURRENT_TIMESTAMP
             WHERE EmployeeID=?""",
         (stored_name, sniffed_mime, eid),
     )
@@ -203,15 +203,15 @@ def delete_avatar(eid):
         return jsonify({'error': 'permission denied'}), 403
 
     row = app_pkg.db.query(
-        "SELECT AvatarPath FROM dbo.Employee WHERE EmployeeID=?",
+        'SELECT AvatarPath AS "AvatarPath" FROM Employee WHERE EmployeeID=?',
         (eid,), fetchone=True,
     )
     if not row:
         return jsonify({'error': 'employee not found'}), 404
 
     app_pkg.db.execute(
-        """UPDATE dbo.Employee
-              SET AvatarPath=NULL, AvatarMime=NULL, AvatarUpdatedAt=GETDATE()
+        """UPDATE Employee
+              SET AvatarPath=NULL, AvatarMime=NULL, AvatarUpdatedAt=CURRENT_TIMESTAMP
             WHERE EmployeeID=?""",
         (eid,),
     )

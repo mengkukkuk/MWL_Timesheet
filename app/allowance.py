@@ -1,12 +1,12 @@
 """Allowance blueprint — daily allowance entries per employee, per project.
 
-Table: dbo.Allowance
+Table: Allowance
     [ID (PK identity), log_date, EmployeeID, ProjectCode, Description, type,
      createdAt, updatedAt, IsEditRow]
 
 Semantics:
     - `Description` is the human-readable project name (matches Worklogs).
-    - `ProjectCode` is the mapped code, resolved from dbo.ProjectAndBudget on
+    - `ProjectCode` is the mapped code, resolved from ProjectAndBudget on
       INSERT/UPDATE (same pattern as worklogs.py).
     - `type` is one of {'Normal', 'Special'}.
     - `IsEditRow` is a BIT row-lock flag:
@@ -81,9 +81,10 @@ def get_allowance():
 
     rows = app_pkg.db.query(
         """
-        SELECT ID, log_date, EmployeeID, ProjectCode, Description, type,
-               CreateAt, UpdateAt, IsEditRow
-        FROM dbo.Allowance
+        SELECT ID AS "ID", log_date, EmployeeID AS "EmployeeID",
+               ProjectCode AS "ProjectCode", Description AS "Description", type,
+               CreateAt AS "CreateAt", UpdateAt AS "UpdateAt", IsEditRow AS "IsEditRow"
+        FROM Allowance
         WHERE EmployeeID = ? AND log_date BETWEEN ? AND ?
         ORDER BY log_date
         """,
@@ -93,9 +94,9 @@ def get_allowance():
     return jsonify([_serialize_row(r) for r in rows])
 
 def _is_holiday(log_date) -> bool:
-    """Return True if log_date (YYYY-MM-DD string or date) is in dbo.holiday or saturday/sunday"""
+    """Return True if log_date (YYYY-MM-DD string or date) is in holiday or saturday/sunday"""
     row = app_pkg.db.query(
-        "SELECT 1 AS hit FROM dbo.holiday WHERE [date]=?",
+        'SELECT 1 AS hit FROM holiday WHERE "date"=?',
         (log_date,), fetchone=True,
     )
     if not row:
@@ -139,14 +140,13 @@ def create_allowance():
 
     if not target_employee:
         return jsonify({'error': 'member_id is required'}), 400
-    try:
-        target_employee = int(target_employee)
-    except (TypeError, ValueError):
+    target_employee = str(target_employee).strip()
+    if not target_employee.isdigit():
         return jsonify({'error': 'member_id must be a number'}), 400
 
     # Validate the target employee exists.
     emp = app_pkg.db.query(
-        "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID FROM Employee WHERE EmployeeID=?",
         (target_employee,), fetchone=True,
     )
     if not emp:
@@ -154,7 +154,7 @@ def create_allowance():
 
     #check if log_date is already exist
     exist_row = app_pkg.db.query(
-        "SELECT ID FROM dbo.Allowance WHERE EmployeeID=? AND log_date=?",
+        "SELECT ID FROM Allowance WHERE EmployeeID=? AND log_date=?",
         (target_employee, log_date), fetchone=True,
     )
     if exist_row:
@@ -163,7 +163,7 @@ def create_allowance():
     # Mapping Description → ProjectCode (mirrors worklogs.py).
     project_code = None
     mapp = app_pkg.db.query(
-        "SELECT ProjectCode FROM dbo.ProjectAndBudget WHERE Description=?",
+        "SELECT ProjectCode FROM ProjectAndBudget WHERE Description=?",
         (project,), fetchone=True,
     )
     if mapp:
@@ -175,10 +175,11 @@ def create_allowance():
     # Do NOT specify IsEditRow → DB default (1) applies, new rows are editable.
     new_id = app_pkg.db.execute(
         """
-        INSERT INTO dbo.Allowance
+        INSERT INTO Allowance
             (log_date, EmployeeID, ProjectCode, Description, type)
-        OUTPUT INSERTED.ID
+            {OUTPUT_ID}
         VALUES (?, ?, ?, ?, ?)
+            {RETURNING_ID}
         """,
         (log_date, target_employee, project_code, project, al_type),
     )
@@ -193,7 +194,7 @@ def create_allowance():
 def update_allowance(aid):
     # Fetch row to check permissions + lock status.
     row = app_pkg.db.query(
-        "SELECT EmployeeID, IsEditRow FROM dbo.Allowance WHERE ID=?",
+        'SELECT EmployeeID AS "EmployeeID", IsEditRow AS "IsEditRow" FROM Allowance WHERE ID=?',
         (aid,), fetchone=True,
     )
     if not row:
@@ -233,7 +234,7 @@ def update_allowance(aid):
     # Re-resolve ProjectCode from Description.
     project_code = None
     mapp = app_pkg.db.query(
-        "SELECT ProjectCode FROM dbo.ProjectAndBudget WHERE Description=?",
+        "SELECT ProjectCode FROM ProjectAndBudget WHERE Description=?",
         (project,), fetchone=True,
     )
     if mapp:
@@ -241,7 +242,7 @@ def update_allowance(aid):
 
     #check if log_date is already exist
     exist_row = app_pkg.db.query(
-        "SELECT ID FROM dbo.Allowance WHERE ID<>? AND log_date=?",
+        "SELECT ID FROM Allowance WHERE ID<>? AND log_date=?",
         (aid, log_date), fetchone=True,
     )
     if exist_row:
@@ -251,8 +252,8 @@ def update_allowance(aid):
 
     app_pkg.db.execute(
         """
-        UPDATE dbo.Allowance
-           SET log_date=?, ProjectCode=?, Description=?, type=?, UpdateAt=GETDATE()
+        UPDATE Allowance
+           SET log_date=?, ProjectCode=?, Description=?, type=?, UpdateAt=CURRENT_TIMESTAMP
          WHERE ID=?
         """,
         (log_date, project_code, project, al_type, aid),
@@ -267,7 +268,7 @@ def update_allowance(aid):
 @login_required
 def delete_allowance(aid):
     row = app_pkg.db.query(
-        "SELECT EmployeeID, IsEditRow FROM dbo.Allowance WHERE ID=?",
+        'SELECT EmployeeID AS "EmployeeID", IsEditRow AS "IsEditRow" FROM Allowance WHERE ID=?',
         (aid,), fetchone=True,
     )
     if not row:
@@ -284,5 +285,5 @@ def delete_allowance(aid):
     if not is_editable:
         return jsonify({'error': 'This row is locked and cannot be deleted'}), 403
 
-    app_pkg.db.execute("DELETE FROM dbo.Allowance WHERE ID=?", (aid,))
+    app_pkg.db.execute("DELETE FROM Allowance WHERE ID=?", (aid,))
     return jsonify({'ok': True})

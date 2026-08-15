@@ -59,14 +59,19 @@ def _row_to_dto(r):
 
 
 def _validate_employee_id(raw):
-    """Return (employee_id_int, error_str). employee_id_int is None on error."""
+    """Return (employee_id_str, error_str). employee_id_str is None on error.
+
+    EmployeeID is a varchar(5) business key, not an integer — validate shape
+    (digits, non-empty) without coercing to int, so the value round-trips as
+    a plain string on both DB engines (MSSQL implicitly casts str==int, but
+    Postgres raises 42883 on that comparison).
+    """
     if raw is None or str(raw).strip() == '':
         return None, 'Employee ID is required'
-    try:
-        eid = int(str(raw).strip())
-    except (TypeError, ValueError):
+    eid = str(raw).strip()
+    if not eid.isdigit():
         return None, 'Employee ID must be a number'
-    if eid <= 0:
+    if int(eid) <= 0:
         return None, 'Employee ID must be positive'
     return eid, None
 
@@ -74,9 +79,11 @@ def _validate_employee_id(raw):
 def _load_employees():
     """Build the employee DTO list. Pulled out so cached_list can call it lazily."""
     rows = app_pkg.db.query(
-        """SELECT EmployeeID, EmployeeName, Department, Position, Level, JG,
-                  AvatarPath, AvatarUpdatedAt
-           FROM dbo.Employee
+        """SELECT EmployeeID AS "EmployeeID", EmployeeName AS "EmployeeName",
+                  Department AS "Department", Position AS "Position",
+                  Level AS "Level", JG AS "JG",
+                  AvatarPath AS "AvatarPath", AvatarUpdatedAt AS "AvatarUpdatedAt"
+           FROM Employee
            ORDER BY EmployeeName"""
     )
     return [_row_to_dto(r) for r in rows]
@@ -126,7 +133,7 @@ def create_employee():
     # Reject duplicate EmployeeID (UQ_Employee_EmpID would also catch
     # we want a clean 409 instead of a generic DB error).
     existing = app_pkg.db.query(
-        "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID FROM Employee WHERE EmployeeID=?",
         (eid,),
         fetchone=True,
     )
@@ -134,9 +141,9 @@ def create_employee():
         return jsonify({'error': f'EmployeeID {eid} already exists'}), 409
 
     app_pkg.db.execute(
-        """INSERT INTO dbo.Employee
+        """INSERT INTO Employee
                (EmployeeID, EmployeeName, Department, Position, Level, JG, CreateAt)
-           VALUES (?, ?, ?, ?, ?, ?, GETDATE())""",
+           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
         (eid, name, dept or None, position or None, level or None, jg or None),
     )
     _invalidate_employee_caches()
@@ -151,13 +158,14 @@ def create_employee():
     }), 201
 
 
-@employees_bp.route('/api/employees/<int:eid>', methods=['PUT'])
+@employees_bp.route('/api/employees/<eid>', methods=['PUT'])
 @elevated_required
 def update_employee(eid):
     """Update mutable fields. EmployeeID itself is immutable (it's a stable
     business key referenced by users and worklogs)."""
+    eid = eid.strip()
     existing = app_pkg.db.query(
-        "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID FROM Employee WHERE EmployeeID=?",
         (eid,),
         fetchone=True,
     )
@@ -185,8 +193,8 @@ def update_employee(eid):
         return jsonify({'error': f'JG must be {MAX_JG_LEN} characters or fewer'}), 400
 
     app_pkg.db.execute(
-        """UPDATE dbo.Employee
-              SET EmployeeName=?, Department=?, Position=?, Level=?, JG=?, UpdateAt=GETDATE()
+        """UPDATE Employee
+              SET EmployeeName=?, Department=?, Position=?, Level=?, JG=?, UpdateAt=CURRENT_TIMESTAMP
             WHERE EmployeeID=?""",
         (name, dept or None, position or None, level or None, jg or None, eid),
     )
@@ -202,11 +210,12 @@ def update_employee(eid):
     })
 
 
-@employees_bp.route('/api/employees/<int:eid>', methods=['DELETE'])
+@employees_bp.route('/api/employees/<eid>', methods=['DELETE'])
 @elevated_required
 def delete_employee(eid):
+    eid = eid.strip()
     existing = app_pkg.db.query(
-        "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID FROM Employee WHERE EmployeeID=?",
         (eid,),
         fetchone=True,
     )
@@ -222,7 +231,7 @@ def delete_employee(eid):
     )
     linked_count = (linked or {}).get('n', 0)
 
-    app_pkg.db.execute("DELETE FROM dbo.Employee WHERE EmployeeID=?", (eid,))
+    app_pkg.db.execute("DELETE FROM Employee WHERE EmployeeID=?", (eid,))
     _invalidate_employee_caches()
 
     return jsonify({

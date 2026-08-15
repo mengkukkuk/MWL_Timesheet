@@ -32,7 +32,7 @@ FAILED_LOGINS_DB_KEY = 'failed_logins'
 
 def _load_failed_logins_from_db():
     row = app_pkg.db.query(
-        "SELECT value FROM settings WHERE [key]=?",
+        'SELECT value FROM settings WHERE "key"=?',
         (FAILED_LOGINS_DB_KEY,),
         fetchone=True,
     )
@@ -72,18 +72,18 @@ def _save_failed_logins_to_db():
         }
     raw = json.dumps(payload, separators=(',', ':'))
     existing = app_pkg.db.query(
-        "SELECT [key] FROM settings WHERE [key]=?",
+        'SELECT "key" FROM settings WHERE "key"=?',
         (FAILED_LOGINS_DB_KEY,),
         fetchone=True,
     )
     if existing:
         app_pkg.db.execute(
-            "UPDATE settings SET value=? WHERE [key]=?",
+            'UPDATE settings SET value=? WHERE "key"=?',
             (raw, FAILED_LOGINS_DB_KEY),
         )
     else:
         app_pkg.db.execute(
-            "INSERT INTO settings ([key], value) VALUES (?, ?)",
+            'INSERT INTO settings ("key", value) VALUES (?, ?)',
             (FAILED_LOGINS_DB_KEY, raw),
         )
 
@@ -227,7 +227,7 @@ def api_login():
 def api_employee_lookup(emp_id):
     """Public endpoint used by the registration form to preview an EmployeeID
     before submitting. Returns minimal HR data (name/department/position).
-    Returns 404 if EmployeeID isn't in dbo.Employee.
+    Returns 404 if EmployeeID isn't in Employee.
 
     NOTE: this endpoint is intentionally public (no auth) because it's used on
     the registration page before the user has a session. To prevent enumeration
@@ -238,7 +238,9 @@ def api_employee_lookup(emp_id):
     if not emp_id:
         return jsonify({'error': 'invalid EmployeeID'}), 400
     row = app_pkg.db.query(
-        "SELECT EmployeeID, EmployeeName, Department, Position FROM dbo.Employee WHERE EmployeeID=?",
+        'SELECT EmployeeID AS "EmployeeID", EmployeeName AS "EmployeeName", '
+        'Department AS "Department", Position AS "Position" '
+        'FROM Employee WHERE EmployeeID=?',
         (emp_id,),
         fetchone=True,
     )
@@ -264,7 +266,7 @@ def api_employee_lookup(emp_id):
 def api_register():
     """Registration is now driven by EmployeeID:
     user supplies username + password + EmployeeID; name/department/position
-    are pulled from dbo.Employee (the HR-authoritative table). The legacy
+    are pulled from Employee (the HR-authoritative table). The legacy
     name/department/position payload fields are still accepted as a fallback
     for callers that haven't been updated yet, but EmployeeID is preferred.
     """
@@ -298,7 +300,7 @@ def api_register():
     # Resolve member profile fields
     if employee_id is not None:
         emp = app_pkg.db.query(
-            "SELECT EmployeeID, EmployeeName, Department, Position FROM dbo.Employee WHERE EmployeeID=?",
+            "SELECT EmployeeID, EmployeeName, Department, Position FROM Employee WHERE EmployeeID=?",
             (employee_id,),
             fetchone=True,
         )
@@ -358,7 +360,7 @@ def _upsert_security_state(user_id, **cols):
     )
     if existing:
         app_pkg.db.execute(
-            f"UPDATE user_security_state SET {assignments}, updated_at=GETDATE() WHERE user_id=?",
+            f"UPDATE user_security_state SET {assignments}, updated_at=CURRENT_TIMESTAMP WHERE user_id=?",
             (*cols.values(), user_id),
         )
     else:
@@ -449,7 +451,7 @@ def _find_user_by_reset_token(token):
            FROM user_security_state s
            JOIN users u ON u.id = s.user_id
            WHERE s.reset_token_hash = ?
-             AND s.reset_token_expires_at > GETDATE()
+             AND s.reset_token_expires_at > CURRENT_TIMESTAMP
              AND u.status = 'Active'
              AND u.role <> ?""",
         (_token_hash(token), ROLE_SUPER_ADMIN), fetchone=True,
@@ -483,7 +485,7 @@ def api_reset_password_confirm():
     # Single-use: burn the token.
     app_pkg.db.execute(
         """UPDATE user_security_state
-           SET reset_token_hash=NULL, reset_token_expires_at=NULL, updated_at=GETDATE()
+           SET reset_token_hash=NULL, reset_token_expires_at=NULL, updated_at=CURRENT_TIMESTAMP
            WHERE user_id=?""",
         (match['user_id'],),
     )

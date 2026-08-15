@@ -61,9 +61,7 @@ def generate_excel_bytes(employee_id, member, year, months=None):
     worklogs = app_pkg.db.query(
         """
         SELECT log_date, project, task, projectdepartment, description,
-               CONVERT(VARCHAR(5), start_time, 108) as start_time,
-               CONVERT(VARCHAR(5), end_time,   108) as end_time,
-               hours, status, note
+               start_time, end_time, hours, status, note
         FROM worklogs
         WHERE EmployeeID = ? AND log_date BETWEEN ? AND ?
         ORDER BY log_date, start_time
@@ -73,6 +71,10 @@ def generate_excel_bytes(employee_id, member, year, months=None):
 
     by_month_day = defaultdict(list)
     for worklog in worklogs:
+        # Format here (not in SQL) so the same query string works on both
+        # engines — see helpers.parse_time(), which expects a 'HH:MM' str.
+        worklog['start_time'] = worklog['start_time'].strftime('%H:%M') if worklog['start_time'] else None
+        worklog['end_time'] = worklog['end_time'].strftime('%H:%M') if worklog['end_time'] else None
         log_date = worklog['log_date']
         if isinstance(log_date, str):
             log_date = datetime.strptime(log_date, '%Y-%m-%d').date()
@@ -160,7 +162,7 @@ def generate_excel_bytes(employee_id, member, year, months=None):
 @export_bp.route('/api/export/excel', methods=['GET'])
 @login_required
 def export_excel():
-    member_id = request.args.get('member_id', type=int)
+    member_id = (request.args.get('member_id') or '').strip()
     year = request.args.get('year', type=int, default=date.today().year)
     months_str = request.args.get('months', '')
     months = [int(month) for month in months_str.split(',') if month.strip().isdigit()] or None
@@ -174,10 +176,10 @@ def export_excel():
     member = app_pkg.db.query(
         """SELECT EmployeeName AS name,
                   Department  AS department,
-                  CAST(EmployeeID AS NVARCHAR(20)) AS staff_id,
+                  EmployeeID  AS staff_id,
                   Position    AS position,
                   Level       AS level
-           FROM dbo.Employee WHERE EmployeeID=?""",
+           FROM Employee WHERE EmployeeID=?""",
         (member_id,),
         fetchone=True,
     )
@@ -205,10 +207,7 @@ def export_excel_bulk():
     if not member_ids_str:
         return jsonify({'error': 'member_ids required'}), 400
 
-    try:
-        member_ids = [int(member_id) for member_id in member_ids_str.split(',') if member_id.strip()]
-    except ValueError:
-        return jsonify({'error': 'Invalid member_ids'}), 400
+    member_ids = [m.strip() for m in member_ids_str.split(',') if m.strip()]
 
     if not member_ids:
         return jsonify({'error': 'No valid member_ids provided'}), 400
@@ -219,10 +218,10 @@ def export_excel_bulk():
             member = app_pkg.db.query(
                 """SELECT EmployeeName AS name,
                           Department  AS department,
-                          CAST(EmployeeID AS NVARCHAR(20)) AS staff_id,
+                          EmployeeID  AS staff_id,
                           Position    AS position,
                           Level       AS level
-                   FROM dbo.Employee WHERE EmployeeID=?""",
+                   FROM Employee WHERE EmployeeID=?""",
                 (member_id,),
                 fetchone=True,
             )

@@ -32,7 +32,7 @@ def set_worklog_visibility():
     data = request.json or {}
     app_pkg._worklog_open = bool(data.get('open', False))
     app_pkg.db.execute(
-        "UPDATE settings SET value=? WHERE [key]='worklog_open'",
+        "UPDATE settings SET value=? WHERE \"key\"='worklog_open'",
         ('1' if app_pkg._worklog_open else '0',),
     )
     return jsonify({'ok': True, 'worklog_open': app_pkg._worklog_open})
@@ -55,7 +55,7 @@ _DEFAULT_TIME_PRESETS = {
 @core_bp.route('/api/settings/time-presets', methods=['GET'])
 @login_required
 def get_time_presets():
-    row = app_pkg.db.query("SELECT value FROM settings WHERE [key]='time_presets'", fetchone=True)
+    row = app_pkg.db.query("SELECT value FROM settings WHERE \"key\"='time_presets'", fetchone=True)
     if row:
         try:
             data = _json.loads(row['value'])
@@ -82,9 +82,9 @@ def set_time_presets():
         if not isinstance(item.get('label', ''), str):
             return jsonify({'error': 'Label must be a string'}), 400
     payload = _json.dumps({'start': start, 'end': end})
-    existing = app_pkg.db.query("SELECT 1 FROM settings WHERE [key]='time_presets'", fetchone=True)
+    existing = app_pkg.db.query("SELECT 1 FROM settings WHERE \"key\"='time_presets'", fetchone=True)
     if existing:
-        app_pkg.db.execute("UPDATE settings SET value=? WHERE [key]='time_presets'", (payload,))
+        app_pkg.db.execute("UPDATE settings SET value=? WHERE \"key\"='time_presets'", (payload,))
     else:
-        app_pkg.db.execute("INSERT INTO settings ([key], value) VALUES ('time_presets', ?)", (payload,))
+        app_pkg.db.execute("INSERT INTO settings (\"key\", value) VALUES ('time_presets', ?)", (payload,))
     return jsonify({'ok': True})

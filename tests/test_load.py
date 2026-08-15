@@ -8,6 +8,11 @@ Validates that the application handles simultaneous requests correctly:
   4. Stateless HTTP endpoints return correct responses under concurrent load
   5. Concurrent login attempts never produce 5xx responses
 
+Sections 1-2 are parametrized over DB_ENGINE (mssql / postgres) via the
+`db_engine` fixture in conftest.py, since they exercise db.py's per-engine
+`_healthy()`/`_connect()`/exception-class branches directly. Sections 3-5
+never touch db.py's engine-conditional code, so they stay unparametrized.
+
 No extra dependencies required (uses concurrent.futures from stdlib).
 
 Run:
@@ -15,6 +20,8 @@ Run:
 """
 import threading
 import time
+import psycopg2
+import psycopg2.extensions
 import pyodbc
 import pytest
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -36,7 +43,13 @@ TIMEOUT_S = 10    # max seconds a load test may run
 # ---------------------------------------------------------------------------
 
 def _make_good_conn():
-    """Return a mock pyodbc connection that always succeeds."""
+    """Return a mock connection that always succeeds (engine-agnostic).
+
+    Sets Postgres's liveness-check attributes too (conn.closed / transaction
+    status), even under mssql where _healthy() ignores them: a bare
+    MagicMock's auto-generated `.closed` attribute is truthy, which would
+    make _healthy() report a fresh Postgres connection as already dead.
+    """
     conn   = MagicMock()
     cursor = MagicMock()
     conn.cursor.return_value    = cursor
@@ -44,7 +57,56 @@ def _make_good_conn():
     cursor.description          = [('col',)]
     cursor.fetchall.return_value = []
     cursor.fetchone.return_value = None
+    conn.closed = 0
+    conn.get_transaction_status.return_value = (
+        psycopg2.extensions.TRANSACTION_STATUS_IDLE
+    )
     return conn
+
+
+def _connect_target(db_engine):
+    """Dotted path to patch so it intercepts db.py's `_connect()` call."""
+    return 'psycopg2.connect' if db_engine.IS_POSTGRES else 'pyodbc.connect'
+
+
+def _make_healthy_liveness_conn(db_engine):
+    """A connection that _healthy() must judge alive, engine-correctly.
+
+    Postgres: _healthy() never issues a probe query — it inspects
+    conn.closed / conn.get_transaction_status() instead.
+    MSSQL: _healthy() issues a real cursor().execute("SELECT 1") probe.
+    """
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value = cursor
+
+    if db_engine.IS_POSTGRES:
+        conn.closed = 0
+        conn.get_transaction_status.return_value = (
+            psycopg2.extensions.TRANSACTION_STATUS_IDLE
+        )
+    else:
+        cursor.execute.side_effect = None
+
+    return conn, cursor
+
+
+def _make_stale_liveness_conn(db_engine):
+    """A connection that _healthy() must judge dead, engine-correctly.
+
+    Postgres: a closed connection — _healthy() returns False immediately.
+    MSSQL: the SELECT 1 probe raises OperationalError.
+    """
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value = cursor
+
+    if db_engine.IS_POSTGRES:
+        conn.closed = 1
+    else:
+        cursor.execute.side_effect = db_engine.OperationalError("connection dead")
+
+    return conn, cursor
 
 
 def _make_client():
@@ -67,7 +129,7 @@ def reset_db_thread_local():
 # ---------------------------------------------------------------------------
 
 class TestThreadLocalIsolation:
-    def test_each_thread_gets_its_own_connection(self):
+    def test_each_thread_gets_its_own_connection(self, db_engine):
         """
         N threads each calling get_connection() must each receive a connection
         that is local to that thread (thread-local storage is per-thread).
@@ -77,13 +139,13 @@ class TestThreadLocalIsolation:
 
         def grab_connection(thread_id):
             fresh = _make_good_conn()
-            with patch('pyodbc.connect', return_value=fresh):
-                conn = db.get_connection()
+            with patch(_connect_target(db_engine), return_value=fresh):
+                conn = db_engine.get_connection()
             with lock:
                 thread_conn_ids[thread_id] = id(conn)
             # Second call in the same thread must reuse the cached connection
-            with patch('pyodbc.connect', return_value=_make_good_conn()):
-                same_conn = db.get_connection()
+            with patch(_connect_target(db_engine), return_value=_make_good_conn()):
+                same_conn = db_engine.get_connection()
             assert id(same_conn) == id(conn), "Same thread must reuse its cached connection"
 
         with ThreadPoolExecutor(max_workers=WORKERS) as ex:
@@ -93,30 +155,29 @@ class TestThreadLocalIsolation:
 
         assert len(thread_conn_ids) == WORKERS
 
-    def test_stale_connection_in_one_thread_does_not_affect_another(self):
+    def test_stale_connection_in_one_thread_does_not_affect_another(self, db_engine):
         """
-        Thread A reconnecting due to a stale connection must not disturb
+        Thread A reconnecting due to an unhealthy connection must not disturb
         thread B's healthy cached connection.
         """
         errors = []
 
         def thread_with_stale():
-            stale = MagicMock()
-            stale.cursor.return_value.execute.side_effect = pyodbc.OperationalError
-            db._thread_local.connection = stale
+            stale, _ = _make_stale_liveness_conn(db_engine)
+            db_engine._thread_local.connection = stale
             fresh = _make_good_conn()
-            with patch('pyodbc.connect', return_value=fresh):
+            with patch(_connect_target(db_engine), return_value=fresh):
                 try:
-                    conn = db.get_connection()
+                    conn = db_engine.get_connection()
                     assert conn is fresh
                 except Exception as exc:
                     errors.append(exc)
 
         def thread_with_live():
-            live = _make_good_conn()
-            db._thread_local.connection = live
-            with patch('pyodbc.connect') as mock_connect:
-                conn = db.get_connection()
+            live, _ = _make_healthy_liveness_conn(db_engine)
+            db_engine._thread_local.connection = live
+            with patch(_connect_target(db_engine)) as mock_connect:
+                conn = db_engine.get_connection()
                 mock_connect.assert_not_called()
                 assert conn is live
 
@@ -164,7 +225,7 @@ class TestConcurrentDbOperations:
         assert not errors, f"Errors during concurrent queries: {errors}"
         assert len(results) == WORKERS
 
-    def test_concurrent_retries_no_deadlock(self):
+    def test_concurrent_retries_no_deadlock(self, db_engine):
         """
         WORKERS threads each triggering the one-retry path must all succeed
         without deadlocking or losing their retry.
@@ -175,12 +236,12 @@ class TestConcurrentDbOperations:
         def run_query_with_retry(i):
             nonlocal success_count
             fail = MagicMock()
-            fail.cursor.return_value.execute.side_effect = pyodbc.OperationalError
+            fail.cursor.return_value.execute.side_effect = db_engine.OperationalError("dead")
             good = _make_good_conn()
             good.cursor.return_value.description         = [('v',)]
             good.cursor.return_value.fetchall.return_value = [(i,)]
             with patch('db.get_connection', side_effect=[fail, good]):
-                db.query("SELECT v FROM t")
+                db_engine.query("SELECT v FROM t")
                 with lock:
                     success_count += 1
 
@@ -201,7 +262,9 @@ class TestConcurrentDbOperations:
         def run_execute(i):
             nonlocal success_count
             good = _make_good_conn()
-            good.cursor.return_value.fetchone.side_effect = pyodbc.ProgrammingError
+            # A statement with no result set leaves cursor.description as None
+            # on both pyodbc and psycopg2 — that is the signal execute() probes.
+            good.cursor.return_value.description = None
             with patch('db.get_connection', return_value=good):
                 db.execute("UPDATE t SET v=? WHERE id=?", ('a', i))
                 with lock:

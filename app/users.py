@@ -42,10 +42,10 @@ def get_users():
                   u.status,
                   u.email,
                   e.EmployeeName AS member_name,
-                  e.Department,
-                  e.Position
+                  e.Department AS "Department",
+                  e.Position AS "Position"
            FROM users u
-           LEFT JOIN dbo.Employee e ON u.EmployeeID = e.EmployeeID
+           LEFT JOIN Employee e ON u.EmployeeID = e.EmployeeID
            ORDER BY u.role, u.username""",
     )
     return jsonify(rows or [])
@@ -62,10 +62,10 @@ def list_pending_users():
                   u.EmployeeID AS member_id,                  -- alias for frontend compat
                   e.EmployeeName AS member_name,
                   e.Department    AS department,
-                  CAST(u.EmployeeID AS NVARCHAR(20)) AS staff_id,
+                  u.EmployeeID    AS staff_id,
                   e.Position      AS position
            FROM users u
-           LEFT JOIN dbo.Employee e ON u.EmployeeID = e.EmployeeID
+           LEFT JOIN Employee e ON u.EmployeeID = e.EmployeeID
            WHERE u.status = 'Pending'
            ORDER BY u.created_at ASC""",
     )
@@ -99,7 +99,7 @@ def approve_user(uid):
         return jsonify({'ok': True, 'already_active': True})
     app_pkg.db.execute(
         """UPDATE users
-              SET status='Active', reviewed_by=?, reviewed_at=GETDATE()
+              SET status='Active', reviewed_by=?, reviewed_at=CURRENT_TIMESTAMP
               WHERE id=?""",
         (session['user_id'], uid),
     )
@@ -121,7 +121,7 @@ def decline_user(uid):
         return jsonify({'error': 'Cannot decline your own account'}), 400
     app_pkg.db.execute(
         """UPDATE users
-              SET status='Declined', reviewed_by=?, reviewed_at=GETDATE()
+              SET status='Declined', reviewed_by=?, reviewed_at=CURRENT_TIMESTAMP
               WHERE id=?""",
         (session['user_id'], uid),
     )
@@ -191,7 +191,7 @@ def delete_user(uid):
         return jsonify({'error': 'Cannot delete your own account'}), 400
 
     target = app_pkg.db.query(
-        "SELECT role, EmployeeID FROM users WHERE id=?", (uid,), fetchone=True
+        'SELECT role, EmployeeID AS "EmployeeID" FROM users WHERE id=?', (uid,), fetchone=True
     )
     if not target:
         return jsonify({'error': 'User not found'}), 404

@@ -35,13 +35,13 @@ def _load_members():
         """SELECT EmployeeID  AS id,
                   EmployeeName AS name,
                   Department  AS department,
-                  CAST(EmployeeID AS NVARCHAR(20)) AS staff_id,
+                  EmployeeID  AS staff_id,
                   Position    AS position,
                   Level       AS level,
                   JG          AS jg,
-                  AvatarPath,
-                  AvatarUpdatedAt
-           FROM dbo.Employee
+                  AvatarPath  AS "AvatarPath",
+                  AvatarUpdatedAt AS "AvatarUpdatedAt"
+           FROM Employee
            ORDER BY EmployeeName"""
     )
     for row in rows:

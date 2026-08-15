@@ -26,13 +26,16 @@ PROJECT_MEMBER_COLUMN_WHITELIST = {'main': 'main_members', 'support': 'support_m
 def _load_projects():
     """Build the projects list. Pulled out so cached_list can call it lazily."""
     return app_pkg.db.query(
-        "SELECT id, name, Description, main_members, support_members FROM projects ORDER BY name"
+        'SELECT id, name, Description AS "Description", main_members, support_members '
+        'FROM projects ORDER BY name'
     )
 
 def _load_projects_description():
     """Load project description, Department and status"""
     return app_pkg.db.query(
-        "SELECT Projectcode, Description, ProjectDepartment, Status FROM ProjectAndBudget ORDER BY ProjectDepartment"
+        'SELECT Projectcode AS "Projectcode", Description AS "Description", '
+        '       ProjectDepartment AS "ProjectDepartment", Status AS "Status" '
+        'FROM ProjectAndBudget ORDER BY ProjectDepartment'
     )
 
 
@@ -57,7 +60,7 @@ def create_project():
     if len(name) > 200:
         return jsonify({'error': 'Project name must be 200 characters or fewer'}), 400
     project_id = app_pkg.db.execute(
-        "INSERT INTO projects (name) OUTPUT INSERTED.id VALUES (?)",
+        "INSERT INTO projects (name) {OUTPUT_ID} VALUES (?) {RETURNING_ID}",
         (name,),
     )
     invalidate('projects:')
@@ -83,24 +86,25 @@ def get_member_project_roles(mid):
     mid = mid.strip()
     # Validate the employee exists in HR
     emp = app_pkg.db.query(
-        "SELECT EmployeeID, EmployeeName FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID, EmployeeName FROM Employee WHERE EmployeeID=?",
         (mid,), fetchone=True,
     )
     if not emp:
         return jsonify({'error': 'member not found'}), 404
 
-    # Push the membership filter into SQL via OPENJSON so we only return rows
-    # the employee actually belongs to, instead of fetching every project and
-    # filtering in Python. OPENJSON value column is always nvarchar — compare directly.
-    sql = """
+    # Push the membership filter into SQL via a lateral JSON-array expansion so
+    # we only return rows the employee actually belongs to, instead of fetching
+    # every project and filtering in Python. The expanded value column is text
+    # on both engines — compare directly.
+    sql = f"""
         SELECT id, name, 'main' AS role_type
         FROM projects
-        CROSS APPLY OPENJSON(main_members) AS j
+        {app_pkg.db.json_members('main_members')}
         WHERE main_members IS NOT NULL AND j.value = ?
         UNION ALL
         SELECT id, name, 'support' AS role_type
         FROM projects
-        CROSS APPLY OPENJSON(support_members) AS j
+        {app_pkg.db.json_members('support_members')}
         WHERE support_members IS NOT NULL AND j.value = ?
         ORDER BY name
     """
@@ -128,7 +132,7 @@ def _modify_project_member(pid, employee_id, role_type, action):
 
     # Validate Employee exists
     emp = app_pkg.db.query(
-        "SELECT EmployeeID FROM dbo.Employee WHERE EmployeeID=?",
+        "SELECT EmployeeID FROM Employee WHERE EmployeeID=?",
         (employee_id,), fetchone=True,
     )
     if not emp:

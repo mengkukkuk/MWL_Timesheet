@@ -49,8 +49,9 @@ def cascade_delete_employee(db, employee_id):
     """Delete all worklogs and skills for an EmployeeID. Used when a user
     account is deleted — frees up their data so the EmployeeID can be reclaimed.
     """
-    db.execute("DELETE FROM worklogs WHERE EmployeeID=?", (employee_id,))
-    db.execute("DELETE FROM member_skills WHERE EmployeeID=?", (employee_id,))
+    with db.transaction():
+        db.execute("DELETE FROM worklogs WHERE EmployeeID=?", (employee_id,))
+        db.execute("DELETE FROM member_skills WHERE EmployeeID=?", (employee_id,))
 
 
 # Backward-compat alias for any forgotten callers

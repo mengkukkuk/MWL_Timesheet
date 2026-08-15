@@ -185,8 +185,8 @@ def get_folder_contents(fid=None):
         return jsonify({'error': 'folder not found'}), 404
 
     # Non-elevated callers must never receive classified items.
-    folder_filter = '' if elevated else ' AND is_classified = 0'
-    file_filter = '' if elevated else ' AND f.is_classified = 0'
+    folder_filter = '' if elevated else ' AND is_classified = {FALSE}'
+    file_filter = '' if elevated else ' AND f.is_classified = {FALSE}'
 
     if fid is None:
         subfolders = app_pkg.db.query(
@@ -227,7 +227,7 @@ def get_folder_contents(fid=None):
         # walks on malformed parent chains.
         bc_rows = app_pkg.db.query(
             """
-            WITH bc AS (
+            WITH {RECURSIVE} bc AS (
                 SELECT id, name, parent_id, 0 AS lvl
                 FROM file_folders WHERE id = ?
                 UNION ALL
@@ -236,7 +236,7 @@ def get_folder_contents(fid=None):
                 JOIN bc ON f.id = bc.parent_id
             )
             SELECT id, name FROM bc ORDER BY lvl DESC
-            OPTION (MAXRECURSION 100)
+            {MAXRECURSION}
             """,
             (fid,),
         ) or []
@@ -289,7 +289,7 @@ def create_folder():
         return jsonify({'error': 'A folder with that name already exists here'}), 409
 
     new_id = app_pkg.db.execute(
-        "INSERT INTO file_folders (name, parent_id, created_by) OUTPUT INSERTED.id VALUES (?, ?, ?)",
+        "INSERT INTO file_folders (name, parent_id, created_by) {OUTPUT_ID} VALUES (?, ?, ?) {RETURNING_ID}",
         (name, parent_id, session.get('user_id')),
     )
     return jsonify({'id': new_id, 'name': name, 'parent_id': parent_id}), 201
@@ -325,7 +325,7 @@ def rename_folder(fid):
 
     # Optional classified toggle (elevated-only, enforced by the decorator).
     if 'is_classified' in data:
-        classified = 1 if data.get('is_classified') else 0
+        classified = True if data.get('is_classified') else False
         app_pkg.db.execute(
             "UPDATE file_folders SET name=?, is_classified=? WHERE id=?",
             (name, classified, fid),
@@ -503,8 +503,9 @@ def upload_file():
     new_id = app_pkg.db.execute(
         """INSERT INTO files (folder_id, original_name, stored_name, size_bytes, mime_type,
                               sha256, uploaded_by)
-           OUTPUT INSERTED.id
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           {OUTPUT_ID}
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           {RETURNING_ID}""",
         (folder_id, original, rel_path, size, mime, sha.hexdigest(), session.get('user_id')),
     )
     return jsonify({
@@ -561,7 +562,7 @@ def update_file(fid):
         return jsonify({'error': 'file not found'}), 404
 
     data = request.json or {}
-    classified = 1 if data.get('is_classified') else 0
+    classified = True if data.get('is_classified') else False
     app_pkg.db.execute("UPDATE files SET is_classified=? WHERE id=?", (classified, fid))
     return jsonify({'ok': True, 'id': fid, 'is_classified': bool(classified)})
 
@@ -602,13 +603,13 @@ def delete_folder(fid):
         return jsonify({'error': 'folder not found'}), 404
 
     child = app_pkg.db.query(
-        "SELECT TOP 1 id FROM file_folders WHERE parent_id=?", (fid,), fetchone=True
+        "SELECT {TOP1} id FROM file_folders WHERE parent_id=? {LIMIT1}", (fid,), fetchone=True
     )
     if child:
         return jsonify({'error': 'Folder is not empty (contains subfolders)'}), 409
 
     file_in = app_pkg.db.query(
-        "SELECT TOP 1 id FROM files WHERE folder_id=?", (fid,), fetchone=True
+        "SELECT {TOP1} id FROM files WHERE folder_id=? {LIMIT1}", (fid,), fetchone=True
     )
     if file_in:
         return jsonify({'error': 'Folder is not empty (contains files)'}), 409
@@ -884,9 +885,14 @@ def recent_uploads():
     limit = max(1, min(limit, 100))
 
     elevated = _is_elevated()
-    classified_filter = '' if elevated else ' WHERE f.is_classified = 0'
+    classified_filter = '' if elevated else ' WHERE f.is_classified = {FALSE}'
+    # No token exists for a variable-N row limit (only the literal-1 TOP1/LIMIT1
+    # pair), so branch manually — `limit` is clamped to 1..100 above, safe to
+    # interpolate.
+    top_clause = f'TOP {limit}' if not app_pkg.db.IS_POSTGRES else ''
+    limit_clause = f'LIMIT {limit}' if app_pkg.db.IS_POSTGRES else ''
     rows = app_pkg.db.query(
-        f"""SELECT TOP {limit} f.id, f.original_name, f.size_bytes, f.mime_type,
+        f"""SELECT {top_clause} f.id, f.original_name, f.size_bytes, f.mime_type,
                    f.uploaded_at, f.uploaded_by, f.folder_id, f.is_classified,
                    COALESCE(m.name, u.username) AS uploaded_by_name,
                    ff.name AS folder_name
@@ -894,7 +900,8 @@ def recent_uploads():
             LEFT JOIN users u ON f.uploaded_by = u.id
             LEFT JOIN members m ON u.member_id = m.id
             LEFT JOIN file_folders ff ON f.folder_id = ff.id{classified_filter}
-            ORDER BY f.uploaded_at DESC"""
+            ORDER BY f.uploaded_at DESC
+            {limit_clause}"""
     ) or []
     # Also exclude files that sit under a classified folder (row itself not flagged).
     if not elevated:

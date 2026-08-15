@@ -15,10 +15,8 @@ import pytest
 
 from app.helpers import format_member_ids, parse_member_ids, parse_time
 import app as app_module
-import db
 
 _is_same_origin = app_module._is_same_origin
-_rstrip_params   = db._rstrip_params
 
 
 # ---------------------------------------------------------------------------
@@ -135,21 +133,21 @@ class TestIsSameOriginPerformance:
 # ---------------------------------------------------------------------------
 
 class TestRstripParamsPerformance:
-    def test_typical_string_params(self):
+    def test_typical_string_params(self, db_engine):
         params = ('33546 ', 'testuser ', 'Done ')
-        mean = _mean_ms(_rstrip_params, params)
+        mean = _mean_ms(db_engine._rstrip_params, params)
         assert mean < THRESHOLD_FAST_MS, f"mean {mean:.4f} ms > {THRESHOLD_FAST_MS} ms"
 
-    def test_mixed_type_params(self):
+    def test_mixed_type_params(self, db_engine):
         params = ('33546 ', 1, None, 3.14, 'text ')
-        mean = _mean_ms(_rstrip_params, params)
+        mean = _mean_ms(db_engine._rstrip_params, params)
         assert mean < THRESHOLD_FAST_MS, f"mean {mean:.4f} ms > {THRESHOLD_FAST_MS} ms"
 
-    def test_empty_params(self):
-        mean = _mean_ms(_rstrip_params, ())
+    def test_empty_params(self, db_engine):
+        mean = _mean_ms(db_engine._rstrip_params, ())
         assert mean < THRESHOLD_FAST_MS, f"mean {mean:.4f} ms > {THRESHOLD_FAST_MS} ms"
 
-    def test_large_params_tuple(self):
+    def test_large_params_tuple(self, db_engine):
         params = tuple(f'value{i}  ' for i in range(50))
-        mean = _mean_ms(_rstrip_params, params)
+        mean = _mean_ms(db_engine._rstrip_params, params)
         assert mean < THRESHOLD_FAST_MS, f"mean {mean:.4f} ms > {THRESHOLD_FAST_MS} ms"

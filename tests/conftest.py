@@ -1,3 +1,4 @@
+import importlib
 import os
 import sys
 
@@ -11,9 +12,45 @@ import pytest
 import app as app_pkg
 from app import app as flask_app
 
+import db
+
+# db.py only registers the PostgreSQL client DLL directory when DB_ENGINE=postgres
+# at its own import time (see db.py's `if IS_POSTGRES:` block). The test suite's
+# `db_engine` fixture needs a bare, always-available `import psycopg2` at module
+# level in tests/test_db.py and tests/test_load.py regardless of the ambient
+# DB_ENGINE, so the same registration is done here unconditionally. db.py's own
+# load_dotenv() call (unconditional, at its top) has already populated PG_BIN_DIR
+# into os.environ by the time this runs, since `import db` above executed it.
+_pg_bin = os.getenv('PG_BIN_DIR', '').strip()
+if _pg_bin and hasattr(os, 'add_dll_directory') and os.path.isdir(_pg_bin):
+    os.add_dll_directory(_pg_bin)
+
 # The Origin header value that matches Flask test client's default host,
 # so the CSRF before_request hook passes on every POST in tests.
 ORIGIN = 'http://localhost/'
+
+
+@pytest.fixture(params=['mssql', 'postgres'])
+def db_engine(request, monkeypatch):
+    """Re-execute db.py under each engine so its module-level ENGINE /
+    IS_POSTGRES / Error / OperationalError / InterfaceError bindings (and the
+    conditional `import psycopg2` / `import pyodbc`) reflect the parametrized
+    engine for the duration of one test.
+
+    `importlib.reload` mutates the *existing* db module object in place
+    rather than creating a new one, so every other module's `import db`
+    (a module reference, not `from db import X`) sees the change too — no
+    need to re-import anywhere else.
+    """
+    monkeypatch.setenv('DB_ENGINE', request.param)
+    importlib.reload(db)
+    try:
+        yield db
+    finally:
+        # Undo the env var first so the restoring reload below picks up
+        # whatever DB_ENGINE was set to before this fixture ran.
+        monkeypatch.undo()
+        importlib.reload(db)
 
 
 @pytest.fixture(autouse=True)
