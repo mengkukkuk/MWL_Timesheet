@@ -411,14 +411,9 @@ def _rstrip_params(params):
     other queries. Centralizing the trim here means every current and
     future INSERT/UPDATE/DELETE path is protected without having to
     audit each call site.
-
-    Non-string values (None, int, bytes, datetime, decimal, ...) are
-    passed through untouched. Returns None for an empty parameter set:
-    psycopg2 %-interpolates the whole statement when handed an empty tuple,
-    which breaks any statement containing a literal '%'.
     """
     if not params:
-        return None
+        return None if IS_POSTGRES else ()
     return tuple(p.rstrip() if isinstance(p, str) else p for p in params)
 
 
