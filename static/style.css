@@ -307,6 +307,79 @@ body {
 .badge-pending  { background: #e5e7eb; color: #4b5563; }
 .badge-manday   { background: #e0e7ff; color: #3730a3; }
 
+/* Settings → Projects list: a fixed-column grid so Project Name / Description /
+   Department / Status line up down every row. The previous flex+justify-between
+   let each cell's own content width ripple down the column, which is what made
+   the table read as ragged/unclear. */
+.proj-table-wrap { overflow-x: auto; }
+.proj-row {
+    display: grid;
+    grid-template-columns: minmax(110px, 150px) minmax(220px, 1fr) minmax(110px, 160px) 110px;
+    column-gap: 1rem;
+    align-items: center;
+}
+.proj-row-header {
+    padding: 0.6rem 0.9rem;
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.proj-row-body {
+    padding: 0.55rem 0.9rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    transition: background 0.1s;
+}
+.proj-row-body:hover { background: #f3f4f6; }
+.proj-col-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    color: #374151;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.proj-col-desc {
+    color: #1f2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: help;
+}
+.proj-col-dept { overflow: hidden; }
+
+/* Department pill — hollow/outline treatment (transparent fill, blue ring)
+   so it reads as a lightweight tag rather than competing with the solid
+   Status badge in the next column. */
+.badge-dept {
+    background: transparent;
+    border: 1px solid #93c5fd;
+    color: #2563eb;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    box-sizing: border-box;
+}
+.proj-col-status { text-align: left; }
+
+/* Project status badges — Status is free text from the external
+   ProjectAndBudget table, so unrecognized values fall back to badge-proj-default
+   rather than rendering unstyled. */
+.badge-proj-initiative { background: #ffedd5; color: #9a3412; }
+.badge-proj-exclusive  { background: #ede9fe; color: #5b21b6; }
+.badge-proj-monitoring { background: #dbeafe; color: #1e40af; }
+.badge-proj-execute    { background: #d1fae5; color: #065f46; }
+.badge-proj-warranty   { background: #cffafe; color: #155e75; }
+.badge-proj-hold       { background: #fef3c7; color: #92400e; }
+.badge-proj-closed,
+.badge-proj-default    { background: #e5e7eb; color: #4b5563; }
+
 /* Modal */
 .modal-overlay {
     position: fixed;

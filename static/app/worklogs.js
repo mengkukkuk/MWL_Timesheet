@@ -758,18 +758,53 @@ function loadProjectsList() {
     ul.innerHTML = '';
     pdes.forEach(p => {
         const li = document.createElement('li');
-        li.className = 'flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-50';
-        li.innerHTML = `
-            <span class="text-sm">${esc(p.Projectcode)}</span>
-            <span class="text-sm">${esc(p.Description)}</span>
-            <span class="text-sm">${esc(p.ProjectDepartment)}</span>
-            <span class="text-sm">${esc(p.Status)}</span>
-            <!-- <button class="btn-icon danger" onclick="deleteProject(${p.id})" title="Remove">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button> -->
-        `;
+        li.className = 'proj-row proj-row-body';
+
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'proj-col-code';
+        codeSpan.textContent = p.Projectcode || '';
+        codeSpan.title = p.Projectcode || '';
+
+        const descSpan = document.createElement('span');
+        descSpan.className = 'proj-col-desc';
+        descSpan.textContent = p.Description || '';
+        descSpan.title = p.Description || '';
+
+        // Add department badge Status statusWrap
+        const statusWrap = document.createElement('span');
+        statusWrap.className = 'proj-col-dept';
+        if (p.Status) {
+            const statusBadge = document.createElement('span');
+            statusBadge.className = 'badge badge-dept';
+            statusBadge.textContent = p.Status;
+            statusBadge.title = p.Status;
+            statusWrap.appendChild(statusBadge);
+        }
+
+        // Add status badge ProjectDepartment deptWrap
+        const deptWrap = document.createElement('span');
+        deptWrap.className = 'proj-col-status';
+        const badge = document.createElement('span');
+        badge.className = `badge ${_projStatusBadgeClass(p.ProjectDepartment)}`;
+        badge.textContent = p.ProjectDepartment || '';
+        deptWrap.appendChild(badge);
+
+        li.append(codeSpan, descSpan, statusWrap, deptWrap);
         ul.appendChild(li);
     });
+}
+
+function _projStatusBadgeClass(status) {
+    const map = {
+        initiative: 'badge-proj-initiative',
+        exclusive:  'badge-proj-exclusive',
+        monitoring: 'badge-proj-monitoring',
+        execute:    'badge-proj-execute',
+        warranty:   'badge-proj-warranty',
+        hold:       'badge-proj-hold',
+        closed:     'badge-proj-closed',
+    };
+    return map[String(status || '').trim().toLowerCase()] || 'badge-proj-default';
 }
 
 async function addProject() {
