@@ -683,10 +683,10 @@
                         <div class="proj-table-wrap">
                             <ul id="projects-header" class="space-y-2">
                                 <li class="proj-row proj-row-header">
-                                    <span data-i18n="set.project_name">Project Name</span>
-                                    <span data-i18n="set.description">Description</span>
-                                    <span data-i18n="set.status">Status</span>
-                                    <span data-i18n="set.department">Department</span>
+                                    <span class="proj-sort-btn" onclick="sortProjects('code')"><span data-i18n="set.project_name">Project Name</span><span class="sort-arrow" data-sort-field="code"></span></span>
+                                    <span class="proj-sort-btn" onclick="sortProjects('desc')"><span data-i18n="set.description">Description</span><span class="sort-arrow" data-sort-field="desc"></span></span>
+                                    <span class="proj-sort-btn" onclick="sortProjects('status')"><span data-i18n="set.status">Status</span><span class="sort-arrow" data-sort-field="status"></span></span>
+                                    <span class="proj-sort-btn" onclick="sortProjects('dept')"><span data-i18n="set.department">Department</span><span class="sort-arrow" data-sort-field="dept"></span></span>
                                 </li>
                             </ul>
                             <ul id="projects-list" class="space-y-2"></ul>

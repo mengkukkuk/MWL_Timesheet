@@ -794,6 +794,32 @@ function populateProjectsFilterDept() {
     sel.value = val;
 }
 
+const PROJECTS_SORT_FIELD_MAP = {
+    code: 'Projectcode',
+    desc: 'Description',
+    status: 'Status',
+    dept: 'ProjectDepartment',
+};
+let projectsSortState = { field: null, dir: 'asc' };
+
+function sortProjects(field) {
+    if (projectsSortState.field === field) {
+        projectsSortState.dir = projectsSortState.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        projectsSortState.field = field;
+        projectsSortState.dir = 'asc';
+    }
+    applyProjectsFilter();
+}
+
+function updateProjectsSortHeaderUI() {
+    document.querySelectorAll('.sort-arrow').forEach(el => {
+        const isActive = el.dataset.sortField === projectsSortState.field;
+        el.classList.toggle('active', isActive);
+        el.textContent = isActive ? (projectsSortState.dir === 'asc' ? '▲' : '▼') : '↕';
+    });
+}
+
 function applyProjectsFilter() {
     const searchEl = document.getElementById('projects-filter-search');
     const statusEl = document.getElementById('projects-filter-status');
@@ -812,6 +838,17 @@ function applyProjectsFilter() {
         return true;
     });
 
+    if (projectsSortState.field) {
+        const key = PROJECTS_SORT_FIELD_MAP[projectsSortState.field];
+        const dir = projectsSortState.dir === 'asc' ? 1 : -1;
+        filtered.sort((a, b) => {
+            const av = (a[key] || '').trim();
+            const bv = (b[key] || '').trim();
+            return dir * av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' });
+        });
+    }
+
+    updateProjectsSortHeaderUI();
     renderProjectsRows(filtered);
 }
 
