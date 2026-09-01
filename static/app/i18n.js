@@ -187,12 +187,17 @@ const _i18n = {
         'set.refresh': 'Refresh',
         'set.accept': 'Accept',
         'set.decline': 'Decline',
+        'set.project_name': 'Project Name',
+        'set.description': 'Description',
+        'set.department': 'Department',
+        'set.status': 'Status',
         'set.wl_visibility': 'Worklog Visibility',
         'set.wl_visibility_desc': "Controls whether Staff members can view each other's worklogs.",
         'set.vis_on': "ON — All members can view each other's worklogs",
         'set.vis_on_desc': 'Staff, Leaders, and Admins can browse any member\'s worklog data.',
         'set.vis_off': 'OFF — Staff can only view their own worklogs',
         'set.vis_off_desc': 'Elevated roles (Admin, Leader) are unaffected and retain full access.',
+
 
         // Modal — worklog
         'modal.add_entry': 'Add Work Log Entry',
@@ -509,6 +514,10 @@ const _i18n = {
         'set.refresh': 'รีเฟรช',
         'set.accept': 'อนุมัติ',
         'set.decline': 'ปฏิเสธ',
+        'set.project_name': 'รหัสโปรเจกต์',
+        'set.description': 'ชื่อโปรเจกต์',
+        'set.department': 'Department',
+        'set.status': 'สถานะ',
         'set.wl_visibility': 'การมองเห็นบันทึกงาน',
         'set.wl_visibility_desc': 'ควบคุมว่าสมาชิก Staff สามารถดูบันทึกงานของกันและกันได้หรือไม่',
         'set.vis_on': 'เปิด — สมาชิกทุกคนสามารถดูบันทึกงานของกันได้',

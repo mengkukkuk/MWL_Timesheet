@@ -756,14 +756,17 @@ async function loadProjects() {
 function loadProjectsList() {
     const ul = document.getElementById('projects-list');
     ul.innerHTML = '';
-    projects.forEach(p => {
+    pdes.forEach(p => {
         const li = document.createElement('li');
         li.className = 'flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-50';
         li.innerHTML = `
-            <span class="text-sm">${esc(p.name)}</span>
-            <button class="btn-icon danger" onclick="deleteProject(${p.id})" title="Remove">
+            <span class="text-sm">${esc(p.Projectcode)}</span>
+            <span class="text-sm">${esc(p.Description)}</span>
+            <span class="text-sm">${esc(p.ProjectDepartment)}</span>
+            <span class="text-sm">${esc(p.Status)}</span>
+            <!-- <button class="btn-icon danger" onclick="deleteProject(${p.id})" title="Remove">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            </button> -->
         `;
         ul.appendChild(li);
     });
