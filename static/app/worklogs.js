@@ -754,9 +754,71 @@ async function loadProjects() {
 }
 
 function loadProjectsList() {
+    populateProjectsFilterStatus();
+    populateProjectsFilterDept();
+    applyProjectsFilter();
+}
+
+function populateProjectsFilterStatus() {
+    const sel = document.getElementById('projects-filter-status');
+    if (!sel) return;
+    const val = sel.value;
+    sel.innerHTML = `<option value="">${t('set.all_status')}</option>`;
+    const seen = new Set();
+    pdes.forEach(p => {
+        const status = (p.Status || '').trim();
+        if (status && !seen.has(status)) {
+            seen.add(status);
+            const opt = document.createElement('option');
+            opt.value = status;
+            opt.textContent = status;
+            sel.appendChild(opt);
+        }
+    });
+    sel.value = val;
+}
+
+function populateProjectsFilterDept() {
+    const sel = document.getElementById('projects-filter-dept');
+    if (!sel) return;
+    const val = sel.value;
+    sel.innerHTML = `<option value="">${t('set.all_departments')}</option>`;
+    const depts = [...new Set(pdes.map(p => (p.ProjectDepartment || '').trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+    depts.forEach(dept => {
+        const opt = document.createElement('option');
+        opt.value = dept;
+        opt.textContent = dept;
+        sel.appendChild(opt);
+    });
+    sel.value = val;
+}
+
+function applyProjectsFilter() {
+    const searchEl = document.getElementById('projects-filter-search');
+    const statusEl = document.getElementById('projects-filter-status');
+    const deptEl = document.getElementById('projects-filter-dept');
+    const search = searchEl ? searchEl.value.toLowerCase().trim() : '';
+    const status = statusEl ? statusEl.value : '';
+    const dept = deptEl ? deptEl.value : '';
+
+    const filtered = pdes.filter(p => {
+        if (status && (p.Status || '').trim() !== status) return false;
+        if (dept && (p.ProjectDepartment || '').trim() !== dept) return false;
+        if (search) {
+            const hay = `${p.Projectcode || ''} ${p.Description || ''}`.toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    renderProjectsRows(filtered);
+}
+
+function renderProjectsRows(list) {
     const ul = document.getElementById('projects-list');
     ul.innerHTML = '';
-    pdes.forEach(p => {
+    list.forEach(p => {
         const li = document.createElement('li');
         li.className = 'proj-row proj-row-body';
 

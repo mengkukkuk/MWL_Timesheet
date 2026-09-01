@@ -667,8 +667,18 @@
                     <div id="settings-panel-projects" class="settings-panel card bg-white hidden">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide" data-i18n="set.projects">Projects</h3>
                         <div class="flex gap-2 mb-4">
-                            <input id="new-project-name" placeholder="Project name" class="input-field flex-1" data-i18n-ph="set.project_name_ph">
-                            <button onclick="addProject()" class="btn-primary text-sm px-3" data-i18n="set.add">Add</button>
+                            <!--input id="new-project-name" placeholder="Project name" class="input-field flex-1" data-i18n-ph="set.project_name_ph">
+                            <button onclick="addProject()" class="btn-primary text-sm px-3" data-i18n="set.add">Add</button-->
+                        </div>
+                        <div class="flex gap-2 mb-3">
+                            <input id="projects-filter-search" type="text" placeholder="Search project code or description..."
+                                   oninput="applyProjectsFilter()" class="input-field flex-1" data-i18n-ph="set.projects_search_ph">
+                            <select id="projects-filter-status" onchange="applyProjectsFilter()" class="input-field" style="min-width:9rem;">
+                                <option value="" data-i18n="set.all_status">All Status</option>
+                            </select>
+                            <select id="projects-filter-dept" onchange="applyProjectsFilter()" class="input-field" style="min-width:9rem;">
+                                <option value="" data-i18n="set.all_departments">All Departments</option>
+                            </select>
                         </div>
                         <div class="proj-table-wrap">
                             <ul id="projects-header" class="space-y-2">
