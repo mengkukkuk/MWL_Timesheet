@@ -679,6 +679,7 @@
                             <select id="projects-filter-dept" onchange="applyProjectsFilter()" class="input-field" style="min-width:9rem;">
                                 <option value="" data-i18n="set.all_departments">All Departments</option>
                             </select>
+                            
                         </div>
                         <div class="proj-table-wrap">
                             <ul id="projects-header" class="space-y-2">
@@ -690,6 +691,18 @@
                                 </li>
                             </ul>
                             <ul id="projects-list" class="space-y-2"></ul>
+                        </div>
+                        <div id="projects-pagination" class="flex items-center justify-between mt-3 text-sm text-gray-600">
+                            <span id="projects-page-info"></span>
+                            <div class="flex gap-2">
+                                <select id="projects-page-size" onchange="changeProjectsPageSize()" class="input-field" style="min-width:7rem;">
+                                    <option value="10">10 / page</option>
+                                    <option value="20">20 / page</option>
+                                    <option value="50">50 / page</option>
+                                </select>
+                                <button onclick="changeProjectsPage(-1)" class="btn-secondary text-sm px-3" data-i18n="set.prev">Prev</button>
+                                <button onclick="changeProjectsPage(1)" class="btn-secondary text-sm px-3" data-i18n="set.next">Next</button>
+                            </div>
                         </div>
                     </div>
 

@@ -349,6 +349,7 @@ main:has(#settings-panel-projects:not(.hidden)) {
     min-width: 0.7rem;
 }
 .sort-arrow.active { opacity: 1; color: #2563eb; }
+#projects-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
 .proj-row-body {
     padding: 0.55rem 0.9rem;
     background: #f9fafb;

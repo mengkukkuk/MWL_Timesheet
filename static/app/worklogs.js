@@ -849,7 +849,50 @@ function applyProjectsFilter() {
     }
 
     updateProjectsSortHeaderUI();
-    renderProjectsRows(filtered);
+    projectsFilteredList = filtered;
+    projectsCurrentPage = 1;
+    renderProjectsPage();
+}
+
+let projectsFilteredList = [];
+let projectsCurrentPage = 1;
+let projectsPageSize = 10;
+
+function changeProjectsPageSize() {
+    const sel = document.getElementById('projects-page-size');
+    projectsPageSize = sel ? parseInt(sel.value, 10) || 10 : 10;
+    projectsCurrentPage = 1;
+    renderProjectsPage();
+}
+
+function changeProjectsPage(delta) {
+    const totalPages = Math.max(1, Math.ceil(projectsFilteredList.length / projectsPageSize));
+    const next = projectsCurrentPage + delta;
+    if (next < 1 || next > totalPages) return;
+    projectsCurrentPage = next;
+    renderProjectsPage();
+}
+
+function renderProjectsPage() {
+    const total = projectsFilteredList.length;
+    const totalPages = Math.max(1, Math.ceil(total / projectsPageSize));
+    if (projectsCurrentPage > totalPages) projectsCurrentPage = totalPages;
+
+    const start = (projectsCurrentPage - 1) * projectsPageSize;
+    const pageItems = projectsFilteredList.slice(start, start + projectsPageSize);
+
+    const infoEl = document.getElementById('projects-page-info');
+    if (infoEl) {
+        infoEl.textContent = t('set.page_info', total === 0 ? 0 : start + 1, Math.min(start + projectsPageSize, total), total);
+    }
+
+    const pagerButtons = document.querySelectorAll('#projects-pagination button');
+    if (pagerButtons.length === 2) {
+        pagerButtons[0].disabled = projectsCurrentPage <= 1;
+        pagerButtons[1].disabled = projectsCurrentPage >= totalPages;
+    }
+
+    renderProjectsRows(pageItems);
 }
 
 function renderProjectsRows(list) {
