@@ -31,7 +31,7 @@ def _load_projects():
 def _load_projects_description():
     return app_pkg.db.query(
         "SELECT Projectcode, Description, ProjectDepartment,Status " 
-        "FROM ProjectAndBudget ORDER BY Projectcode, Status"
+        "FROM ProjectAndBudget ORDER BY Projectcode"
     )
 
 

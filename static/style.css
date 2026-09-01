@@ -379,13 +379,13 @@ main:has(#settings-panel-projects:not(.hidden)) {
 /* Project status badges — Status is free text from the external
    ProjectAndBudget table, so unrecognized values fall back to badge-proj-default
    rather than rendering unstyled. */
-.badge-proj-initiative { background: #ffedd5; color: #9a3412; }
+.badge-proj-initiative { background: #ffedd5; color: #3bd443; }
 .badge-proj-exclusive  { background: #ede9fe; color: #5b21b6; }
 .badge-proj-monitoring { background: #dbeafe; color: #1e40af; }
 .badge-proj-execute    { background: #d1fae5; color: #065f46; }
 .badge-proj-warranty   { background: #cffafe; color: #155e75; }
 .badge-proj-hold       { background: #fef3c7; color: #92400e; }
-.badge-proj-closed,
+.badge-proj-closed     { background: #faf1cd; color: #f00606; }
 .badge-proj-default    { background: #e5e7eb; color: #4b5563; }
 
 /* Modal */

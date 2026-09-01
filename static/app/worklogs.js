@@ -770,24 +770,22 @@ function loadProjectsList() {
         descSpan.textContent = p.Description || '';
         descSpan.title = p.Description || '';
 
-        // Add department badge Status statusWrap
-        const statusWrap = document.createElement('span');
-        statusWrap.className = 'proj-col-dept';
-        if (p.Status) {
-            const statusBadge = document.createElement('span');
-            statusBadge.className = 'badge badge-dept';
-            statusBadge.textContent = p.Status;
-            statusBadge.title = p.Status;
-            statusWrap.appendChild(statusBadge);
-        }
-
-        // Add status badge ProjectDepartment deptWrap
         const deptWrap = document.createElement('span');
-        deptWrap.className = 'proj-col-status';
+        deptWrap.className = 'proj-col-dept';
+        if (p.ProjectDepartment) {
+            const deptBadge = document.createElement('span');
+            deptBadge.className = 'badge badge-dept';
+            deptBadge.textContent = p.ProjectDepartment;
+            deptBadge.title = p.ProjectDepartment;
+            deptWrap.appendChild(deptBadge);
+        }
+        
+        const statusWrap = document.createElement('span');
+        statusWrap.className = 'proj-col-status';
         const badge = document.createElement('span');
-        badge.className = `badge ${_projStatusBadgeClass(p.ProjectDepartment)}`;
-        badge.textContent = p.ProjectDepartment || '';
-        deptWrap.appendChild(badge);
+        badge.className = `badge ${_projStatusBadgeClass(p.Status)}`;
+        badge.textContent = p.Status || '';
+        statusWrap.appendChild(badge);
 
         li.append(codeSpan, descSpan, statusWrap, deptWrap);
         ul.appendChild(li);
